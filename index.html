@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.5</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.6</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -604,6 +604,14 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
       <!-- VACACIONES Y HORAS EXTRAS -->
       <div class="tabpanel" id="tab-vacaciones">
+        <div class="card" style="margin-bottom:14px;">
+          <h3>Empleados</h3>
+          <p class="hint" style="margin-bottom:10px;">Misma lista que en Configuración → Empleados — añadir aquí también los añade allí.</p>
+          <div class="subfilter" style="margin-bottom:0;">
+            <input type="text" id="vacEmpNuevoNombre" placeholder="Nombre del empleado" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="vacEmpNuevoBtn" style="padding:5px 10px;font-size:12px;">+ Añadir empleado</button>
+          </div>
+        </div>
         <h3 style="margin-bottom:10px;">Vacaciones</h3>
         <div class="card" style="margin-bottom:14px;">
           <p class="hint" style="margin-bottom:10px;">Marca un <b>valor de referencia</b> ("a esta fecha, tenía X días disponibles") y la app suma sola <b>2.5 días por cada mes completo</b> trabajado desde entonces. Cuando el empleado usa vacaciones, añade una entrada de tipo "Usada" para restarlo del saldo.</p>
@@ -639,12 +647,12 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <div class="section-title">Total por empleado</div>
         <div class="card" style="margin-bottom:14px;">
-          <table id="tablaHxTotal"><thead><tr><th>Empleado</th><th>Horas extras totales</th></tr></thead><tbody></tbody></table>
+          <table id="tablaHxTotal"><thead><tr><th>Empleado</th><th>Total horas</th><th>Pagadas</th><th>Pendientes de pago</th></tr></thead><tbody></tbody></table>
         </div>
         <div class="section-title">Histórico de horas extras</div>
         <div class="card">
           <div style="max-height:320px;overflow:auto;">
-            <table id="tablaHxHistorico"><thead><tr><th>Fecha</th><th>Empleado</th><th>Horas</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
+            <table id="tablaHxHistorico"><thead><tr><th>Fecha</th><th>Empleado</th><th>Horas</th><th>Nota</th><th>Pago</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </div>
@@ -3551,11 +3559,25 @@ async function loadAndRenderVacaciones(){
   }catch(e){ toast('No se pudo cargar vacaciones: '+e.message, true); STATE.vacaciones=[]; }
   try{
     const rowsH = await sbList('horas_extras', 'select=*&order=fecha.desc');
-    STATE.horasExtras = rowsH.map(r=>({ id:r.id, empleado:r.empleado, fecha:r.fecha, horas:parseFloat(r.horas), nota:r.nota }));
+    STATE.horasExtras = rowsH.map(r=>({ id:r.id, empleado:r.empleado, fecha:r.fecha, horas:parseFloat(r.horas), nota:r.nota, pagada:!!r.pagada }));
   }catch(e){ toast('No se pudo cargar horas extras: '+e.message, true); STATE.horasExtras=[]; }
   renderVacaciones();
   renderHorasExtras();
 }
+document.getElementById('vacEmpNuevoBtn').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('vacEmpNuevoNombre').value.trim();
+  if(!nombre){ toast('Escribe un nombre.', true); return; }
+  try{
+    const saved = await sbInsert('empleados', { nombre, activo:true });
+    STATE.employees.push({ id:saved.id, nombre:saved.nombre, activo:saved.activo });
+    document.getElementById('vacEmpNuevoNombre').value='';
+    poblarSelectEmpleados('vacEmpleado');
+    poblarSelectEmpleados('hxEmpleado');
+    document.getElementById('vacEmpleado').value = nombre;
+    renderEmpleados();
+    toast('Empleado añadido.');
+  }catch(e){ toast('Error: '+e.message, true); }
+});
 /* meses completos transcurridos entre dos fechas (para la acumulación de 2.5 días/mes) */
 function mesesCompletosEntre(fechaInicio, fechaFin){
   const d1 = new Date(fechaInicio+'T00:00:00');
@@ -3607,14 +3629,36 @@ function renderHorasExtras(){
   const tbodyTotal = document.querySelector('#tablaHxTotal tbody');
   if(!tbodyTotal) return;
   const porEmpleado = {};
-  STATE.horasExtras.forEach(h=>{ porEmpleado[h.empleado] = (porEmpleado[h.empleado]||0) + h.horas; });
+  STATE.horasExtras.forEach(h=>{
+    if(!porEmpleado[h.empleado]) porEmpleado[h.empleado] = { total:0, pagadas:0, pendientes:0 };
+    porEmpleado[h.empleado].total += h.horas;
+    if(h.pagada) porEmpleado[h.empleado].pagadas += h.horas;
+    else porEmpleado[h.empleado].pendientes += h.horas;
+  });
   const nombres = Object.keys(porEmpleado).sort();
-  tbodyTotal.innerHTML = nombres.map(n=>`<tr><td>${n}</td><td class="num">${porEmpleado[n]}</td></tr>`).join('') || '<tr><td colspan="2" class="hint">Sin registros todavía.</td></tr>';
+  tbodyTotal.innerHTML = nombres.map(n=>{
+    const d = porEmpleado[n];
+    return `<tr><td>${n}</td><td class="num">${d.total}</td><td class="num" style="color:var(--positive)">${d.pagadas}</td><td class="num" style="color:${d.pendientes>0?'var(--negative)':'var(--text)'}"><b>${d.pendientes}</b></td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="hint">Sin registros todavía.</td></tr>';
 
   document.querySelector('#tablaHxHistorico tbody').innerHTML = STATE.horasExtras.map(h=>`
     <tr><td>${h.fecha}</td><td>${h.empleado}</td><td class="num">${h.horas}</td><td class="hint">${h.nota||''}</td>
+    <td><button class="btn ${h.pagada?'secondary':'danger'}" data-toggle-pagada="${h.id}" style="padding:3px 10px;font-size:11px;">${h.pagada?'✓ Pagada':'Sin pagar'}</button></td>
     <td><button class="btn danger" data-del-hx="${h.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="5" class="hint">Sin registros todavía.</td></tr>';
+  `).join('') || '<tr><td colspan="6" class="hint">Sin registros todavía.</td></tr>';
+  document.querySelectorAll('[data-toggle-pagada]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-toggle-pagada');
+      const h = STATE.horasExtras.find(x=>x.id===id);
+      if(!h) return;
+      const nuevoEstado = !h.pagada;
+      try{
+        await sbUpdate('horas_extras', id, { pagada: nuevoEstado });
+        h.pagada = nuevoEstado;
+        renderHorasExtras();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
   document.querySelectorAll('[data-del-hx]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar este registro de horas extras?')) return;
@@ -3647,8 +3691,8 @@ document.getElementById('hxAddBtn').addEventListener('click', async ()=>{
   const nota = document.getElementById('hxNota').value.trim();
   if(!empleado || !fecha || isNaN(horas)){ toast('Rellena empleado, fecha y horas.', true); return; }
   try{
-    const saved = await sbInsert('horas_extras', { empleado, fecha, horas, nota: nota||null });
-    STATE.horasExtras.unshift({ id:saved.id, empleado:saved.empleado, fecha:saved.fecha, horas:parseFloat(saved.horas), nota:saved.nota });
+    const saved = await sbInsert('horas_extras', { empleado, fecha, horas, nota: nota||null, pagada:false });
+    STATE.horasExtras.unshift({ id:saved.id, empleado:saved.empleado, fecha:saved.fecha, horas:parseFloat(saved.horas), nota:saved.nota, pagada:false });
     document.getElementById('hxHoras').value=''; document.getElementById('hxNota').value='';
     renderHorasExtras();
     toast('Guardado.');
