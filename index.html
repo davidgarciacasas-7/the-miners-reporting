@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.6</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.7</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -200,6 +200,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="nav-item" data-tab="rendimiento"><span class="dot"></span>Rendimiento operacional</div>
     <div class="nav-item" data-tab="resumenejecutivo"><span class="dot"></span>Resumen Ejecutivo</div>
     <div class="nav-item" data-tab="vacaciones"><span class="dot"></span>Vacaciones y horas extras</div>
+    <div class="nav-item" data-tab="facturas"><span class="dot"></span>Facturas</div>
     <div class="nav-item" data-tab="historico"><span class="dot"></span>Subir datos</div>
     <div class="nav-item" data-tab="config"><span class="dot"></span>Configuración</div>
   </div>
@@ -653,6 +654,76 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card">
           <div style="max-height:320px;overflow:auto;">
             <table id="tablaHxHistorico"><thead><tr><th>Fecha</th><th>Empleado</th><th>Horas</th><th>Nota</th><th>Pago</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- FACTURAS -->
+      <div class="tabpanel" id="tab-facturas">
+        <div class="grid two">
+          <div class="card">
+            <h3>Mi empresa (emisor)</h3>
+            <p class="hint" style="margin-bottom:8px;">Estos datos se guardan y se reutilizan en cada factura nueva.</p>
+            <div class="config-field"><label>Nombre / razón social</label><input type="text" id="facEmisorNombre"></div>
+            <div class="config-field"><label>CIF/NIF</label><input type="text" id="facEmisorCif"></div>
+            <div class="config-field"><label>Dirección</label><input type="text" id="facEmisorDireccion"></div>
+            <div class="config-field"><label>Email</label><input type="text" id="facEmisorEmail"></div>
+            <div class="config-field"><label>Teléfono</label><input type="text" id="facEmisorTelefono"></div>
+            <button class="btn secondary" id="facEmisorGuardarBtn">Guardar datos de empresa</button>
+          </div>
+          <div class="card">
+            <h3>Cuentas bancarias</h3>
+            <p class="hint" style="margin-bottom:8px;">Para elegir a cuál se debe pagar en cada factura.</p>
+            <div class="subfilter">
+              <input type="text" id="facBancoNombre" placeholder="Nombre (ej. BBVA)" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+              <input type="text" id="facBancoIban" placeholder="IBAN" style="flex:1.5;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+              <button class="btn secondary" id="facBancoAddBtn" style="padding:5px 10px;font-size:12px;">Añadir</button>
+            </div>
+            <div style="max-height:160px;overflow:auto;margin-top:10px;">
+              <table id="tablaBancos"><thead><tr><th>Nombre</th><th>IBAN</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">Clientes</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="subfilter">
+            <input type="text" id="facClienteNombre" placeholder="Nombre / razón social" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <input type="text" id="facClienteCif" placeholder="CIF/NIF" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <input type="text" id="facClienteDireccion" placeholder="Dirección" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <input type="text" id="facClienteEmail" placeholder="Email (opcional)" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="facClienteAddBtn" style="padding:5px 10px;font-size:12px;">Añadir cliente</button>
+          </div>
+          <div style="max-height:180px;overflow:auto;margin-top:10px;">
+            <table id="tablaClientes"><thead><tr><th>Nombre</th><th>CIF</th><th>Dirección</th><th>Email</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div class="section-title">Nueva factura</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="grid two">
+            <div class="config-field"><label>Número</label><input type="text" id="facNumero"></div>
+            <div class="config-field"><label>Fecha</label><input type="date" id="facFecha"></div>
+          </div>
+          <div class="config-field"><label>Cliente</label><select id="facCliente"></select></div>
+          <div class="config-field"><label>Concepto</label><input type="text" id="facConcepto" placeholder="Descripción de lo facturado"></div>
+          <div class="grid two">
+            <div class="config-field"><label>Importe sin IVA (€)</label><input type="number" step="0.01" id="facImporteBase"></div>
+            <div class="config-field"><label>IVA</label>
+              <select id="facIva"><option value="21">21%</option><option value="10">10%</option><option value="4">4%</option><option value="0">0%</option></select>
+            </div>
+          </div>
+          <div class="config-field"><label>Cuenta bancaria (a la que se debe pagar)</label><select id="facCuentaBancaria"></select></div>
+          <div class="config-field"><label>Nota (opcional)</label><input type="text" id="facNota"></div>
+          <p class="hint" id="facResumen" style="margin:10px 0;font-size:14px;"></p>
+          <button class="btn" id="facGuardarBtn">Guardar factura y descargar PDF</button>
+          <p class="hint" id="facStatus" style="margin-top:8px;"></p>
+        </div>
+
+        <div class="section-title">Histórico de facturas</div>
+        <div class="card">
+          <div style="max-height:400px;overflow:auto;">
+            <table id="tablaFacturas"><thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th>Base</th><th>IVA</th><th>Total</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </div>
@@ -1618,7 +1689,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], mermas:['Mermas','Registro de mermas de los empleados'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
+    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], mermas:['Mermas','Registro de mermas de los empleados'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
     document.getElementById('pageTitle').textContent = titles[item.dataset.tab][0];
     document.getElementById('pageSub').textContent = titles[item.dataset.tab][1];
     const TABS_CON_FILTRO_GLOBAL = new Set(['ventas','tickets','productos','clientes']);
@@ -1656,6 +1727,10 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     }
     if(item.dataset.tab==='clientes') renderClientesTendencia();
     if(item.dataset.tab==='productos') renderCategoriaGrupos();
+    if(item.dataset.tab==='facturas'){
+      if(STATE.facturas.length===0 && !STATE.empresaEmisora) loadAndRenderFacturas();
+      else { renderFacEmisorForm(); renderFacBancos(); renderFacClientes(); renderFacturasHistorico(); if(!document.getElementById('facNumero').value) sugerirNumeroFactura(); }
+    }
   });
 });
 
@@ -3698,6 +3773,295 @@ document.getElementById('hxAddBtn').addEventListener('click', async ()=>{
     toast('Guardado.');
   }catch(e){ toast('Error: '+e.message, true); }
 });
+
+/* =========================================================
+   FACTURAS
+   ========================================================= */
+STATE.empresaEmisora = null;
+STATE.cuentasBancarias = [];
+STATE.clientesFacturacion = [];
+STATE.facturas = [];
+async function loadAndRenderFacturas(){
+  try{
+    const rows = await sbList('empresa_emisora', 'select=*&order=updated_at.desc&limit=1');
+    STATE.empresaEmisora = rows[0] ? { id:rows[0].id, nombre:rows[0].nombre, cif:rows[0].cif, direccion:rows[0].direccion, email:rows[0].email, telefono:rows[0].telefono } : null;
+  }catch(e){ toast('No se pudo cargar la empresa emisora: '+e.message, true); }
+  try{
+    const rows = await sbList('cuentas_bancarias', 'select=*&order=created_at.asc');
+    STATE.cuentasBancarias = rows.map(r=>({ id:r.id, nombre:r.nombre_cuenta, iban:r.iban }));
+  }catch(e){ toast('No se pudo cargar las cuentas bancarias: '+e.message, true); }
+  try{
+    const rows = await sbList('clientes_facturacion', 'select=*&order=nombre.asc');
+    STATE.clientesFacturacion = rows.map(r=>({ id:r.id, nombre:r.nombre, cif:r.cif, direccion:r.direccion, email:r.email, telefono:r.telefono }));
+  }catch(e){ toast('No se pudo cargar los clientes: '+e.message, true); }
+  try{
+    const rows = await sbList('facturas', 'select=*&order=fecha.desc,numero.desc');
+    STATE.facturas = rows.map(r=>({
+      id:r.id, numero:r.numero, fecha:r.fecha, concepto:r.concepto,
+      emisorNombre:r.emisor_nombre, emisorCif:r.emisor_cif, emisorDireccion:r.emisor_direccion, emisorEmail:r.emisor_email, emisorTelefono:r.emisor_telefono,
+      bancoNombre:r.banco_nombre, bancoIban:r.banco_iban,
+      clienteNombre:r.cliente_nombre, clienteCif:r.cliente_cif, clienteDireccion:r.cliente_direccion, clienteEmail:r.cliente_email, clienteTelefono:r.cliente_telefono,
+      importeBase:parseFloat(r.importe_base), ivaPorcentaje:parseFloat(r.iva_porcentaje), ivaImporte:parseFloat(r.iva_importe), total:parseFloat(r.total), nota:r.nota
+    }));
+  }catch(e){ toast('No se pudo cargar el histórico de facturas: '+e.message, true); }
+  renderFacEmisorForm();
+  renderFacBancos();
+  renderFacClientes();
+  renderFacturasHistorico();
+  sugerirNumeroFactura();
+}
+function renderFacEmisorForm(){
+  const e = STATE.empresaEmisora || {};
+  document.getElementById('facEmisorNombre').value = e.nombre||'';
+  document.getElementById('facEmisorCif').value = e.cif||'';
+  document.getElementById('facEmisorDireccion').value = e.direccion||'';
+  document.getElementById('facEmisorEmail').value = e.email||'';
+  document.getElementById('facEmisorTelefono').value = e.telefono||'';
+}
+document.getElementById('facEmisorGuardarBtn').addEventListener('click', async ()=>{
+  const datos = {
+    nombre: document.getElementById('facEmisorNombre').value.trim(),
+    cif: document.getElementById('facEmisorCif').value.trim(),
+    direccion: document.getElementById('facEmisorDireccion').value.trim(),
+    email: document.getElementById('facEmisorEmail').value.trim(),
+    telefono: document.getElementById('facEmisorTelefono').value.trim(),
+  };
+  if(!datos.nombre){ toast('Pon al menos el nombre de la empresa.', true); return; }
+  try{
+    let saved;
+    if(STATE.empresaEmisora && STATE.empresaEmisora.id){
+      saved = await sbUpdate('empresa_emisora', STATE.empresaEmisora.id, datos);
+    } else {
+      saved = await sbInsert('empresa_emisora', datos);
+    }
+    STATE.empresaEmisora = { id:saved.id, ...datos };
+    toast('Datos de empresa guardados.');
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+
+function renderFacBancos(){
+  const tbody = document.querySelector('#tablaBancos tbody');
+  tbody.innerHTML = STATE.cuentasBancarias.map(b=>`
+    <tr><td>${b.nombre}</td><td class="hint">${b.iban}</td><td><button class="btn danger" data-del-banco="${b.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+  `).join('') || '<tr><td colspan="3" class="hint">Sin cuentas todavía.</td></tr>';
+  tbody.querySelectorAll('[data-del-banco]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Eliminar esta cuenta bancaria?')) return;
+      const id = btn.getAttribute('data-del-banco');
+      await sbDelete('cuentas_bancarias', id);
+      STATE.cuentasBancarias = STATE.cuentasBancarias.filter(b=>b.id!==id);
+      renderFacBancos();
+    });
+  });
+  const sel = document.getElementById('facCuentaBancaria');
+  const actual = sel.value;
+  sel.innerHTML = STATE.cuentasBancarias.map(b=>`<option value="${b.id}">${b.nombre} — ${b.iban}</option>`).join('') || '<option value="">(añade una cuenta arriba)</option>';
+  if(actual) sel.value = actual;
+}
+document.getElementById('facBancoAddBtn').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('facBancoNombre').value.trim();
+  const iban = document.getElementById('facBancoIban').value.trim();
+  if(!nombre || !iban){ toast('Rellena nombre e IBAN.', true); return; }
+  try{
+    const saved = await sbInsert('cuentas_bancarias', { nombre_cuenta:nombre, iban });
+    STATE.cuentasBancarias.push({ id:saved.id, nombre:saved.nombre_cuenta, iban:saved.iban });
+    document.getElementById('facBancoNombre').value=''; document.getElementById('facBancoIban').value='';
+    renderFacBancos();
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+
+function renderFacClientes(){
+  const tbody = document.querySelector('#tablaClientes tbody');
+  tbody.innerHTML = STATE.clientesFacturacion.map(c=>`
+    <tr><td>${c.nombre}</td><td class="hint">${c.cif||''}</td><td class="hint">${c.direccion||''}</td><td class="hint">${c.email||''}</td>
+    <td><button class="btn danger" data-del-cliente="${c.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+  `).join('') || '<tr><td colspan="5" class="hint">Sin clientes todavía.</td></tr>';
+  tbody.querySelectorAll('[data-del-cliente]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Eliminar este cliente?')) return;
+      const id = btn.getAttribute('data-del-cliente');
+      await sbDelete('clientes_facturacion', id);
+      STATE.clientesFacturacion = STATE.clientesFacturacion.filter(c=>c.id!==id);
+      renderFacClientes();
+    });
+  });
+  const sel = document.getElementById('facCliente');
+  const actual = sel.value;
+  sel.innerHTML = STATE.clientesFacturacion.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('') || '<option value="">(añade un cliente arriba)</option>';
+  if(actual) sel.value = actual;
+}
+document.getElementById('facClienteAddBtn').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('facClienteNombre').value.trim();
+  const cif = document.getElementById('facClienteCif').value.trim();
+  const direccion = document.getElementById('facClienteDireccion').value.trim();
+  const email = document.getElementById('facClienteEmail').value.trim();
+  if(!nombre){ toast('Pon al menos el nombre del cliente.', true); return; }
+  try{
+    const saved = await sbInsert('clientes_facturacion', { nombre, cif:cif||null, direccion:direccion||null, email:email||null });
+    STATE.clientesFacturacion.push({ id:saved.id, nombre:saved.nombre, cif:saved.cif, direccion:saved.direccion, email:saved.email, telefono:saved.telefono });
+    document.getElementById('facClienteNombre').value=''; document.getElementById('facClienteCif').value=''; document.getElementById('facClienteDireccion').value=''; document.getElementById('facClienteEmail').value='';
+    renderFacClientes();
+    toast('Cliente añadido.');
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+
+function sugerirNumeroFactura(){
+  const anio = new Date().getFullYear();
+  const delAnio = STATE.facturas.filter(f=>f.numero && f.numero.startsWith(anio+'-'));
+  const siguiente = delAnio.length+1;
+  document.getElementById('facNumero').value = anio+'-'+String(siguiente).padStart(3,'0');
+  document.getElementById('facFecha').value = new Date().toISOString().slice(0,10);
+}
+function actualizarResumenFactura(){
+  const base = parseFloat(document.getElementById('facImporteBase').value)||0;
+  const ivaPct = parseFloat(document.getElementById('facIva').value)||0;
+  const ivaImporte = base*ivaPct/100;
+  const total = base+ivaImporte;
+  document.getElementById('facResumen').innerHTML = `Base: <b>${eur(Math.round(base*100))}</b> &nbsp; + IVA (${ivaPct}%): <b>${eur(Math.round(ivaImporte*100))}</b> &nbsp; = Total: <b style="color:var(--copper);">${eur(Math.round(total*100))}</b>`;
+}
+['facImporteBase','facIva'].forEach(id=>document.getElementById(id).addEventListener('input', actualizarResumenFactura));
+
+function generarFacturaPDF(f){
+  if(!window.jspdf){ toast('No se pudo cargar la librería de PDF.', true); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  let y = margin;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(20,20,20);
+  doc.text(f.emisorNombre||'', margin, y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(90,90,90);
+  y += 6;
+  if(f.emisorCif){ doc.text('CIF/NIF: '+f.emisorCif, margin, y); y += 4.5; }
+  if(f.emisorDireccion){ doc.text(f.emisorDireccion, margin, y); y += 4.5; }
+  if(f.emisorEmail || f.emisorTelefono){ doc.text([f.emisorEmail,f.emisorTelefono].filter(Boolean).join(' · '), margin, y); y += 4.5; }
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(20,20,20);
+  doc.text('FACTURA', W-margin, margin, { align:'right' });
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Nº '+f.numero, W-margin, margin+7, { align:'right' });
+  doc.text('Fecha: '+f.fecha, W-margin, margin+12, { align:'right' });
+
+  y = Math.max(y, margin+12) + 12;
+  doc.setDrawColor(200,200,200); doc.line(margin, y, W-margin, y); y += 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,20,20);
+  doc.text('Facturar a:', margin, y); y += 5.5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(f.clienteNombre||'', margin, y); y += 5;
+  doc.setFontSize(9); doc.setTextColor(90,90,90);
+  if(f.clienteCif){ doc.text('CIF/NIF: '+f.clienteCif, margin, y); y += 4.5; }
+  if(f.clienteDireccion){ doc.text(f.clienteDireccion, margin, y); y += 4.5; }
+  if(f.clienteEmail){ doc.text(f.clienteEmail, margin, y); y += 4.5; }
+
+  y += 10;
+  doc.setFillColor(240,240,240);
+  doc.rect(margin, y, W-margin*2, 8, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
+  doc.text('Concepto', margin+3, y+5.5);
+  doc.text('Importe', W-margin-3, y+5.5, { align:'right' });
+  y += 8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  const conceptoLines = doc.splitTextToSize(f.concepto||'—', W-margin*2-50);
+  doc.text(conceptoLines, margin+3, y+6);
+  doc.text(eur(Math.round(f.importeBase*100)), W-margin-3, y+6, { align:'right' });
+  y += Math.max(10, conceptoLines.length*5) + 6;
+
+  doc.setDrawColor(220,220,220); doc.line(margin, y, W-margin, y); y += 8;
+  const filaTotal = (label, valor, negrita) => {
+    doc.setFont('helvetica', negrita?'bold':'normal'); doc.setFontSize(10);
+    doc.text(label, W-margin-55, y);
+    doc.text(valor, W-margin-3, y, { align:'right' });
+    y += 6;
+  };
+  filaTotal('Base imponible', eur(Math.round(f.importeBase*100)), false);
+  filaTotal('IVA ('+f.ivaPorcentaje+'%)', eur(Math.round(f.ivaImporte*100)), false);
+  doc.setDrawColor(20,20,20); doc.line(W-margin-58, y, W-margin, y); y += 6;
+  filaTotal('TOTAL', eur(Math.round(f.total*100)), true);
+
+  y += 14;
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20,20,20);
+  doc.text('Forma de pago', margin, y); y += 5.5;
+  doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
+  doc.text('Transferencia bancaria — '+(f.bancoNombre||'')+(f.bancoIban?' — IBAN: '+f.bancoIban:''), margin, y);
+
+  if(f.nota){
+    y += 10;
+    doc.setFont('helvetica','italic'); doc.setFontSize(9);
+    doc.text(doc.splitTextToSize('Nota: '+f.nota, W-margin*2), margin, y);
+  }
+
+  doc.save('factura-'+f.numero+'.pdf');
+}
+
+document.getElementById('facGuardarBtn').addEventListener('click', async ()=>{
+  const numero = document.getElementById('facNumero').value.trim();
+  const fecha = document.getElementById('facFecha').value;
+  const clienteId = document.getElementById('facCliente').value;
+  const concepto = document.getElementById('facConcepto').value.trim();
+  const base = parseFloat(document.getElementById('facImporteBase').value);
+  const ivaPct = parseFloat(document.getElementById('facIva').value);
+  const bancoId = document.getElementById('facCuentaBancaria').value;
+  const nota = document.getElementById('facNota').value.trim();
+
+  if(!numero || !fecha || !clienteId || isNaN(base)){ toast('Rellena al menos número, fecha, cliente e importe.', true); return; }
+  if(!STATE.empresaEmisora){ toast('Rellena primero los datos de tu empresa (arriba).', true); return; }
+  const cliente = STATE.clientesFacturacion.find(c=>c.id===clienteId);
+  const banco = STATE.cuentasBancarias.find(b=>b.id===bancoId);
+  const ivaImporte = base*ivaPct/100;
+  const total = base+ivaImporte;
+  const e = STATE.empresaEmisora;
+
+  const registro = {
+    numero, fecha, concepto: concepto||null,
+    emisor_nombre:e.nombre, emisor_cif:e.cif, emisor_direccion:e.direccion, emisor_email:e.email, emisor_telefono:e.telefono,
+    banco_nombre: banco?banco.nombre:null, banco_iban: banco?banco.iban:null,
+    cliente_nombre: cliente.nombre, cliente_cif:cliente.cif, cliente_direccion:cliente.direccion, cliente_email:cliente.email, cliente_telefono:cliente.telefono,
+    importe_base:base, iva_porcentaje:ivaPct, iva_importe:ivaImporte, total, nota: nota||null
+  };
+  try{
+    const saved = await sbInsert('facturas', registro);
+    const facturaObj = {
+      id:saved.id, numero:saved.numero, fecha:saved.fecha, concepto:saved.concepto,
+      emisorNombre:saved.emisor_nombre, emisorCif:saved.emisor_cif, emisorDireccion:saved.emisor_direccion, emisorEmail:saved.emisor_email, emisorTelefono:saved.emisor_telefono,
+      bancoNombre:saved.banco_nombre, bancoIban:saved.banco_iban,
+      clienteNombre:saved.cliente_nombre, clienteCif:saved.cliente_cif, clienteDireccion:saved.cliente_direccion, clienteEmail:saved.cliente_email, clienteTelefono:saved.cliente_telefono,
+      importeBase:parseFloat(saved.importe_base), ivaPorcentaje:parseFloat(saved.iva_porcentaje), ivaImporte:parseFloat(saved.iva_importe), total:parseFloat(saved.total), nota:saved.nota
+    };
+    STATE.facturas.unshift(facturaObj);
+    renderFacturasHistorico();
+    generarFacturaPDF(facturaObj);
+    document.getElementById('facConcepto').value=''; document.getElementById('facImporteBase').value=''; document.getElementById('facNota').value='';
+    actualizarResumenFactura();
+    sugerirNumeroFactura();
+    toast('Factura guardada y PDF descargado.');
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+
+function renderFacturasHistorico(){
+  const tbody = document.querySelector('#tablaFacturas tbody');
+  if(!tbody) return;
+  tbody.innerHTML = STATE.facturas.map(f=>`
+    <tr><td>${f.numero}</td><td>${f.fecha}</td><td>${f.clienteNombre||''}</td><td class="num">${eur(Math.round(f.importeBase*100))}</td><td class="num">${eur(Math.round(f.ivaImporte*100))}</td><td class="num"><b>${eur(Math.round(f.total*100))}</b></td>
+    <td style="white-space:nowrap;"><button class="btn secondary" data-pdf-factura="${f.id}" style="padding:3px 8px;font-size:11px;">PDF</button> <button class="btn danger" data-del-factura="${f.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+  `).join('') || '<tr><td colspan="7" class="hint">Sin facturas todavía.</td></tr>';
+  tbody.querySelectorAll('[data-pdf-factura]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const f = STATE.facturas.find(x=>x.id===btn.getAttribute('data-pdf-factura'));
+      if(f) generarFacturaPDF(f);
+    });
+  });
+  tbody.querySelectorAll('[data-del-factura]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Eliminar esta factura del histórico? No se puede deshacer.')) return;
+      const id = btn.getAttribute('data-del-factura');
+      await sbDelete('facturas', id);
+      STATE.facturas = STATE.facturas.filter(f=>f.id!==id);
+      renderFacturasHistorico();
+    });
+  });
+}
 
 /* =========================================================
    MERMAS (registro de los empleados)
