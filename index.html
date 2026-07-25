@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.25</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.26</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -4718,6 +4718,17 @@ STATE.caja = {
   confirmDelete: null,
   showManualForm: false,
   manualForm: { concept:'', amount:'', category:'' },
+  tendView: 'abs',
+  grafPeriod: 'all',
+  grafFrom: '',
+  grafTo: '',
+  excludedCats: [],
+  detalleMode: 'categoria',
+  detalleSearch: '',
+  detalleSelected: null,
+  detalleCatSelected: null,
+  showNewGroup: false,
+  newGroup: { name:'', type:'cat', items:[] },
 };
 
 function cajaFmt(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n??0); }
@@ -5109,7 +5120,7 @@ function renderCajaTabContent(){
   if(c.tab==='balances'){ renderCajaBalancesTab(el); return; }
   if(c.tab==='proveedores'){ renderCajaProveedoresTab(el); return; }
   if(c.tab==='tendencias'){ renderCajaTendenciasTab(el); return; }
-  if(c.tab==='graficos'){ el.innerHTML = '<p class="hint">Próximamente en esta reconstrucción.</p>'; return; }
+  if(c.tab==='graficos'){ renderCajaGraficosTab(el); return; }
   el.innerHTML = '';
 }
 
@@ -5424,6 +5435,359 @@ function renderCajaTendenciasTab(el){
   });
 }
 
+function cajaDetalleCatData(){
+  const c = STATE.caja;
+  if(!c.savedMonths.length) return {months:[], cats:[], table:{}};
+  const months = c.savedMonths.map(m=>m.title||m.month);
+  const catSet = new Set();
+  c.savedMonths.forEach(m=>(m.catData||[]).forEach(x=>catSet.add(x.name)));
+  const cats = [...catSet].sort();
+  const table = {};
+  cats.forEach(cat=>{
+    table[cat] = {};
+    c.savedMonths.forEach(m=>{
+      const totalGasto = Math.abs(m.totalExpense)||1;
+      const found = (m.catData||[]).find(x=>x.name===cat);
+      const euros = found?.value||0;
+      table[cat][m.title||m.month] = { euros, pct: +(euros/totalGasto*100).toFixed(1) };
+    });
+  });
+  return { months, cats, table };
+}
+function cajaDetalleProvData(){
+  const c = STATE.caja;
+  if(!c.savedMonths.length) return {months:[], providers:[], table:{}};
+  const months = c.savedMonths.map(m=>m.title||m.month);
+  const provSet = new Set();
+  c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>{
+    const p = mv.concept.length>40 ? mv.concept.slice(0,40)+'…' : mv.concept;
+    provSet.add(p);
+  }));
+  const providers = [...provSet].sort();
+  const table = {};
+  providers.forEach(p=>{
+    table[p] = {};
+    c.savedMonths.forEach(m=>{
+      const totalGasto = Math.abs(m.totalExpense)||1;
+      const euros = (m.movements||[]).filter(mv=>mv.amount<0).filter(mv=>(mv.concept.length>40?mv.concept.slice(0,40)+'…':mv.concept)===p).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+      table[p][m.title||m.month] = { euros, pct: +(euros/totalGasto*100).toFixed(1) };
+    });
+  });
+  return { months, providers, table };
+}
+
+function renderCajaGraficosTab(el){
+  const c = STATE.caja;
+  if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
+  if(c.savedMonths.length<2){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Necesitas al menos 2 balances. Tienes '+c.savedMonths.length+'.</p>'; return; }
+
+  el.innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn ${c.detalleMode!=='proveedor'?'':'secondary'}" data-detalle-mode="categoria" style="padding:7px 14px;font-size:12px;">Por categoría</button>
+        <button class="btn ${c.detalleMode==='proveedor'?'':'secondary'}" data-detalle-mode="proveedor" style="padding:7px 14px;font-size:12px;">Por proveedor</button>
+      </div>
+      <input type="text" id="cajaDetalleSearch" placeholder="Buscar…" value="${c.detalleSearch||''}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12px;width:200px;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span class="hint">Ver:</span>
+        <button class="btn ${c.tendView!=='pct'?'':'secondary'}" data-tend-view="abs" style="padding:5px 10px;font-size:11px;">€</button>
+        <button class="btn ${c.tendView==='pct'?'':'secondary'}" data-tend-view="pct" style="padding:5px 10px;font-size:11px;">% Square</button>
+      </div>
+      ${cajaFiltroPeriodoHtml(c.grafPeriod, c.grafFrom, c.grafTo, c.savedMonths)}
+    </div>
+    <div id="cajaGraficosGrid"></div>
+    <div style="margin-top:28px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="color:var(--copper);font-weight:700;font-size:15px;">Análisis personalizado</div>
+        <button class="btn" id="cajaNuevoGrupoBtn" style="padding:7px 16px;font-size:12px;">+ Nuevo grupo</button>
+      </div>
+      <div id="cajaNuevoGrupoForm"></div>
+      <div id="cajaGruposCharts" style="display:flex;flex-direction:column;gap:16px;"></div>
+    </div>
+  `;
+
+  el.querySelectorAll('[data-detalle-mode]').forEach(btn=>btn.addEventListener('click', ()=>{
+    c.detalleMode = btn.getAttribute('data-detalle-mode'); c.detalleSelected=null; c.detalleCatSelected=null; renderCajaTabContent();
+  }));
+  document.getElementById('cajaDetalleSearch').addEventListener('input', e=>{ c.detalleSearch = e.target.value; renderCajaGraficosGrid(); });
+  el.querySelectorAll('[data-tend-view]').forEach(btn=>btn.addEventListener('click', ()=>{ c.tendView = btn.getAttribute('data-tend-view'); renderCajaTabContent(); }));
+  attachCajaFiltroPeriodoHandlers(el, renderCajaTabContent);
+
+  renderCajaGraficosGrid();
+  renderCajaGruposSection();
+}
+
+function renderCajaGraficosGrid(){
+  const c = STATE.caja;
+  const gridEl = document.getElementById('cajaGraficosGrid');
+  if(!gridEl) return;
+  const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
+  const periodMonthNames = tendPeriod.map(m=>m.title||m.month);
+  const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  const c2 = chartColors();
+
+  if(c.detalleMode!=='proveedor'){
+    const detalleCatData = cajaDetalleCatData();
+    const search = (c.detalleSearch||'').toLowerCase();
+    const cats = detalleCatData.cats.filter(cat=>!search||cat.toLowerCase().includes(search)).filter(cat=>periodMonthNames.some(m=>(detalleCatData.table[cat]?.[m]?.euros||0)>0));
+    const getVal = (cat,month) => {
+      const euros = detalleCatData.table[cat]?.[month]?.euros||0;
+      if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0? +(euros/sq*100).toFixed(1):0; }
+      return euros;
+    };
+    let html = '';
+    if(c.detalleCatSelected){
+      html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
+        <div class="chart-wrap" style="height:180px;"><canvas id="cajaCatDestacado"></canvas></div>
+      </div>`;
+    }
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
+    cats.forEach((cat,ci)=>{
+      const total = periodMonthNames.reduce((s,m)=>s+getVal(cat,m),0);
+      html += `<div class="card" data-select-cat="${cat.replace(/"/g,'&quot;')}" style="cursor:pointer;border:1px solid ${c.detalleCatSelected===cat?'var(--copper)':'var(--line)'};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <div style="color:${c.detalleCatSelected===cat?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;">${cat}</div>
+          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;">${cajaFmt(total)}</div>`:''}
+        </div>
+        <div class="chart-wrap" style="height:120px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
+      </div>`;
+    });
+    html += `</div>`;
+    if(cats.length===0) html = `<p class="hint" style="text-align:center;padding:40px;">Sin categorías con datos en este periodo.</p>`;
+    gridEl.innerHTML = html;
+
+    if(c.detalleCatSelected){
+      destroyChart('cajaCatDestacado');
+      STATE.charts.cajaCatDestacado = safeNewChart('cajaCatDestacado', {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getVal(c.detalleCatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>c.tendView==='pct'?v+'%':v+'€'}, grid:{color:c2.grid} } } }
+      });
+      const cerrarBtn = document.getElementById('cajaCerrarCatDest');
+      if(cerrarBtn) cerrarBtn.addEventListener('click', ()=>{ c.detalleCatSelected=null; renderCajaGraficosGrid(); });
+    }
+    cats.forEach((cat,ci)=>{
+      destroyChart('cajaCatMini_'+ci);
+      STATE.charts['cajaCatMini_'+ci] = safeNewChart('cajaCatMini_'+ci, {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getVal(cat,m)), borderColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}}, grid:{color:c2.grid} } } }
+      });
+    });
+    gridEl.querySelectorAll('[data-select-cat]').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const cat = card.getAttribute('data-select-cat');
+        c.detalleCatSelected = (c.detalleCatSelected===cat) ? null : cat;
+        renderCajaGraficosGrid();
+      });
+    });
+  } else {
+    const detalleData = cajaDetalleProvData();
+    const search = (c.detalleSearch||'').toLowerCase();
+    const provs = detalleData.providers.filter(p=>!search||p.toLowerCase().includes(search)).filter(p=>periodMonthNames.filter(m=>(detalleData.table[p]?.[m]?.euros||0)>0).length>0);
+    const getProvVal = (prov,month) => {
+      const euros = detalleData.table[prov]?.[month]?.euros||0;
+      if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0? +(euros/sq*100).toFixed(1):0; }
+      return euros;
+    };
+    let html = '';
+    if(c.detalleSelected){
+      html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleSelected}</div><button class="btn secondary" id="cajaCerrarProvDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
+        <div class="chart-wrap" style="height:180px;"><canvas id="cajaProvDestacado"></canvas></div>
+      </div>`;
+    }
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
+    provs.forEach((prov,pi)=>{
+      const total = periodMonthNames.reduce((s,m)=>s+getProvVal(prov,m),0);
+      html += `<div class="card" data-select-prov="${pi}" style="cursor:pointer;border:1px solid ${c.detalleSelected===prov?'var(--copper)':'var(--line)'};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:6px;">
+          <div style="color:${c.detalleSelected===prov?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${prov}</div>
+          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;flex-shrink:0;">${cajaFmt(total)}</div>`:''}
+        </div>
+        <div class="chart-wrap" style="height:120px;"><canvas id="cajaProvMini_${pi}"></canvas></div>
+      </div>`;
+    });
+    html += `</div>`;
+    if(provs.length===0) html += `<p class="hint" style="text-align:center;padding:40px;">No hay proveedores con datos en más de un mes.</p>`;
+    gridEl.innerHTML = html;
+
+    if(c.detalleSelected){
+      destroyChart('cajaProvDestacado');
+      STATE.charts.cajaProvDestacado = safeNewChart('cajaProvDestacado', {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getProvVal(c.detalleSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>c.tendView==='pct'?v+'%':v+'€'}, grid:{color:c2.grid} } } }
+      });
+      const cerrarBtn = document.getElementById('cajaCerrarProvDest');
+      if(cerrarBtn) cerrarBtn.addEventListener('click', ()=>{ c.detalleSelected=null; renderCajaGraficosGrid(); });
+    }
+    provs.forEach((prov,pi)=>{
+      destroyChart('cajaProvMini_'+pi);
+      STATE.charts['cajaProvMini_'+pi] = safeNewChart('cajaProvMini_'+pi, {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getProvVal(prov,m)), borderColor:CAJA_CHART_PALETTE[pi%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[pi%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}}, grid:{color:c2.grid} } } }
+      });
+    });
+    gridEl.querySelectorAll('[data-select-prov]').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const pi = parseInt(card.getAttribute('data-select-prov'),10);
+        const prov = provs[pi];
+        c.detalleSelected = (c.detalleSelected===prov) ? null : prov;
+        renderCajaGraficosGrid();
+      });
+    });
+  }
+}
+
+function renderCajaGruposSection(){
+  const c = STATE.caja;
+  const formEl = document.getElementById('cajaNuevoGrupoForm');
+  const chartsEl = document.getElementById('cajaGruposCharts');
+  const nuevoGrupoBtn = document.getElementById('cajaNuevoGrupoBtn');
+  if(nuevoGrupoBtn) nuevoGrupoBtn.addEventListener('click', ()=>{ c.showNewGroup=true; c.newGroup = c.newGroup||{name:'',type:'cat',items:[]}; renderCajaGruposSection(); });
+
+  if(c.showNewGroup){
+    const opciones = c.newGroup.type==='cat'
+      ? [...new Set(c.savedMonths.flatMap(m=>(m.catData||[]).map(x=>x.name)))].sort()
+      : [...new Set(c.savedMonths.flatMap(m=>(m.movements||[]).filter(mv=>mv.amount<0).map(mv=>mv.concept.length>40?mv.concept.slice(0,40)+'…':mv.concept)))].sort();
+    formEl.innerHTML = `<div class="card" style="border:2px solid var(--copper);margin-bottom:16px;">
+      <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:12px;">Crear grupo personalizado</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="cajaNuevoGrupoNombre" placeholder="Nombre del grupo…" value="${c.newGroup.name}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:13px;padding:7px 12px;flex:1;min-width:160px;">
+        <button class="btn ${c.newGroup.type==='cat'?'':'secondary'}" data-grupo-tipo="cat" style="padding:6px 12px;font-size:12px;">Por categoría</button>
+        <button class="btn ${c.newGroup.type==='prov'?'':'secondary'}" data-grupo-tipo="prov" style="padding:6px 12px;font-size:12px;">Por proveedor</button>
+      </div>
+      <p class="hint" style="margin-bottom:8px;">Selecciona ${c.newGroup.type==='cat'?'categorías':'proveedores'} a agrupar:</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto;margin-bottom:12px;">
+        ${opciones.map(item=>{
+          const selected = c.newGroup.items.includes(item);
+          return `<button class="btn ${selected?'':'secondary'}" data-grupo-item="${item.replace(/"/g,'&quot;')}" style="padding:4px 10px;font-size:11px;">${item}</button>`;
+        }).join('')}
+      </div>
+      <button class="btn" id="cajaGuardarGrupoBtn" style="padding:8px 20px;">Guardar grupo</button>
+      <button class="btn secondary" id="cajaCancelarGrupoBtn" style="padding:8px 14px;">Cancelar</button>
+    </div>`;
+    document.getElementById('cajaNuevoGrupoNombre').addEventListener('input', e=>{ c.newGroup.name=e.target.value; });
+    formEl.querySelectorAll('[data-grupo-tipo]').forEach(btn=>btn.addEventListener('click', ()=>{ c.newGroup.type=btn.getAttribute('data-grupo-tipo'); c.newGroup.items=[]; renderCajaGruposSection(); }));
+    formEl.querySelectorAll('[data-grupo-item]').forEach(btn=>btn.addEventListener('click', ()=>{
+      const item = btn.getAttribute('data-grupo-item');
+      c.newGroup.items = c.newGroup.items.includes(item) ? c.newGroup.items.filter(x=>x!==item) : [...c.newGroup.items, item];
+      renderCajaGruposSection();
+    }));
+    document.getElementById('cajaGuardarGrupoBtn').addEventListener('click', ()=>{
+      if(!c.newGroup.name.trim() || c.newGroup.items.length===0) return;
+      const updated = [...c.savedGroups, { id:Date.now(), name:c.newGroup.name.trim(), type:c.newGroup.type, items:c.newGroup.items }];
+      c.savedGroups = updated; cajaSet('groups', updated);
+      c.newGroup = {name:'',type:'cat',items:[]}; c.showNewGroup=false;
+      renderCajaGruposSection();
+    });
+    document.getElementById('cajaCancelarGrupoBtn').addEventListener('click', ()=>{ c.showNewGroup=false; c.newGroup={name:'',type:'cat',items:[]}; renderCajaGruposSection(); });
+  } else {
+    formEl.innerHTML = c.savedGroups.length===0 ? `<p class="hint" style="text-align:center;padding:20px;background:var(--surface-2);border-radius:12px;border:1px solid var(--line);">No hay grupos creados todavía.</p>` : '';
+  }
+
+  const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
+  const periodMonthNames = tendPeriod.map(m=>m.title||m.month);
+  const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  const c2 = chartColors();
+
+  chartsEl.innerHTML = c.savedGroups.map(group=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div><span style="color:var(--copper);font-weight:700;font-size:14px;">${group.name}</span> <span class="hint" style="margin-left:10px;">${group.type==='cat'?'Categorías':'Proveedores'}: ${group.items.join(' + ')}</span></div>
+        <button class="btn danger" data-borrar-grupo="${group.id}" style="padding:3px 8px;font-size:11px;">✕</button>
+      </div>
+      <div class="chart-wrap" style="height:180px;"><canvas id="cajaGrupoChart_${group.id}"></canvas></div>
+    </div>
+  `).join('');
+
+  c.savedGroups.forEach(group=>{
+    const data = periodMonthNames.map(m=>{
+      const mes = tendPeriod.find(x=>(x.title||x.month)===m);
+      let euros = 0;
+      if(!mes) return 0;
+      if(group.type==='cat') euros = (mes.catData||[]).filter(x=>group.items.includes(x.name)).reduce((s,x)=>s+x.value,0);
+      else euros = (mes.movements||[]).filter(mv=>mv.amount<0).filter(mv=>group.items.includes(mv.concept.length>40?mv.concept.slice(0,40)+'…':mv.concept)).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+      const sq = sqByMonth[m]||0;
+      return (c.tendView==='pct' && sq>0) ? +(euros/sq*100).toFixed(1) : euros;
+    });
+    destroyChart('cajaGrupo'+group.id);
+    STATE.charts['cajaGrupo'+group.id] = safeNewChart('cajaGrupoChart_'+group.id, {
+      type:'line',
+      data:{ labels:periodMonthNames, datasets:[{ data, borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>c.tendView==='pct'?v+'%':v+'€'}, grid:{color:c2.grid} } } }
+    });
+  });
+  chartsEl.querySelectorAll('[data-borrar-grupo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = parseInt(btn.getAttribute('data-borrar-grupo'),10);
+      c.savedGroups = c.savedGroups.filter(g=>g.id!==id);
+      cajaSet('groups', c.savedGroups);
+      renderCajaGruposSection();
+    });
+  });
+}
+
+function cajaExportTab(tabId, format){
+  const c = STATE.caja;
+  const month = c.data?.movements?.[0]?.month || 'balance';
+  if(format==='xlsx'){
+    const wb = XLSX.utils.book_new();
+    if(tabId==='movimientos' || tabId==='categorizar'){
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((c.data?.movements||[]).map(m=>({Mes:m.month,Concepto:m.concept,Importe:m.amount,Categoría:m.category,Tipo:m.amount<0?'Gasto':'Ingreso'}))), 'Movimientos');
+    } else if(tabId==='balances'){
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(c.savedMonths.map(m=>({Mes:m.title||m.month, Gastos:Math.abs(m.totalExpense).toFixed(2), Ingresos:m.totalIncome.toFixed(2), Balance:(m.totalIncome+m.totalExpense).toFixed(2)}))), 'Balances');
+    } else if(tabId==='proveedores'){
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(c.savedProviders.map(p=>({Proveedor:p.prov, Categoría:p.cat}))), 'Proveedores');
+    } else {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((c.data?.movements||[]).map(m=>({Mes:m.month,Concepto:m.concept,Importe:m.amount,Categoría:m.category}))), 'Movimientos');
+    }
+    XLSX.writeFile(wb, tabId+'_'+month+'.xlsx');
+  } else {
+    let html = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px;}table{border-collapse:collapse;width:100%;}th{background:#f0f0f0;padding:6px 10px;}td{padding:6px 10px;border-bottom:1px solid #eee;}.r{text-align:right;}</style></head><body>';
+    html += '<h1>Análisis de Caja — '+month+'</h1>';
+    if((tabId==='movimientos'||tabId==='categorizar') && c.data){
+      html += '<table><tr><th>Mes</th><th>Concepto</th><th>Categoría</th><th class="r">Importe</th></tr>';
+      c.data.movements.forEach(m=>{ html += '<tr><td>'+m.month+'</td><td>'+m.concept+'</td><td>'+m.category+'</td><td class="r">'+cajaFmt(m.amount)+'</td></tr>'; });
+      html += '</table>';
+    }
+    if(tabId==='balances'){
+      html += '<table><tr><th>Mes</th><th class="r">Gastos</th><th class="r">Ingresos</th><th class="r">Balance</th></tr>';
+      c.savedMonths.forEach(m=>{ const b=m.totalIncome+m.totalExpense; html += '<tr><td>'+(m.title||m.month)+'</td><td class="r">'+cajaFmt(Math.abs(m.totalExpense))+'</td><td class="r">'+cajaFmt(m.totalIncome)+'</td><td class="r">'+cajaFmt(b)+'</td></tr>'; });
+      html += '</table>';
+    }
+    if(tabId==='proveedores'){
+      html += '<table><tr><th>Proveedor</th><th>Categoría</th></tr>';
+      c.savedProviders.forEach(p=>{ html += '<tr><td>'+p.prov+'</td><td>'+p.cat+'</td></tr>'; });
+      html += '</table>';
+    }
+    html += '</body></html>';
+    const w = window.open('', '_blank');
+    if(w){ w.document.write(html); w.document.close(); w.print(); }
+  }
+}
+function cajaMostrarModalExportar(){
+  const tabId = STATE.caja.tab;
+  const win = document.createElement('div');
+  win.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;';
+  win.innerHTML = `<div class="card" style="min-width:280px;padding:28px;">
+    <div style="color:var(--copper);font-weight:700;font-size:15px;margin-bottom:18px;">Exportar — ${tabId}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn" id="cajaExportXlsxBtn">Excel (.xlsx)</button>
+      <button class="btn secondary" id="cajaExportPdfBtn2">PDF / Imprimir</button>
+      <button class="btn secondary" id="cajaExportCancelarBtn">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(win);
+  win.addEventListener('click', (e)=>{ if(e.target===win) win.remove(); });
+  win.querySelector('#cajaExportXlsxBtn').addEventListener('click', ()=>{ cajaExportTab(tabId, 'xlsx'); win.remove(); });
+  win.querySelector('#cajaExportPdfBtn2').addEventListener('click', ()=>{ cajaExportTab(tabId, 'pdf'); win.remove(); });
+  win.querySelector('#cajaExportCancelarBtn').addEventListener('click', ()=>win.remove());
+}
+
 function renderCaja(){
   const c = STATE.caja;
   document.getElementById('cajaUploadScreen').style.display = c.data ? 'none' : 'block';
@@ -5436,7 +5800,7 @@ function renderCaja(){
 }
 document.getElementById('cajaProcesarBtn').addEventListener('click', cajaProcess);
 document.getElementById('cajaInicioBtn').addEventListener('click', ()=>{ STATE.caja.data=null; STATE.caja.pending={}; STATE.caja.tab='categorizar'; renderCaja(); });
-document.getElementById('cajaExportarBtn').addEventListener('click', ()=>{ toast('La exportación llega en la siguiente etapa.'); });
+document.getElementById('cajaExportarBtn').addEventListener('click', cajaMostrarModalExportar);
 let cajaInicializada = false;
 async function initCajaSiHaceFalta(){
   if(cajaInicializada) return;
