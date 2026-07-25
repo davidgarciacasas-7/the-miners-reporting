@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.18</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.24</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -449,10 +449,35 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       </div>
 
       <!-- MERMAS -->
-      <!-- CAJA (app aparte, integrada mediante iframe) -->
+      <!-- CAJA (integrada de forma nativa, migrada desde la app de React) -->
       <div class="tabpanel" id="tab-caja">
-        <div class="card" style="padding:0;overflow:hidden;height:calc(100vh - 140px);">
-          <iframe src="https://caja-app-three.vercel.app/" style="width:100%;height:100%;border:none;display:block;"></iframe>
+        <div id="cajaUploadScreen">
+          <div id="cajaQuickAccess" style="margin-bottom:16px;"></div>
+          <p class="hint" style="text-transform:uppercase;letter-spacing:1px;font-size:11px;margin-bottom:10px;">Carga los archivos del mes</p>
+          <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+            <div id="cajaUpload_bank"></div>
+            <div id="cajaUpload_personal"></div>
+            <div id="cajaUpload_providers"></div>
+          </div>
+          <p class="hint" id="cajaUploadError" style="color:var(--negative);display:none;"></p>
+          <div id="cajaCategoriasGuardadas" style="margin-bottom:14px;"></div>
+          <button class="btn" id="cajaProcesarBtn" disabled>Generar balance del mes</button>
+        </div>
+
+        <div id="cajaWorkingView" style="display:none;">
+          <div id="cajaHeaderExtra" style="margin-bottom:14px;"></div>
+          <div id="cajaCheckBars" class="card" style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;"></div>
+          <div class="grid kpi" id="cajaKpis" style="margin-bottom:14px;"></div>
+
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;gap:4px;flex-wrap:wrap;" id="cajaTabBar"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn secondary" id="cajaExportarBtn" style="padding:7px 12px;font-size:12px;">Exportar</button>
+              <button class="btn secondary" id="cajaInicioBtn" style="padding:7px 12px;font-size:12px;">Inicio</button>
+            </div>
+          </div>
+
+          <div id="cajaTabContent"></div>
         </div>
       </div>
 
@@ -491,37 +516,23 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
       <!-- PERFORMANCE DEL EQUIPO -->
       <div class="tabpanel" id="tab-performance">
+        <div style="text-align:center;margin-bottom:16px;padding:14px 0;border-bottom:1px solid var(--line);">
+          <h1 style="font-family:'Fraunces',serif;font-size:24px;margin:0;color:var(--text);">The Miners <span style="color:var(--copper);">Plaza de España</span></h1>
+          <p class="hint" style="margin-top:4px;">Performance del equipo</p>
+        </div>
         <div class="topbar" style="margin-bottom:10px;">
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="perfDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="perfHasta"></div>
+            <div class="filter-group"><label>Vista</label><select id="perfGranularidad"><option value="semana" selected>Semanal</option><option value="mes">Mensual</option></select></div>
             <div class="filter-group"><label>Tipo de gráfico</label><select id="perfChartTypeSelect"><option value="barras">Barras</option><option value="lineas">Líneas</option></select></div>
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="perfExcluirFuera"> Excluir "Fuera de horario"</label>
+            <div class="filter-group"><label>+ Añadir gráfico</label><select id="perfAddWidgetSelect"><option value="">Elegir...</option></select></div>
           </div>
           <button class="btn" id="perfExportPdfBtn">Exportar PDF</button>
         </div>
-        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <span>Tarjetas de fidelidad nuevas</span>
-          <select id="perfGranularidad"><option value="semana" selected>Semanal</option><option value="mes">Mensual</option></select>
-        </div>
-        <div class="grid kpi" id="kpiFidelidad"></div>
-        <div class="card" style="margin-top:10px;"><div class="chart-wrap"><canvas id="chartFidelidadNueva"></canvas></div></div>
-
-        <div class="section-title">Tickets con algo más que "solo bebida", por franja horaria — valor absoluto</div>
-        <p class="hint" style="margin-bottom:10px;">Categorías consideradas "bebida" (editable en Configuración): <span id="bebidaCategoriasResumen"></span></p>
-        <div class="grid split">
-          <div class="card"><h3>Entre semana (L–V)</h3><div class="chart-wrap"><canvas id="chartNoBebidaLV"></canvas></div></div>
-          <div class="card"><h3>Fin de semana (S–D)</h3><div class="chart-wrap"><canvas id="chartNoBebidaFinde"></canvas></div></div>
-        </div>
-        <div class="section-title">Tickets con algo más que "solo bebida" — % sobre el total de tickets</div>
-        <div class="grid split">
-          <div class="card"><h3>Entre semana (L–V)</h3><div class="chart-wrap"><canvas id="chartNoBebidaLVPct"></canvas></div></div>
-          <div class="card"><h3>Fin de semana (S–D)</h3><div class="chart-wrap"><canvas id="chartNoBebidaFindePct"></canvas></div></div>
-        </div>
-        <div class="grid split" style="margin-top:14px;">
-          <div class="card"><table id="tablaNoBebidaLV"><thead><tr><th>Franja</th><th>Tickets</th><th>Con algo más</th><th>%</th></tr></thead><tbody></tbody></table></div>
-          <div class="card"><table id="tablaNoBebidaFinde"><thead><tr><th>Franja</th><th>Tickets</th><th>Con algo más</th><th>%</th></tr></thead><tbody></tbody></table></div>
-        </div>
+        <p class="hint" style="margin-bottom:14px;">Categorías consideradas "bebida" (editable en Configuración): <span id="bebidaCategoriasResumen"></span>. Arrastra una tarjeta por su título (✥) para reordenarla.</p>
+        <div id="perfWidgetsContainer" class="grid split"></div>
       </div>
 
       <!-- RENTABILIDAD POR FRANJA -->
@@ -538,21 +549,28 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <div class="card" style="margin-bottom:14px;">
           <h3>Plantilla de personal</h3>
-          <p class="hint" style="margin-bottom:6px;"><b>Cocina</b> y <b>Baristas</b> se cuentan por separado, cada uno con su propio coste por hora — la app multiplica nº personas × €/hora × duración de la franja para cada uno, y la columna "Coste total" te enseña la suma de ambos para esa línea y ese patrón (L-V o S-D).</p>
+          <p class="hint" style="margin-bottom:6px;"><b>Cocina</b> y <b>Baristas</b> se cuentan por separado, cada uno con su propio coste por hora — la app multiplica nº personas × €/hora × duración de la franja para cada uno, y la columna "Coste total" te enseña la suma de ambos para esa línea y ese patrón.</p>
           <p class="hint" style="margin-bottom:6px;">El coste por hora es siempre <u>por persona</u> (no la suma de todas).</p>
-          <p class="hint" style="margin-bottom:8px;">Genera las líneas de horario automáticamente eligiendo apertura, cierre (puede ser distinto entre semana y fin de semana) y cada cuánto tiempo quieres una línea nueva. Se generan franjas hasta el cierre más tardío de los dos, así puedes poner 0 empleados en las franjas donde uno de los dos tipos de día no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
-          <div class="subfilter" style="margin-bottom:10px;">
-            <div class="filter-group"><label>Apertura</label><input type="time" id="rentAperturaInput" value="08:00"></div>
+          <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 personal en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura L–V</label><input type="time" id="rentAperturaLVInput" value="08:00"></div>
             <div class="filter-group"><label>Cierre L–V</label><input type="time" id="rentCierreLVInput" value="21:00"></div>
-            <div class="filter-group"><label>Cierre S–D</label><input type="time" id="rentCierreSDInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura Sábado</label><input type="time" id="rentAperturaSabInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Sábado</label><input type="time" id="rentCierreSabInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div class="filter-group"><label>Apertura Domingo</label><input type="time" id="rentAperturaDomInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Domingo</label><input type="time" id="rentCierreDomInput" value="18:00"></div>
             <div class="filter-group"><label>Cada</label><select id="rentGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
             <button class="btn secondary" id="rentGenerarFranjasBtn">Generar franjas</button>
           </div>
           <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rentPlantillaDia" style="max-width:200px;"></div>
           <div style="overflow-x:auto;">
             <table id="tablaPlantilla">
-              <thead><tr><th>Franja</th><th colspan="5">Entre semana (L–V)</th><th colspan="5">Fin de semana (S–D)</th></tr>
-              <tr><th></th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th></tr></thead>
+              <thead><tr><th>Franja</th><th colspan="5">Entre semana (L–V)</th><th colspan="5">Sábado</th><th colspan="5">Domingo</th></tr>
+              <tr><th></th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -584,19 +602,26 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <div class="card" style="margin-bottom:14px;">
           <h3>Baristas por franja horaria</h3>
-          <p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón entre semana y otro fin de semana.</p>
-          <p class="hint" style="margin-bottom:8px;">Genera las líneas de horario automáticamente eligiendo apertura, cierre (puede ser distinto entre semana y fin de semana) y cada cuánto tiempo quieres una línea nueva. Se generan franjas hasta el cierre más tardío de los dos, así puedes poner 0 baristas en las franjas donde uno de los dos tipos de día no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
-          <div class="subfilter" style="margin-bottom:10px;">
-            <div class="filter-group"><label>Apertura</label><input type="time" id="rendAperturaInput" value="08:00"></div>
+          <p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón para L-V, otro para Sábado, otro para Domingo.</p>
+          <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 baristas en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura L–V</label><input type="time" id="rendAperturaLVInput" value="08:00"></div>
             <div class="filter-group"><label>Cierre L–V</label><input type="time" id="rendCierreLVInput" value="21:00"></div>
-            <div class="filter-group"><label>Cierre S–D</label><input type="time" id="rendCierreSDInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura Sábado</label><input type="time" id="rendAperturaSabInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Sábado</label><input type="time" id="rendCierreSabInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div class="filter-group"><label>Apertura Domingo</label><input type="time" id="rendAperturaDomInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Domingo</label><input type="time" id="rendCierreDomInput" value="18:00"></div>
             <div class="filter-group"><label>Cada</label><select id="rendGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
             <button class="btn secondary" id="rendGenerarFranjasBtn">Generar franjas</button>
           </div>
           <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rendPlantillaDia" style="max-width:200px;"></div>
           <div style="overflow-x:auto;">
             <table id="tablaBaristas">
-              <thead><tr><th>Franja</th><th>Nº baristas (L–V)</th><th>Nº baristas (S–D)</th></tr></thead>
+              <thead><tr><th>Franja</th><th>Nº baristas (L–V)</th><th>Nº baristas (Sábado)</th><th>Nº baristas (Domingo)</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -1767,6 +1792,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       if(STATE.facturas.length===0 && !STATE.empresaEmisora) loadAndRenderFacturas();
       else { renderFacEmisorForm(); renderFacBancos(); renderFacClientes(); renderFacturasHistorico(); if(!document.getElementById('facNumero').value) sugerirNumeroFactura(); }
     }
+    if(item.dataset.tab==='caja') initCajaSiHaceFalta();
   });
 });
 
@@ -2371,55 +2397,103 @@ function perfRango(){
   return { desde, hasta };
 }
 
-function renderFidelidadNueva(){
-  const canvas = document.getElementById('chartFidelidadNueva');
-  if(!canvas) return;
-  const gran = document.getElementById('perfGranularidad').value;
-  const { desde, hasta } = perfRango();
-  if(!desde || !hasta) return;
-  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
-  const primera = computeNuevasFidelidad();
-  const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
-  Object.values(primera).forEach(fecha=>{
-    const b = buckets.find(bk=>fecha>=bk.dateMin && fecha<=bk.dateMax);
-    if(b) porBucket[b.label]++;
-  });
-  const totalEnRango = Object.values(porBucket).reduce((a,b)=>a+b,0);
-  document.getElementById('kpiFidelidad').innerHTML = `
-    <div class="stub"><div class="label">Nuevas en el periodo</div><div class="value">${totalEnRango}</div></div>
-    <div class="stub"><div class="label">Nuevas en el último tramo del periodo</div><div class="value">${buckets.length?porBucket[buckets[buckets.length-1].label]:0}</div></div>
-  `;
-  const c = chartColors();
-  destroyChart('fidelidadNueva');
-  STATE.charts.fidelidadNueva = safeNewChart('chartFidelidadNueva', {
-    type: trendChartType(),
-    data:{ labels:buckets.map(b=>b.label), datasets:[ trendDataset('Tarjetas nuevas', buckets.map(b=>porBucket[b.label]), c.copper) ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+/* =========================================================
+   PERFORMANCE DEL EQUIPO — sistema de widgets (igual que Resumen Ejecutivo)
+   ========================================================= */
+const FRANJA_COLOR_PALETTE = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968'];
+const PERF_WIDGET_TYPES = {
+  fidelidadNueva:      { label:'Tarjetas de fidelidad nuevas' },
+  noBebidaLVAbs:       { label:'Tickets con algo más — L-V, total del periodo (nº)' },
+  noBebidaLVPct:       { label:'Tickets con algo más — L-V, total del periodo (%)' },
+  noBebidaSDAbs:       { label:'Tickets con algo más — S-D, total del periodo (nº)' },
+  noBebidaSDPct:       { label:'Tickets con algo más — S-D, total del periodo (%)' },
+  evolNoBebidaLVAbs:   { label:'Evolución por franja — L-V (nº tickets con algo más)' },
+  evolNoBebidaLVPct:   { label:'Evolución por franja — L-V (% tickets con algo más)' },
+  evolNoBebidaSDAbs:   { label:'Evolución por franja — S-D (nº tickets con algo más)' },
+  evolNoBebidaSDPct:   { label:'Evolución por franja — S-D (% tickets con algo más)' },
+};
+function getPerfWidgets(){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_perf_widgets'));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return [
+    { instanceId:'p1', typeId:'fidelidadNueva' }, { instanceId:'p2', typeId:'noBebidaLVAbs' }, { instanceId:'p3', typeId:'noBebidaLVPct' },
+    { instanceId:'p4', typeId:'noBebidaSDAbs' }, { instanceId:'p5', typeId:'noBebidaSDPct' },
+  ];
+}
+function setPerfWidgets(list){ localStorage.setItem('miners_perf_widgets', JSON.stringify(list)); }
+function renderPerfAddWidgetSelect(){
+  const sel = document.getElementById('perfAddWidgetSelect');
+  sel.innerHTML = '<option value="">Elegir...</option>' + Object.entries(PERF_WIDGET_TYPES).map(([id,t])=>'<option value="'+id+'">'+t.label+'</option>').join('');
+}
+document.getElementById('perfAddWidgetSelect').addEventListener('change', (e)=>{
+  const typeId = e.target.value;
+  if(!typeId) return;
+  const widgets = getPerfWidgets();
+  widgets.push({ instanceId:'p'+Date.now()+Math.random().toString(36).slice(2,6), typeId });
+  setPerfWidgets(widgets);
+  e.target.value = '';
+  renderPerformanceEquipo();
+});
+let perfDragSrc = null;
+function attachPerfDragHandlers(){
+  document.querySelectorAll('#perfWidgetsContainer [data-perf-instance]').forEach(card=>{
+    card.addEventListener('dragstart', ()=>{ perfDragSrc = card.getAttribute('data-perf-instance'); card.style.opacity='0.4'; });
+    card.addEventListener('dragend', ()=>{ card.style.opacity=''; });
+    card.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+    card.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const targetId = card.getAttribute('data-perf-instance');
+      if(!perfDragSrc || perfDragSrc===targetId) return;
+      const widgets = getPerfWidgets();
+      const fromIdx = widgets.findIndex(w=>w.instanceId===perfDragSrc);
+      const toIdx = widgets.findIndex(w=>w.instanceId===targetId);
+      if(fromIdx<0||toIdx<0) return;
+      const [moved] = widgets.splice(fromIdx,1);
+      widgets.splice(toIdx,0,moved);
+      setPerfWidgets(widgets);
+      renderPerformanceEquipo();
+    });
   });
 }
-
-function renderTicketsNoBebida(){
-  const canvas = document.getElementById('chartNoBebidaLV');
-  if(!canvas) return;
-  const { desde, hasta } = perfRango();
-  if(!desde || !hasta) return;
-  document.getElementById('bebidaCategoriasResumen').textContent = getBebidaCategorias().join(', ');
-  const tickets = ticketsConCategoriaNoBebida(desde, hasta);
+/* evolución temporal (por bucket semana/mes) de tickets-con-algo-más, una línea por franja */
+function calcularEvolucionNoBebida(desde, hasta, gran, esFinde){
   const franjaOrder = franjaOrderNegocioFiltrado();
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const tickets = ticketsConCategoriaNoBebida(desde, hasta).filter(t=>t.esFinde===esFinde);
+  const resultado = {};
+  franjaOrder.forEach(f=>{ resultado[f]={}; buckets.forEach(b=>resultado[f][b.label]={total:0,noBebida:0}); });
+  tickets.forEach(t=>{
+    const b = buckets.find(bk=>t.fecha>=bk.dateMin && t.fecha<=bk.dateMax);
+    if(!b || !resultado[t.franja]) return;
+    resultado[t.franja][b.label].total++;
+    if(t.tieneNoBebida) resultado[t.franja][b.label].noBebida++;
+  });
+  return { franjaOrder, buckets, resultado };
+}
+function pintarWidgetPerf(typeId, canvasId, chartKey, ctx){
   const c = chartColors();
-
-  function aggregate(esFinde){
-    const byFranja = {}; franjaOrder.forEach(f=>byFranja[f]={total:0,noBebida:0});
-    tickets.filter(t=>t.esFinde===esFinde).forEach(t=>{
-      if(!byFranja[t.franja]) byFranja[t.franja]={total:0,noBebida:0};
-      byFranja[t.franja].total++;
-      if(t.tieneNoBebida) byFranja[t.franja].noBebida++;
+  destroyChart(chartKey);
+  if(typeId==='fidelidadNueva'){
+    const { desde, hasta, gran } = ctx;
+    const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+    const primera = computeNuevasFidelidad();
+    const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
+    Object.values(primera).forEach(fecha=>{
+      const b = buckets.find(bk=>fecha>=bk.dateMin && fecha<=bk.dateMax);
+      if(b) porBucket[b.label]++;
     });
-    return byFranja;
+    STATE.charts[chartKey] = safeNewChart(canvasId, {
+      type: trendChartType(),
+      data:{ labels:buckets.map(b=>b.label), datasets:[ trendDataset('Tarjetas nuevas', buckets.map(b=>porBucket[b.label]), c.copper) ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+    });
+    return { totalEnRango: Object.values(porBucket).reduce((a,b)=>a+b,0), ultimoTramo: buckets.length?porBucket[buckets[buckets.length-1].label]:0 };
   }
-  function pintar(esFinde, chartKey, canvasId, tablaId){
-    const byFranja = aggregate(esFinde);
-    destroyChart(chartKey);
+  if(typeId==='noBebidaLVAbs' || typeId==='noBebidaSDAbs'){
+    const esFinde = typeId==='noBebidaSDAbs';
+    const { franjaOrder, byFranja } = ctx.aggregate(esFinde);
     STATE.charts[chartKey] = safeNewChart(canvasId, {
       type: trendChartType(),
       data:{ labels:franjaOrder, datasets:[
@@ -2428,37 +2502,103 @@ function renderTicketsNoBebida(){
       ]},
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
     });
-    destroyChart(chartKey+'Pct');
-    STATE.charts[chartKey+'Pct'] = safeNewChart(canvasId+'Pct', {
+    return { franjaOrder, byFranja };
+  }
+  if(typeId==='noBebidaLVPct' || typeId==='noBebidaSDPct'){
+    const esFinde = typeId==='noBebidaSDPct';
+    const { franjaOrder, byFranja } = ctx.aggregate(esFinde);
+    STATE.charts[chartKey] = safeNewChart(canvasId, {
       type: trendChartType(),
-      data:{ labels:franjaOrder, datasets:[
-        trendDataset('% con algo más que bebida', franjaOrder.map(f=>{ const d=byFranja[f]; return d.total? +(d.noBebida/d.total*100).toFixed(1) : 0; }), c.copper)
-      ]},
+      data:{ labels:franjaOrder, datasets:[ trendDataset('% con algo más que bebida', franjaOrder.map(f=>{ const d=byFranja[f]; return d.total? +(d.noBebida/d.total*100).toFixed(1) : 0; }), c.copper) ] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
     });
-    document.querySelector('#'+tablaId+' tbody').innerHTML = franjaOrder.map(f=>{
-      const d = byFranja[f];
-      return `<tr><td>${f}</td><td class="num">${d.total}</td><td class="num">${d.noBebida}</td><td class="num">${pct(d.noBebida,d.total)}</td></tr>`;
-    }).join('');
+    return { franjaOrder, byFranja };
   }
-  pintar(false, 'noBebidaLV', 'chartNoBebidaLV', 'tablaNoBebidaLV');
-  pintar(true, 'noBebidaFinde', 'chartNoBebidaFinde', 'tablaNoBebidaFinde');
+  if(typeId.startsWith('evolNoBebida')){
+    const esFinde = typeId.includes('SD');
+    const esPct = typeId.endsWith('Pct');
+    const { desde, hasta, gran } = ctx;
+    const { franjaOrder, buckets, resultado } = calcularEvolucionNoBebida(desde, hasta, gran, esFinde);
+    const labels = buckets.map(b=>b.label);
+    const datasets = franjaOrder.map((f,i)=>{
+      const color = FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length];
+      const data = labels.map(l=>{ const d=resultado[f][l]; return esPct ? (d.total? +(d.noBebida/d.total*100).toFixed(1) : 0) : d.noBebida; });
+      return trendDataset(f, data, color);
+    });
+    STATE.charts[chartKey] = safeNewChart(canvasId, {
+      type: trendChartType(),
+      data:{ labels, datasets },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback: v=> esPct? v+'%':v}, grid:{color:c.grid} } } }
+    });
+    return null;
+  }
 }
 function renderPerformanceEquipo(){
   const sel = document.getElementById('perfChartTypeSelect');
   if(sel) sel.value = getChartTrendType();
-  renderFidelidadNueva();
-  renderTicketsNoBebida();
+  const { desde, hasta } = perfRango();
+  if(!desde || !hasta) return;
+  const gran = document.getElementById('perfGranularidad').value;
+  document.getElementById('bebidaCategoriasResumen').textContent = getBebidaCategorias().join(', ');
+  renderPerfAddWidgetSelect();
+
+  const tickets = ticketsConCategoriaNoBebida(desde, hasta);
+  const franjaOrderBase = franjaOrderNegocioFiltrado();
+  const aggregate = (esFinde) => {
+    const byFranja = {}; franjaOrderBase.forEach(f=>byFranja[f]={total:0,noBebida:0});
+    tickets.filter(t=>t.esFinde===esFinde).forEach(t=>{
+      if(!byFranja[t.franja]) byFranja[t.franja]={total:0,noBebida:0};
+      byFranja[t.franja].total++;
+      if(t.tieneNoBebida) byFranja[t.franja].noBebida++;
+    });
+    return { franjaOrder:franjaOrderBase, byFranja };
+  };
+  const ctx = { desde, hasta, gran, aggregate };
+
+  const widgets = getPerfWidgets();
+  const container = document.getElementById('perfWidgetsContainer');
+  container.innerHTML = widgets.map(w=>{
+    const type = PERF_WIDGET_TYPES[w.typeId];
+    if(!type) return '';
+    const extraTop = w.typeId==='fidelidadNueva' ? `<div class="grid kpi" id="kpiFidelidad_${w.instanceId}" style="margin-bottom:10px;"></div>` : '';
+    return `<div class="card" draggable="true" data-perf-instance="${w.instanceId}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <h3 style="cursor:grab;margin:0;">✥ ${type.label}</h3>
+        <button class="btn danger" data-perf-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+      </div>
+      ${extraTop}
+      <div class="chart-wrap"><canvas id="chartPerfW_${w.instanceId}"></canvas></div>
+    </div>`;
+  }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
+
+  widgets.forEach(w=>{
+    const resultado = pintarWidgetPerf(w.typeId, 'chartPerfW_'+w.instanceId, 'perfW_'+w.instanceId, ctx);
+    if(w.typeId==='fidelidadNueva' && resultado){
+      const kpiEl = document.getElementById('kpiFidelidad_'+w.instanceId);
+      if(kpiEl) kpiEl.innerHTML = `
+        <div class="stub"><div class="label">Nuevas en el periodo</div><div class="value">${resultado.totalEnRango}</div></div>
+        <div class="stub"><div class="label">Nuevas en el último tramo del periodo</div><div class="value">${resultado.ultimoTramo}</div></div>
+      `;
+    }
+  });
+
+  container.querySelectorAll('[data-perf-quitar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      setPerfWidgets(getPerfWidgets().filter(w=>w.instanceId!==btn.getAttribute('data-perf-quitar')));
+      renderPerformanceEquipo();
+    });
+  });
+  attachPerfDragHandlers();
 }
 document.getElementById('perfDesde').addEventListener('change', renderPerformanceEquipo);
 document.getElementById('perfHasta').addEventListener('change', renderPerformanceEquipo);
 document.getElementById('perfChartTypeSelect').addEventListener('change', (e)=>onChartTypeChange(e.target.value));
-document.getElementById('perfGranularidad').addEventListener('change', renderFidelidadNueva);
+document.getElementById('perfGranularidad').addEventListener('change', renderPerformanceEquipo);
 document.getElementById('bebidaCategoriasSaveBtn').addEventListener('click', ()=>{
   const list = document.getElementById('bebidaCategoriasInput').value.split('\n').map(s=>s.trim()).filter(Boolean);
   setBebidaCategorias(list);
   toast('Categorías guardadas.');
-  renderTicketsNoBebida();
+  renderPerformanceEquipo();
 });
 document.getElementById('trendChartTypeSelect').addEventListener('change', (e)=>{ onChartTypeChange(e.target.value); toast('Tipo de gráfico actualizado.'); });
 document.getElementById('dataLabelsSelect').addEventListener('change', (e)=>{
@@ -2482,71 +2622,49 @@ document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const margin = 14;
+  const widgets = getPerfWidgets();
+  const totalPaginas = Math.max(1, Math.ceil(widgets.length/4));
+  const hoy = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
 
-  const addChartOrPlaceholder = (chartKey, x, y, w, h, tituloVacio) => {
-    const chart = STATE.charts[chartKey];
-    if(chart){
-      doc.addImage(chart.toBase64Image(), 'PNG', x, y, w, h);
-    } else {
-      doc.setDrawColor(58,47,36);
-      doc.rect(x,y,w,h);
-      doc.setFontSize(9); doc.setTextColor(167,154,133);
-      doc.text(tituloVacio||'Gráfico no disponible', x+4, y+h/2);
-    }
-  };
-  const cabecera = (pagina, totalPaginas) => {
+  const cabecera = (pagina) => {
     doc.setFillColor(23,19,15);
     doc.rect(0,0,W,H,'F');
-    doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(18);
-    doc.text('The Miners Plaza de España — Performance del equipo', margin, margin+4);
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(167,154,133);
+    doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('The Miners Plaza de España', margin, margin+4);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
     const gran = document.getElementById('perfGranularidad').value==='mes' ? 'Mensual' : 'Semanal';
-    const hoy = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
-    doc.text('Vista '+gran+'  ·  Generado el '+hoy+'  ·  Página '+pagina+'/'+totalPaginas, margin, margin+11);
+    doc.text('Performance del equipo  ·  Vista '+gran+'  ·  Generado el '+hoy+'  ·  Página '+pagina+'/'+totalPaginas, margin, margin+10);
     doc.setDrawColor(58,47,36);
-    doc.line(margin, margin+15, W-margin, margin+15);
+    doc.line(margin, margin+14, W-margin, margin+14);
+  };
+  const addChart = (typeId, canvasKey, titulo, x, y, w, h) => {
+    doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
+    doc.text(titulo, x, y);
+    doc.setFont('helvetica','normal');
+    const chart = STATE.charts[canvasKey];
+    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+3, w, h); }
+    else { doc.setDrawColor(58,47,36); doc.rect(x,y+3,w,h); }
   };
 
-  const halfW = (W - margin*2 - 8)/2;
-  const hHalf = halfW*0.8;
-  const x2 = margin+halfW+8;
+  const chartW = (W - margin*2 - 8)/2;
+  const chartH = chartW*0.72;
 
-  // Página 1: fidelidad nueva + valores absolutos
-  cabecera(1,2);
-  let y = margin+24;
-  doc.setFontSize(12); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
-  doc.text('Tarjetas de fidelidad nuevas', margin, y);
-  doc.setFont('helvetica','normal');
-  y += 4;
-  const w1 = W - margin*2, h1 = w1*0.4;
-  addChartOrPlaceholder('fidelidadNueva', margin, y, w1, h1);
-  y += h1 + 16;
-
-  doc.setFontSize(12); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
-  doc.text('Tickets con algo más que "solo bebida" — valor absoluto', margin, y);
-  doc.setFont('helvetica','normal');
-  y += 7;
-  doc.setFontSize(10); doc.setTextColor(167,154,133);
-  doc.text('Entre semana (L–V)', margin, y);
-  doc.text('Fin de semana (S–D)', x2, y);
-  y += 4;
-  addChartOrPlaceholder('noBebidaLV', margin, y, halfW, hHalf);
-  addChartOrPlaceholder('noBebidaFinde', x2, y, halfW, hHalf);
-
-  // Página 2: porcentajes
-  doc.addPage();
-  cabecera(2,2);
-  y = margin+24;
-  doc.setFontSize(12); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
-  doc.text('Tickets con algo más que "solo bebida" — % sobre el total', margin, y);
-  doc.setFont('helvetica','normal');
-  y += 7;
-  doc.setFontSize(10); doc.setTextColor(167,154,133);
-  doc.text('Entre semana (L–V)', margin, y);
-  doc.text('Fin de semana (S–D)', x2, y);
-  y += 4;
-  addChartOrPlaceholder('noBebidaLVPct', margin, y, halfW, hHalf);
-  addChartOrPlaceholder('noBebidaFindePct', x2, y, halfW, hHalf);
+  for(let pagina=0; pagina<totalPaginas; pagina++){
+    if(pagina>0) doc.addPage();
+    cabecera(pagina+1);
+    let y = margin+22;
+    for(let fila=0; fila<2; fila++){
+      const idx = pagina*4 + fila*2;
+      for(let col=0; col<2; col++){
+        const w = widgets[idx+col];
+        if(!w) continue;
+        const type = PERF_WIDGET_TYPES[w.typeId];
+        const x = margin + col*(chartW+8);
+        addChart(w.typeId, 'perfW_'+w.instanceId, type?type.label:'', x, y, chartW, chartH);
+      }
+      y += chartH + 16;
+    }
+  }
 
   doc.setFontSize(8); doc.setTextColor(120,110,95);
   doc.text('Generado automáticamente desde el panel de The Miners Plaza de España.', margin, H-margin+2);
@@ -2600,24 +2718,23 @@ function renderTablaPlantilla(){
   const inputTiempo = (val, attr, id) => `<input type="time" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
   const inputNum = (val, campo, id, tipo) => `<input type="number" step="${campo.startsWith('coste')?'0.5':'1'}" min="0" value="${val}" data-plantilla="${id}|${tipo}|${campo}" style="width:60px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 5px;text-align:right;">`;
   const costeTotalFranja = (d, horas) => (d.numCocina*d.costeCocina + d.numBaristas*d.costeBarista) * horas;
+  const TIPOS_DIA = ['semana','sabado','domingo'];
+  const bloqueTipo = (f, tipo, horas) => {
+    const d = buscar(f.id, tipo);
+    return `<td class="num">${inputNum(d.numCocina,'numCocina',f.id,tipo)}</td>
+      <td class="num">${inputNum(d.costeCocina,'costeCocina',f.id,tipo)}</td>
+      <td class="num">${inputNum(d.numBaristas,'numBaristas',f.id,tipo)}</td>
+      <td class="num">${inputNum(d.costeBarista,'costeBarista',f.id,tipo)}</td>
+      <td class="num"><b data-coste-total="${f.id}|${tipo}">${eur(Math.round(costeTotalFranja(d,horas)*100))}</b></td>`;
+  };
 
   tbody.innerHTML = franjas.map(f=>{
-    const lv = buscar(f.id,'semana'), fd = buscar(f.id,'finde');
     const horas = (f.end-f.start)/60;
     return `<tr>
       <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'franja-fin',f.id)} <button class="btn danger" data-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
-      <td class="num">${inputNum(lv.numCocina,'numCocina',f.id,'semana')}</td>
-      <td class="num">${inputNum(lv.costeCocina,'costeCocina',f.id,'semana')}</td>
-      <td class="num">${inputNum(lv.numBaristas,'numBaristas',f.id,'semana')}</td>
-      <td class="num">${inputNum(lv.costeBarista,'costeBarista',f.id,'semana')}</td>
-      <td class="num"><b data-coste-total="${f.id}|semana">${eur(Math.round(costeTotalFranja(lv,horas)*100))}</b></td>
-      <td class="num">${inputNum(fd.numCocina,'numCocina',f.id,'finde')}</td>
-      <td class="num">${inputNum(fd.costeCocina,'costeCocina',f.id,'finde')}</td>
-      <td class="num">${inputNum(fd.numBaristas,'numBaristas',f.id,'finde')}</td>
-      <td class="num">${inputNum(fd.costeBarista,'costeBarista',f.id,'finde')}</td>
-      <td class="num"><b data-coste-total="${f.id}|finde">${eur(Math.round(costeTotalFranja(fd,horas)*100))}</b></td>
+      ${TIPOS_DIA.map(tipo=>bloqueTipo(f,tipo,horas)).join('')}
     </tr>`;
-  }).join('') + `<tr><td colspan="11" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+  }).join('') + `<tr><td colspan="16" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
 
   /* recalcular el "Coste total" en vivo según se va escribiendo, sin necesidad de guardar */
   tbody.querySelectorAll('[data-plantilla]').forEach(inp=>{
@@ -2670,18 +2787,19 @@ function renderTablaPlantilla(){
 document.getElementById('rentGenerarFranjasBtn').addEventListener('click', ()=>{
   const franjasActuales = getRentFranjas();
   if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
-  const apertura = horaAMinutos(document.getElementById('rentAperturaInput').value);
-  const cierreLV = horaAMinutos(document.getElementById('rentCierreLVInput').value);
-  const cierreSD = horaAMinutos(document.getElementById('rentCierreSDInput').value);
-  const cierre = Math.max(cierreLV, cierreSD);
+  const aLV = horaAMinutos(document.getElementById('rentAperturaLVInput').value), cLV = horaAMinutos(document.getElementById('rentCierreLVInput').value);
+  const aSab = horaAMinutos(document.getElementById('rentAperturaSabInput').value), cSab = horaAMinutos(document.getElementById('rentCierreSabInput').value);
+  const aDom = horaAMinutos(document.getElementById('rentAperturaDomInput').value), cDom = horaAMinutos(document.getElementById('rentCierreDomInput').value);
+  const apertura = Math.min(aLV, aSab, aDom);
+  const cierre = Math.max(cLV, cSab, cDom);
   const gran = parseInt(document.getElementById('rentGranularidadFranja').value,10);
-  if(!(cierre>apertura)){ toast('Al menos uno de los dos cierres debe ser posterior a la apertura.', true); return; }
+  if(!(cierre>apertura)){ toast('Al menos uno de los tres cierres debe ser posterior a su apertura.', true); return; }
   const franjas = generarListaFranjas(apertura, cierre, gran);
   setRentFranjas(franjas);
   renderTablaPlantilla();
   renderRentabilidad();
-  const nota = cierreLV!==cierreSD ? ' Recuerda poner 0 empleados en las franjas de '+(cierreLV<cierreSD?'L–V':'S–D')+' donde ya esté cerrado.' : '';
-  toast('Franjas generadas: '+franjas.length+' líneas.'+nota);
+  const distintos = !(aLV===aSab && aSab===aDom && cLV===cSab && cSab===cDom);
+  toast('Franjas generadas: '+franjas.length+' líneas.'+(distintos ? ' Recuerda poner 0 personal en las franjas donde cada día no abra.' : ''));
 });
 async function cargarPlantillaSemana(weekStart){
   try{
@@ -2736,8 +2854,8 @@ async function calcularRentabilidadPeriodo(desde, hasta){
     const fechaStr = d.toISOString().slice(0,10);
     const ws = isoMonday(fechaStr);
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
-    const esFinde = (d.getDay()===0 || d.getDay()===6);
-    const tipoDia = esFinde ? 'finde' : 'semana';
+    const dow = d.getDay(); // 0=domingo ... 6=sabado
+    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
     idsOrder.forEach(id=>{
       if(id==='fuera') return; // no se planifica personal fuera de horario
       const p = patronMap[ws+'|'+id+'|'+tipoDia];
@@ -2776,6 +2894,14 @@ async function renderRentabilidad(){
     const r = resultado[f]; const res = resultados[i];
     return `<tr><td>${f}</td><td class="num">${eur(r.ventas)}</td><td class="num">${eur(r.cogs)}</td><td class="num">${eur(r.laboral)}</td><td class="num" style="color:${res>=0?'var(--positive)':'var(--negative)'}"><b>${eur(res)}</b></td></tr>`;
   }).join('');
+
+  /* fila de totales (todas las franjas sumadas) */
+  const totalVentas = franjaOrder.reduce((s,f)=>s+resultado[f].ventas,0);
+  const totalCogs = franjaOrder.reduce((s,f)=>s+resultado[f].cogs,0);
+  const totalLaboral = franjaOrder.reduce((s,f)=>s+resultado[f].laboral,0);
+  const totalResultado = totalVentas - totalCogs - totalLaboral;
+  const tfoot = document.querySelector('#tablaRentabilidad tfoot') || (() => { const t=document.createElement('tfoot'); document.getElementById('tablaRentabilidad').appendChild(t); return t; })();
+  tfoot.innerHTML = `<tr style="border-top:2px solid var(--line);font-weight:600;"><td>Total (todas las franjas)</td><td class="num">${eur(totalVentas)}</td><td class="num">${eur(totalCogs)}</td><td class="num">${eur(totalLaboral)}</td><td class="num" style="color:${totalResultado>=0?'var(--positive)':'var(--negative)'}"><b>${eur(totalResultado)}</b></td></tr>`;
 }
 document.getElementById('rentDesde').addEventListener('change', renderRentabilidad);
 document.getElementById('rentHasta').addEventListener('change', renderRentabilidad);
@@ -2854,14 +2980,17 @@ function renderTablaBaristas(){
   const franjas = getRendFranjas();
   const buscar = (id,tipo) => STATE.baristaWeek.find(s=>s.franja===id && s.tipoDia===tipo) || {numBaristas:0};
   const inputTiempo = (val, attr, id) => `<input type="time" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
+  const TIPOS_DIA = ['semana','sabado','domingo'];
   tbody.innerHTML = franjas.map(f=>{
-    const lv = buscar(f.id,'semana'), fd = buscar(f.id,'finde');
+    const celdas = TIPOS_DIA.map(tipo=>{
+      const d = buscar(f.id,tipo);
+      return `<td class="num"><input type="number" step="1" min="0" value="${d.numBaristas}" data-barista="${f.id}|${tipo}" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>`;
+    }).join('');
     return `<tr>
       <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'rend-franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'rend-franja-fin',f.id)} <button class="btn danger" data-rend-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
-      <td class="num"><input type="number" step="1" min="0" value="${lv.numBaristas}" data-barista="${f.id}|semana" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="1" min="0" value="${fd.numBaristas}" data-barista="${f.id}|finde" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      ${celdas}
     </tr>`;
-  }).join('') + `<tr><td colspan="3" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+  }).join('') + `<tr><td colspan="4" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
 
   tbody.querySelectorAll('[data-rend-franja-inicio]').forEach(inp=>{
     inp.addEventListener('change', ()=>{
@@ -2900,18 +3029,19 @@ function renderTablaBaristas(){
 document.getElementById('rendGenerarFranjasBtn').addEventListener('click', ()=>{
   const franjasActuales = getRendFranjas();
   if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
-  const apertura = horaAMinutos(document.getElementById('rendAperturaInput').value);
-  const cierreLV = horaAMinutos(document.getElementById('rendCierreLVInput').value);
-  const cierreSD = horaAMinutos(document.getElementById('rendCierreSDInput').value);
-  const cierre = Math.max(cierreLV, cierreSD);
+  const aLV = horaAMinutos(document.getElementById('rendAperturaLVInput').value), cLV = horaAMinutos(document.getElementById('rendCierreLVInput').value);
+  const aSab = horaAMinutos(document.getElementById('rendAperturaSabInput').value), cSab = horaAMinutos(document.getElementById('rendCierreSabInput').value);
+  const aDom = horaAMinutos(document.getElementById('rendAperturaDomInput').value), cDom = horaAMinutos(document.getElementById('rendCierreDomInput').value);
+  const apertura = Math.min(aLV, aSab, aDom);
+  const cierre = Math.max(cLV, cSab, cDom);
   const gran = parseInt(document.getElementById('rendGranularidadFranja').value,10);
-  if(!(cierre>apertura)){ toast('Al menos uno de los dos cierres debe ser posterior a la apertura.', true); return; }
+  if(!(cierre>apertura)){ toast('Al menos uno de los tres cierres debe ser posterior a su apertura.', true); return; }
   const franjas = generarListaFranjas(apertura, cierre, gran);
   setRendFranjas(franjas);
   renderTablaBaristas();
   renderRendimiento();
-  const nota = cierreLV!==cierreSD ? ' Recuerda poner 0 baristas en las franjas de '+(cierreLV<cierreSD?'L–V':'S–D')+' donde ya esté cerrado.' : '';
-  toast('Franjas generadas: '+franjas.length+' líneas.'+nota);
+  const distintos = !(aLV===aSab && aSab===aDom && cLV===cSab && cSab===cDom);
+  toast('Franjas generadas: '+franjas.length+' líneas.'+(distintos ? ' Recuerda poner 0 baristas en las franjas donde cada día no abra.' : ''));
 });
 async function cargarBaristasSemana(weekStart){
   try{
@@ -2978,8 +3108,8 @@ async function calcularRendimientoPeriodo(desde, hasta){
     const fechaStr = d.toISOString().slice(0,10);
     const ws = isoMonday(fechaStr);
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
-    const esFinde = (d.getDay()===0 || d.getDay()===6);
-    const tipoDia = esFinde ? 'finde' : 'semana';
+    const dow = d.getDay(); // 0=domingo ... 6=sabado
+    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
     idsOrder.forEach(id=>{
       if(id==='fuera') return;
       const p = patronMap[ws+'|'+id+'|'+tipoDia];
@@ -3162,6 +3292,19 @@ const RE_WIDGET_TYPES = {
   franjaVentas:    { label:'Ventas por franja horaria', tipo:'snapshot' },
   diaSemanaVentas: { label:'Ventas por día de la semana', tipo:'snapshot' },
   categorias:      { label:'Categorías por ventas', tipo:'snapshot' },
+  ticketsFranja:       { label:'Nº de tickets por franja horaria', tipo:'snapshot' },
+  ticketMedioFranja:   { label:'Ticket medio por franja horaria', tipo:'snapshot' },
+  rentabilidadFranja:  { label:'Rentabilidad — Resultado por franja (Ventas−COGS−Laboral)', tipo:'snapshot-async' },
+  rendBebidasBarista:  { label:'Rendimiento — Bebidas por barista y hora', tipo:'snapshot-async' },
+  rendTicketsBarista:  { label:'Rendimiento — Tickets por barista y hora (todos)', tipo:'snapshot-async' },
+  rendTicketsBebida:   { label:'Rendimiento — Tickets de bebidas por barista y hora', tipo:'snapshot-async' },
+  mermasEvolucion:     { label:'Mermas — Evolución del coste', tipo:'trend' },
+  mermasTop:           { label:'Mermas — Top 10 productos por coste', tipo:'snapshot' },
+  perfFidelidadNueva:  { label:'Performance — Tarjetas de fidelidad nuevas', tipo:'trend' },
+  perfNoBebidaLVAbs:   { label:'Performance — Tickets con algo más, L-V (nº)', tipo:'snapshot' },
+  perfNoBebidaLVPct:   { label:'Performance — Tickets con algo más, L-V (%)', tipo:'snapshot' },
+  perfNoBebidaSDAbs:   { label:'Performance — Tickets con algo más, S-D (nº)', tipo:'snapshot' },
+  perfNoBebidaSDPct:   { label:'Performance — Tickets con algo más, S-D (%)', tipo:'snapshot' },
 };
 function getReWidgets(){
   try{
@@ -3241,7 +3384,45 @@ function reLineOptionsLegend(esPct){
   const c = chartColors();
   return { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
 }
-function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, desde, hasta){
+function calcularTicketsPorFranjaPeriodo(desde, hasta){
+  const franjaOrder = franjaOrderNegocioFiltrado();
+  const byFranja = {}; franjaOrder.forEach(f=>byFranja[f]={n:0,bruto:0});
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const vistos = new Set();
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
+      if(fecha<desde||fecha>hasta) return;
+      if(!esPago) return;
+      const f = franjaLabelFor(hora,'negocio');
+      if(!byFranja[f]) return;
+      byFranja[f].bruto += bruto;
+      const key = periodId+'_'+ticketIdx;
+      if(!vistos.has(key)){ vistos.add(key); byFranja[f].n++; }
+    });
+  }
+  return { franjaOrder, byFranja };
+}
+function calcularMermasEvolucionMensual(buckets){
+  const costHistory = buildCostHistoryMap();
+  const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
+  (STATE.mermas||[]).forEach(m=>{
+    const b = buckets.find(bk=>m.fecha>=bk.dateMin && m.fecha<=bk.dateMax);
+    if(b) porBucket[b.label] += m.cantidad*costAtDate(costHistory, m.producto, m.fecha);
+  });
+  return porBucket;
+}
+function calcularMermasTopProductos(desde, hasta, top){
+  const costHistory = buildCostHistoryMap();
+  const porProducto = {};
+  (STATE.mermas||[]).forEach(m=>{
+    if(m.fecha<desde||m.fecha>hasta) return;
+    porProducto[m.producto] = (porProducto[m.producto]||0) + m.cantidad*costAtDate(costHistory, m.producto, m.fecha);
+  });
+  const entries = Object.entries(porProducto).sort((a,b)=>b[1]-a[1]).slice(0,top||10);
+  return { labels:entries.map(e=>e[0]), data:entries.map(e=>+e[1].toFixed(2)) };
+}
+async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, desde, hasta){
   const c = chartColors();
   destroyChart(chartKey);
   if(typeId==='ventas'){
@@ -3279,9 +3460,56 @@ function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, desde, ha
     const paleta = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968'];
     const valoresPorEtiqueta = Object.fromEntries(d.labels.map((l,i)=>[l,d.data[i]]));
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'doughnut', data:{ labels:d.labels, datasets:[{ data:d.data, backgroundColor:paleta }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:legendConLeyendaValores('bottom', {color:c.muted, boxWidth:11, font:{size:10}}, valoresPorEtiqueta, v=>eur(Math.round(v*100)))} } });
+  } else if(typeId==='ticketsFranja'){
+    const { franjaOrder, byFranja } = calcularTicketsPorFranjaPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets', franjaOrder.map(f=>byFranja[f].n), c.verdigris)] }, options:reLineOptions(false) });
+  } else if(typeId==='ticketMedioFranja'){
+    const { franjaOrder, byFranja } = calcularTicketsPorFranjaPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Ticket medio', franjaOrder.map(f=>{ const d=byFranja[f]; return d.n? +((d.bruto/d.n)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='rentabilidadFranja'){
+    const { franjaOrder, resultado:res } = await calcularRentabilidadPeriodo(desde, hasta);
+    const valores = franjaOrder.map(f=>(res[f].ventas-res[f].cogs-res[f].laboral)/100);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType()==='lineas'?'line':'bar', data:{ labels:franjaOrder, datasets:[{ label:'Resultado', data:valores, backgroundColor:valores.map(v=>v>=0?c.verdigris:'#C1613F'), borderColor:'#C1613F', borderRadius:4, tension:.3 }] }, options:reLineOptions(true) });
+  } else if(typeId==='rendBebidasBarista'){
+    const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Bebidas/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.bebidas/r.baristaHoras).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false) });
+  } else if(typeId==='rendTicketsBarista'){
+    const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.tickets/r.baristaHoras).toFixed(1):0; }), c.verdigris)] }, options:reLineOptions(false) });
+  } else if(typeId==='rendTicketsBebida'){
+    const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets bebida/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.ticketsBebida/r.baristaHoras).toFixed(1):0; }), '#8B6A46')] }, options:reLineOptions(false) });
+  } else if(typeId==='mermasEvolucion'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const porBucket = calcularMermasEvolucionMensual(buckets);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Coste de mermas', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#C1613F')] }, options:reLineOptions(true) });
+  } else if(typeId==='mermasTop'){
+    const d = calcularMermasTopProductos(desde, hasta, 10);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'bar', data:{ labels:d.labels, datasets:[{ label:'Coste', data:d.data, backgroundColor:'#C1613F', borderRadius:4 }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} }, y:{ ticks:{color:c.muted}, grid:{display:false} } } } });
+  } else if(typeId==='perfFidelidadNueva'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const primera = computeNuevasFidelidad();
+    const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
+    Object.values(primera).forEach(fecha=>{ const b=buckets.find(bk=>fecha>=bk.dateMin && fecha<=bk.dateMax); if(b) porBucket[b.label]++; });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Tarjetas nuevas', buckets.map(b=>porBucket[b.label]), c.copper)] }, options:reLineOptions(false) });
+  } else if(typeId.startsWith('perfNoBebida')){
+    const esFinde = typeId.includes('SD');
+    const esPct = typeId.endsWith('Pct');
+    const tickets = ticketsConCategoriaNoBebida(desde, hasta).filter(t=>t.esFinde===esFinde);
+    const franjaOrder = franjaOrderNegocioFiltrado();
+    const byFranja = {}; franjaOrder.forEach(f=>byFranja[f]={total:0,noBebida:0});
+    tickets.forEach(t=>{ if(!byFranja[t.franja]) return; byFranja[t.franja].total++; if(t.tieneNoBebida) byFranja[t.franja].noBebida++; });
+    if(esPct){
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('% con algo más', franjaOrder.map(f=>{ const d=byFranja[f]; return d.total? +(d.noBebida/d.total*100).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false) });
+    } else {
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[
+        trendDataset('Total tickets', franjaOrder.map(f=>byFranja[f].total), c.muted),
+        trendDataset('Con algo más', franjaOrder.map(f=>byFranja[f].noBebida), c.copper)
+      ]}, options:reLineOptionsLegend(false) });
+    }
   }
 }
-function renderResumenEjecutivo(){
+async function renderResumenEjecutivo(){
   const container = document.getElementById('reWidgetsContainer');
   if(!container) return;
   let desde = document.getElementById('reDesde').value;
@@ -3313,7 +3541,9 @@ function renderResumenEjecutivo(){
     </div>`;
   }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
 
-  widgets.forEach(w=>pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta));
+  for(const w of widgets){
+    await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta);
+  }
 
   container.querySelectorAll('[data-re-quitar]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -4452,6 +4682,631 @@ function renderFacturasHistorico(){
       renderFacturasHistorico();
     });
   });
+}
+
+/* =========================================================
+   CAJA — Análisis de caja del mes (migrado desde la app de React,
+   integrado de forma nativa. Etapa 1: subida, categorización, movimientos.)
+   ========================================================= */
+const CAJA_BANK_HEADER_ROW = 16;
+const CAJA_COL_AMOUNT   = 'IMPORTE';
+const CAJA_COL_DATE     = 'F. VALOR';
+const CAJA_COL_SEARCH   = ['CONCEPTO','BENEFICIARIO/ORDENANTE','OBSERVACIONES'];
+const CAJA_COL_CONCEPT1 = 'BENEFICIARIO/ORDENANTE';
+const CAJA_COL_CONCEPT2 = 'OBSERVACIONES';
+const CAJA_UNCATEGORIZED = '❓ A categorizar';
+const CAJA_SQUARE_KEYWORD = 'SQUAREUP INTERNATIONAL LIMITED';
+const CAJA_CHART_PALETTE = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968','#6B7A63','#8C5E3C','#4A7062','#C99A6B','#5A5548'];
+const CAJA_MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+STATE.caja = {
+  files: { bank:null, personal:null, providers:null },
+  data: null,
+  loading: false,
+  error: '',
+  tab: 'categorizar',
+  search: '',
+  savedMonths: [],
+  savedCats: { gastos:[], ingresos:[] },
+  savedProviders: [],
+  savedPersonalProvs: [],
+  savedGroups: [],
+  storageLoaded: false,
+  pending: {},
+  balanceMonth: '',
+  balanceYear: '',
+  confirmDelete: null,
+  showManualForm: false,
+  manualForm: { concept:'', amount:'', category:'' },
+};
+
+function cajaFmt(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n??0); }
+function cajaParseAmt(val){ if(typeof val==='number') return val; return parseFloat(String(val).replace(/\./g,'').replace(',','.'))||0; }
+function cajaISearch(needle, haystack){ if(!needle||!haystack) return false; return String(haystack).toLowerCase().includes(String(needle).toLowerCase()); }
+function cajaRecompute(movements){
+  const catT={}, incT={}, provT={};
+  let exp=0, inc=0;
+  movements.forEach(m=>{
+    if(m.amount<0){
+      exp+=m.amount;
+      catT[m.category]=(catT[m.category]||0)+Math.abs(m.amount);
+      const p=m.concept.length>50?m.concept.slice(0,50)+'…':m.concept;
+      provT[p]=(provT[p]||0)+Math.abs(m.amount);
+    } else {
+      inc+=m.amount;
+      incT[m.category]=(incT[m.category]||0)+m.amount;
+    }
+  });
+  const sort=obj=>Object.entries(obj).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+  return { catData:sort(catT), incomeCatData:sort(incT), provData:sort(provT).slice(0,15), totalExpense:exp, totalIncome:inc };
+}
+function cajaParseSheet(file, headerRow){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = e=>{
+      try{
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const ref = XLSX.utils.decode_range(ws['!ref']||'A1:Z2000');
+        ref.s.r = (headerRow||1)-1;
+        ws['!ref'] = XLSX.utils.encode_range(ref);
+        res(XLSX.utils.sheet_to_json(ws, {defval:''}));
+      }catch(err){ rej(err); }
+    };
+    r.onerror = rej;
+    r.readAsArrayBuffer(file);
+  });
+}
+async function cajaGet(key){
+  try{
+    const rows = await sbList('caja_storage', 'select=value&key=eq.'+encodeURIComponent(key));
+    if(!rows.length) return null;
+    return JSON.parse(rows[0].value);
+  }catch(e){ console.error('Error leyendo caja_storage:', e); return null; }
+}
+async function cajaSet(key, value){
+  try{
+    const val = typeof value==='string' ? value : JSON.stringify(value);
+    await sbUpsert('caja_storage', { key, value:val, updated_at:new Date().toISOString() }, 'key');
+  }catch(e){ console.error('Error guardando en caja_storage:', e); }
+}
+async function cajaLoadStorage(){
+  try{
+    const pp = await cajaGet('personal_provs'); if(pp) STATE.caja.savedPersonalProvs = pp;
+    const p = await cajaGet('providers'); if(p) STATE.caja.savedProviders = p;
+    const a = await cajaGet('months'); if(a) STATE.caja.savedMonths = a;
+    const b = await cajaGet('cats'); if(b) STATE.caja.savedCats = b;
+    const g = await cajaGet('groups'); if(g) STATE.caja.savedGroups = g;
+  }catch(e){ console.error('Caja load error:', e); }
+  STATE.caja.storageLoaded = true;
+}
+
+function cajaUploadZoneHtml(id, label, sublabel, icon, file){
+  return `<label for="cajaFile_${id}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 14px;border-radius:12px;cursor:pointer;border:2px dashed ${file?'var(--copper)':'var(--line)'};background:${file?'var(--copper)11':'var(--surface-2)'};min-height:110px;transition:all .2s;">
+    <span style="font-size:24px;">${icon}</span>
+    <span style="color:var(--text);font-weight:600;font-size:12px;text-align:center;">${label}</span>
+    <span style="color:var(--text-muted);font-size:11px;text-align:center;">${sublabel}</span>
+    ${file ? `<span style="color:var(--copper);font-size:10px;font-family:monospace;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✓ ${file.name}</span>` : `<span style="color:var(--text-muted);font-size:11px;">Haz clic para elegir</span>`}
+    <input type="file" id="cajaFile_${id}" accept=".xlsx,.xls,.csv" style="display:none;">
+  </label>`;
+}
+function renderCajaUploadScreen(){
+  const c = STATE.caja;
+  ['bank','personal','providers'].forEach(id=>{
+    const labels = { bank:['Extracto bancario','Obligatorio · Cabeceras fila 16','🏦'], personal:['Gastos personales','Opcional · Proveedor | Cantidad','🚫'], providers:['Proveedores / Categorías', c.savedProviders.length>0?`✓ ${c.savedProviders.length} guardados · solo si hay cambios`:'Opcional · Proveedor | Categoría','🗂️'] };
+    const [label,sublabel,icon] = labels[id];
+    document.getElementById('cajaUpload_'+id).innerHTML = cajaUploadZoneHtml(id, label, sublabel, icon, c.files[id]);
+    document.getElementById('cajaFile_'+id).addEventListener('change', (e)=>{
+      if(e.target.files[0]){ c.files[id] = e.target.files[0]; renderCajaUploadScreen(); }
+    });
+  });
+  document.getElementById('cajaProcesarBtn').disabled = !c.files.bank || c.loading;
+  document.getElementById('cajaProcesarBtn').textContent = c.loading ? 'Procesando...' : 'Generar balance del mes';
+
+  const errEl = document.getElementById('cajaUploadError');
+  errEl.style.display = c.error ? 'block' : 'none';
+  errEl.textContent = c.error;
+
+  const qa = document.getElementById('cajaQuickAccess');
+  if(c.storageLoaded && c.savedMonths.length>0){
+    qa.innerHTML = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><span class="hint">Ver datos:</span>' +
+      [['balances','Balances'],['tendencias','Tendencias'],['graficos','Gráficos'],['proveedores','Proveedores']].map(([t,l])=>
+        `<button class="btn secondary" data-caja-quick="${t}" style="padding:9px 16px;font-size:12px;">${l}</button>`
+      ).join('') + '</div>';
+    qa.querySelectorAll('[data-caja-quick]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        STATE.caja.data = { movements:[], catData:[], incomeCatData:[], provData:[], totalExpense:0, totalIncome:0, rawGastos:0, rawIngresos:0, saved:true, quickView:true };
+        STATE.caja.tab = btn.getAttribute('data-caja-quick');
+        renderCaja();
+      });
+    });
+  } else { qa.innerHTML=''; }
+
+  const catsEl = document.getElementById('cajaCategoriasGuardadas');
+  if(c.savedCats.gastos.length>0 || c.savedCats.ingresos.length>0){
+    catsEl.innerHTML = `<div class="card"><p class="hint" style="text-transform:uppercase;letter-spacing:1px;font-size:10px;margin-bottom:8px;">Categorías guardadas</p>` +
+      (c.savedCats.gastos.length>0 ? `<div style="margin-bottom:6px;"><span class="hint" style="margin-right:8px;">Gastos:</span>${c.savedCats.gastos.map(cat=>`<span class="pill noident" style="margin-right:5px;">${cat} <a href="#" data-del-cat="gastos|${cat}" style="color:var(--text-muted);">✕</a></span>`).join('')}</div>` : '') +
+      (c.savedCats.ingresos.length>0 ? `<div><span class="hint" style="margin-right:8px;">Ingresos:</span>${c.savedCats.ingresos.map(cat=>`<span class="pill nuevo" style="margin-right:5px;">${cat} <a href="#" data-del-cat="ingresos|${cat}" style="color:var(--text-muted);">✕</a></span>`).join('')}</div>` : '') +
+      `</div>`;
+    catsEl.querySelectorAll('[data-del-cat]').forEach(a=>{
+      a.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const [tipo,cat] = a.getAttribute('data-del-cat').split('|');
+        const sc = { ...c.savedCats, [tipo]: c.savedCats[tipo].filter(x=>x!==cat) };
+        c.savedCats = sc; cajaSet('cats', sc);
+        renderCajaUploadScreen();
+      });
+    });
+  } else { catsEl.innerHTML=''; }
+}
+
+async function cajaProcess(){
+  const c = STATE.caja;
+  if(!c.files.bank){ c.error='El extracto bancario es obligatorio.'; renderCajaUploadScreen(); return; }
+  c.loading=true; c.error=''; c.data=null; c.pending={};
+  renderCajaUploadScreen();
+  try{
+    const bankRows = await cajaParseSheet(c.files.bank, CAJA_BANK_HEADER_ROW);
+    const personalRows = c.files.personal ? await cajaParseSheet(c.files.personal,1) : [];
+    const providerRows = c.files.providers ? await cajaParseSheet(c.files.providers,1) : [];
+
+    if(!bankRows || bankRows.length===0){ c.error='Extracto vacío.'; c.loading=false; renderCajaUploadScreen(); return; }
+    const cols = Object.keys(bankRows[0]);
+    if(!cols.includes(CAJA_COL_AMOUNT)){ c.error='Columna "'+CAJA_COL_AMOUNT+'" no encontrada. Disponibles: '+cols.join(' | '); c.loading=false; renderCajaUploadScreen(); return; }
+
+    const uploadedProvs = providerRows.map(r=>{
+      const k=Object.keys(r);
+      const prov=String(r['Proveedor']||r['proveedor']||r[k[0]]||'').replace(/[\r\n\t]/g,' ').replace(/\s+/g,' ').trim();
+      const cat=String(r['Categoría']||r['Categoria']||r['categoria']||r[k[1]]||'').trim();
+      return {prov,cat};
+    }).filter(e=>e.prov&&e.cat);
+
+    let mergedProviders = [...c.savedProviders];
+    if(uploadedProvs.length>0){
+      uploadedProvs.forEach(u=>{
+        const idx=mergedProviders.findIndex(s=>s.prov.toLowerCase()===u.prov.toLowerCase());
+        if(idx>=0) mergedProviders[idx]=u; else mergedProviders.push(u);
+      });
+      c.savedProviders = mergedProviders;
+      cajaSet('providers', mergedProviders);
+    }
+    const catMap = mergedProviders;
+
+    const personalFromFile = personalRows.map(r=>{
+      const k=Object.keys(r);
+      const prov=String(r['Proveedor']||r['proveedor']||r[k[0]]||'').replace(/[\r\n\t]/g,' ').replace(/\s+/g,' ').trim();
+      const qty=cajaParseAmt(r['Cantidad']||r['cantidad']||r['Importe']||r['importe']||r[k[1]]||0);
+      return {prov,qty};
+    }).filter(p=>p.prov);
+    const alwaysPersonal = c.savedPersonalProvs.map(prov=>({prov,qty:0}));
+    const personalList=[...personalFromFile,...alwaysPersonal.filter(ap=>!personalFromFile.some(p=>p.prov.toLowerCase()===ap.prov.toLowerCase()))];
+
+    const movements=[];
+    let rawGastos=0, rawIngresos=0;
+
+    bankRows.forEach((row,idx)=>{
+      const amount=cajaParseAmt(row[CAJA_COL_AMOUNT]);
+      if(!amount||isNaN(amount)) return;
+      const c1=String(row[CAJA_COL_CONCEPT1]||'').trim();
+      const c2=String(row[CAJA_COL_CONCEPT2]||'').trim();
+      const concept=[c1,c2].filter(Boolean).join(' · ');
+      const searchTexts=CAJA_COL_SEARCH.map(cc=>String(row[cc]||''));
+      const dateRaw=CAJA_COL_DATE?row[CAJA_COL_DATE]:'';
+      let dateObj=null;
+      if(dateRaw){ if(typeof dateRaw==='number') dateObj=new Date(Math.round((dateRaw-25569)*86400*1000)); else dateObj=new Date(dateRaw); }
+      const month=dateObj&&!isNaN(dateObj.getTime())?`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`:'Sin fecha';
+      if(amount<0) rawGastos+=Math.abs(amount); else rawIngresos+=amount;
+
+      const pMatch = amount>0 ? null : personalList.find(pe=>{
+        if(!pe.prov||pe.prov.length<3) return false;
+        if(!searchTexts.some(t=>cajaISearch(pe.prov,t))) return false;
+        if(pe.qty===0) return true;
+        return Math.abs(Math.abs(amount)-Math.abs(pe.qty))<=1;
+      });
+      if(pMatch&&pMatch.qty>0){ movements.push({id:idx,concept,amount,month,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
+      if(pMatch&&pMatch.qty<0){ movements.push({id:idx,concept,amount,month,category:CAJA_UNCATEGORIZED,autoCat:false,isAdelanto:true,rawG:c1}); return; }
+      if(pMatch&&pMatch.qty===0){ movements.push({id:idx,concept,amount,month,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
+
+      let category=null;
+      if(amount>=0){
+        const src=[c1,c2,String(row['CONCEPTO']||'')].find(s=>s.trim().length>2)||'Otros ingresos';
+        category='💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
+      } else {
+        for(const {prov,cat} of catMap){ if(searchTexts.some(t=>cajaISearch(prov,t))){ category=cat; break; } }
+      }
+      const needsManualCat=category===null&&amount<0;
+      movements.push({id:idx,concept,amount,month,category:category||CAJA_UNCATEGORIZED,autoCat:category!==null&&!needsManualCat,needsManualCat,rawG:c1});
+    });
+
+    if(movements.length===0){ c.error='No se encontraron movimientos válidos.'; c.loading=false; renderCajaUploadScreen(); return; }
+    const agg=cajaRecompute(movements);
+    const mo=String(movements.find(m=>m.month!=='Sin fecha')?.month||'').split('-');
+    if(mo[0]) c.balanceYear=mo[0];
+    if(mo[1]) c.balanceMonth=mo[1];
+    c.data={movements,...agg,rawGastos,rawIngresos,saved:false};
+    c.tab='categorizar';
+  }catch(e){ console.error(e); c.error='Error: '+e.message; }
+  c.loading=false;
+  renderCaja();
+}
+
+function cajaAccG(){ const d=STATE.caja.data; return d ? d.movements.filter(m=>m.amount<0&&m.category!==CAJA_UNCATEGORIZED).reduce((s,m)=>s+Math.abs(m.amount),0) : 0; }
+function cajaAccI(){ const d=STATE.caja.data; return d ? d.movements.filter(m=>m.amount>=0&&m.category!==CAJA_UNCATEGORIZED).reduce((s,m)=>s+m.amount,0) : 0; }
+function cajaToCat(){
+  const d=STATE.caja.data;
+  if(!d) return {gastos:[],ingresos:[]};
+  return { gastos:d.movements.filter(m=>m.amount<0&&m.category===CAJA_UNCATEGORIZED), ingresos:d.movements.filter(m=>m.amount>=0&&m.category===CAJA_UNCATEGORIZED) };
+}
+function cajaGasCatOpts(){
+  const c=STATE.caja;
+  return [...new Set([...(c.data?.catData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.gastos, '💼 Gasto financiado por socio', '👤 Gasto personal socio'])];
+}
+function cajaIncCatOpts(){
+  const c=STATE.caja;
+  return ['💰 Aportacion socio', ...new Set([...(c.data?.incomeCatData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.ingresos])];
+}
+
+function cajaCatSelectHtml(id, currentValue, options, placeholder){
+  return `<select data-cat-select="${id}" style="background:var(--bg);border:1px solid ${currentValue?'var(--positive)':'var(--line)'};border-radius:6px;color:${currentValue?'var(--text)':'var(--text-muted)'};font-size:12px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px;">
+    <option value="">${placeholder||'— seleccionar —'}</option>
+    ${options.map(o=>`<option value="${o}" ${o===currentValue?'selected':''}>${o}</option>`).join('')}
+    <option value="__new__">+ Nueva categoría…</option>
+  </select>`;
+}
+function attachCajaCatSelectHandlers(container){
+  container.querySelectorAll('[data-cat-select]').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const id = sel.getAttribute('data-cat-select');
+      if(e.target.value==='__new__'){
+        const nueva = prompt('Nombre de la nueva categoría:');
+        if(nueva && nueva.trim()){ STATE.caja.pending[id] = nueva.trim(); renderCajaTabContent(); }
+        else { sel.value=''; }
+        return;
+      }
+      STATE.caja.pending[id] = e.target.value;
+      renderCajaTabContent();
+    });
+  });
+}
+
+function cajaApplyPending(){
+  const c = STATE.caja;
+  if(!c.data || !Object.keys(c.pending).length) return;
+  const updated = c.data.movements.map(m=> c.pending[m.id] ? {...m, category:c.pending[m.id], autoCat:false, needsManualCat:false} : m);
+  const newG = [...new Set(Object.entries(c.pending).filter(([id])=>{ const m=c.data.movements.find(x=>x.id==id); return m&&m.amount<0; }).map(([,v])=>v))];
+  const newI = [...new Set(Object.entries(c.pending).filter(([id])=>{ const m=c.data.movements.find(x=>x.id==id); return m&&m.amount>=0; }).map(([,v])=>v))];
+  const sc = { gastos:[...new Set([...c.savedCats.gastos,...newG])], ingresos:[...new Set([...c.savedCats.ingresos,...newI])] };
+  c.savedCats = sc; cajaSet('cats', sc);
+  c.pending = {};
+  c.data = { ...c.data, movements:updated, ...cajaRecompute(updated) };
+  renderCaja();
+}
+function cajaAddManualCost(){
+  const c = STATE.caja;
+  const amt = parseFloat(String(c.manualForm.amount).replace(',','.'));
+  if(!c.manualForm.concept.trim() || isNaN(amt) || !c.manualForm.category) return;
+  const newMov = { id:'manual_'+Date.now(), concept:c.manualForm.concept.trim(), amount:-Math.abs(amt), month:c.data?.movements?.find(m=>m.month!=='Sin fecha')?.month||'Sin fecha', category:c.manualForm.category, autoCat:false, isManual:true, needsManualCat:false };
+  const updated = [...(c.data?.movements||[]), newMov];
+  c.data = { ...c.data, movements:updated, ...cajaRecompute(updated), rawGastos:(c.data.rawGastos||0)+Math.abs(amt) };
+  c.manualForm = { concept:'', amount:'', category:'' };
+  c.showManualForm = false;
+  renderCaja();
+}
+async function cajaSaveMonth(){
+  const c = STATE.caja;
+  if(!c.data) return;
+  const mo = c.balanceMonth || String(new Date().getMonth()+1).padStart(2,'0');
+  const yr = c.balanceYear || String(new Date().getFullYear());
+  const month = `${yr}-${mo.padStart(2,'0')}`;
+  const title = `${CAJA_MESES[parseInt(mo,10)]} ${yr}`;
+  const sqInc = c.data.movements.filter(m=>{ if(m.amount<0) return false; const tt=[m.rawG,m.concept,m.category].filter(Boolean); return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t)); }).reduce((s,m)=>s+m.amount,0);
+  const entry = { month, title, savedAt:new Date().toISOString(), movements:c.data.movements, catData:c.data.catData, incomeCatData:c.data.incomeCatData, totalExpense:c.data.totalExpense, totalIncome:c.data.totalIncome, rawGastos:c.data.rawGastos, rawIngresos:c.data.rawIngresos, squareIncome:sqInc };
+  const updated = [...c.savedMonths.filter(m=>m.month!==month), entry].sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
+  await cajaSet('months', updated);
+  c.savedMonths = updated;
+  c.data = { ...c.data, saved:true, savedMonth:month };
+  renderCaja();
+  toast('Balance guardado.');
+}
+async function cajaEditMonth(m){
+  const c = STATE.caja;
+  const entry = c.savedMonths.find(x=>x.month===m);
+  if(!entry) return;
+  const [y,mo] = entry.month.split('-');
+  c.balanceYear=y||''; c.balanceMonth=mo||'';
+  c.data = { ...entry, saved:false }; c.pending={}; c.tab='categorizar';
+  renderCaja();
+}
+async function cajaDeleteMonth(month){
+  const c = STATE.caja;
+  const updated = c.savedMonths.filter(m=>m.month!==month);
+  c.savedMonths = updated; c.confirmDelete = null;
+  await cajaSet('months', updated);
+  if(c.data?.savedMonth===month) c.data=null;
+  renderCaja();
+}
+
+const CAJA_TABS_FULL = [
+  {id:'categorizar', label:'Categorizar'}, {id:'movimientos', label:'Movimientos'}, {id:'tendencias', label:'Tendencias'},
+  {id:'graficos', label:'Gráficos'}, {id:'balances', label:'Balances'}, {id:'proveedores', label:'Proveedores'},
+];
+function cajaTabsVisibles(){
+  const c = STATE.caja;
+  return (c.data && !c.data.quickView) ? CAJA_TABS_FULL : CAJA_TABS_FULL.filter(t=>!['categorizar','movimientos'].includes(t.id));
+}
+
+function renderCajaHeaderExtra(){
+  const c = STATE.caja;
+  const el = document.getElementById('cajaHeaderExtra');
+  let html = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">';
+  if(c.data && !c.data.quickView && !c.data.saved && c.balanceMonth && c.balanceYear){
+    html += `<div style="color:var(--copper);font-size:12px;font-weight:600;padding:5px 10px;background:var(--copper)22;border-radius:6px;border:1px solid var(--copper)44;">${CAJA_MESES[parseInt(c.balanceMonth,10)]} ${c.balanceYear}</div>`;
+  }
+  const allCat = cajaToCat().gastos.length===0 && cajaToCat().ingresos.length===0;
+  if(c.data && !c.data.quickView && allCat && !c.data.saved){
+    const mesesOpt = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+    const aniosOpt = Array.from({length:5},(_,i)=>String(new Date().getFullYear()-2+i));
+    html += `<select id="cajaMesSelect" style="background:var(--surface-2);border:2px solid var(--positive);border-radius:7px;color:var(--text);font-size:13px;padding:6px 10px;">
+      <option value="">— Mes —</option>${mesesOpt.map(m=>`<option value="${m}" ${m===c.balanceMonth?'selected':''}>${CAJA_MESES[parseInt(m,10)]}</option>`).join('')}</select>
+    <select id="cajaAnioSelect" style="background:var(--surface-2);border:2px solid var(--positive);border-radius:7px;color:var(--text);font-size:13px;padding:6px 10px;">
+      <option value="">— Año —</option>${aniosOpt.map(y=>`<option value="${y}" ${y===c.balanceYear?'selected':''}>${y}</option>`).join('')}</select>
+    <button class="btn" id="cajaGuardarBtn" style="padding:8px 16px;">Guardar</button>`;
+  }
+  if(c.data && c.data.saved && !c.data.quickView){
+    html += `<button class="btn secondary" id="cajaEditarBalanceBtn">Editar balance</button>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  const msel = document.getElementById('cajaMesSelect'); if(msel) msel.addEventListener('change', e=>{ c.balanceMonth=e.target.value; });
+  const ysel = document.getElementById('cajaAnioSelect'); if(ysel) ysel.addEventListener('change', e=>{ c.balanceYear=e.target.value; });
+  const gbtn = document.getElementById('cajaGuardarBtn'); if(gbtn) gbtn.addEventListener('click', cajaSaveMonth);
+  const ebtn = document.getElementById('cajaEditarBalanceBtn'); if(ebtn) ebtn.addEventListener('click', ()=>cajaEditMonth(c.data.savedMonth));
+}
+function renderCajaCheckBarsKpis(){
+  const c = STATE.caja;
+  const checkEl = document.getElementById('cajaCheckBars');
+  const kpiEl = document.getElementById('cajaKpis');
+  if(!c.data || c.data.quickView){ checkEl.innerHTML=''; kpiEl.innerHTML=''; return; }
+  const barra = (label, total, accounted) => {
+    const pct = total>0 ? Math.min(100,(accounted/total)*100) : 100;
+    const ok = Math.abs(total-accounted)<0.01;
+    return `<div style="flex:1;min-width:200px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span class="hint" style="text-transform:uppercase;letter-spacing:1px;">${label}</span><span style="font-size:11px;color:${ok?'var(--positive)':'var(--copper)'};font-weight:600;">${ok?'✓ Cuadra':'Pendiente: '+cajaFmt(total-accounted)}</span></div>
+      <div style="background:var(--surface-2);border-radius:4px;height:8px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${ok?'var(--positive)':'var(--copper)'};border-radius:4px;"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;"><span class="hint">Extracto: <b style="color:var(--text);">${cajaFmt(total)}</b></span><span class="hint">Contabilizado: <b style="color:var(--text);">${cajaFmt(accounted)}</b></span></div>
+    </div>`;
+  };
+  checkEl.innerHTML = barra('Gastos', c.data.rawGastos, cajaAccG()) + barra('Ingresos', c.data.rawIngresos, cajaAccI());
+  const toCatCount = cajaToCat().gastos.length + cajaToCat().ingresos.length;
+  const bal = c.data.totalIncome + c.data.totalExpense;
+  const kpis = [
+    ['Gasto Total', cajaFmt(Math.abs(c.data.totalExpense)), 'var(--copper)'],
+    ['Ingresos', cajaFmt(c.data.totalIncome), 'var(--positive)'],
+    ['Balance', cajaFmt(bal), bal>=0?'var(--positive)':'var(--negative)'],
+    ['Movimientos', c.data.movements.length, 'var(--text)'],
+    ['A categorizar', toCatCount, toCatCount>0?'var(--copper)':'var(--positive)'],
+  ];
+  kpiEl.innerHTML = kpis.map(([l,v,col])=>`<div class="stub"><div class="label">${l}</div><div class="value" style="color:${col};">${v}</div></div>`).join('');
+}
+function renderCajaTabBar(){
+  const c = STATE.caja;
+  const tabs = cajaTabsVisibles();
+  const toCatCount = cajaToCat().gastos.length + cajaToCat().ingresos.length;
+  document.getElementById('cajaTabBar').innerHTML = tabs.map(t=>`
+    <button data-caja-tab="${t.id}" style="background:${c.tab===t.id?'var(--surface-2)':'transparent'};color:${c.tab===t.id?'var(--copper)':'var(--text-muted)'};border:none;border-bottom:2px solid ${c.tab===t.id?'var(--copper)':'transparent'};padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer;border-radius:7px 7px 0 0;">
+      ${t.label}${t.id==='categorizar'&&toCatCount>0?` <span style="background:var(--copper);color:var(--bg);border-radius:9px;font-size:10px;font-weight:700;padding:1px 5px;margin-left:2px;">${toCatCount}</span>`:''}
+    </button>`).join('');
+  document.querySelectorAll('[data-caja-tab]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ STATE.caja.tab = btn.getAttribute('data-caja-tab'); renderCaja(); });
+  });
+}
+
+function renderCajaTabContent(){
+  const c = STATE.caja;
+  const el = document.getElementById('cajaTabContent');
+  if(c.tab==='categorizar' && c.data && !c.data.quickView){ renderCajaCategorizarTab(el); return; }
+  if(c.tab==='movimientos' && c.data && !c.data.quickView){ renderCajaMovimientosTab(el); return; }
+  if(c.tab==='balances'){ renderCajaBalancesTab(el); return; }
+  if(c.tab==='proveedores'){ renderCajaProveedoresTab(el); return; }
+  if(c.tab==='tendencias'){ el.innerHTML = '<p class="hint">Próximamente en esta reconstrucción.</p>'; return; }
+  if(c.tab==='graficos'){ el.innerHTML = '<p class="hint">Próximamente en esta reconstrucción.</p>'; return; }
+  el.innerHTML = '';
+}
+
+function renderCajaCategorizarTab(el){
+  const c = STATE.caja;
+  const toCat = cajaToCat();
+  const allCat = toCat.gastos.length===0 && toCat.ingresos.length===0;
+  if(allCat){
+    el.innerHTML = `<div class="card" style="border:1px solid var(--positive);text-align:center;padding:36px;">
+      <div style="font-size:36px;margin-bottom:8px;">✅</div>
+      <div style="color:var(--positive);font-weight:700;font-size:17px;margin-bottom:6px;">Todos los movimientos categorizados</div>
+      <p class="hint">Selecciona mes y año en la cabecera y guarda el balance.</p>
+    </div>`;
+    return;
+  }
+  const pendingCount = Object.keys(c.pending).length;
+  let html = '';
+  if(pendingCount>0) html += `<div style="display:flex;justify-content:flex-end;margin-bottom:12px;"><button class="btn" id="cajaAplicarBtn">Aplicar ${pendingCount} categoría${pendingCount>1?'s':''}</button></div>`;
+
+  html += `<div style="margin-bottom:16px;">`;
+  if(!c.showManualForm){
+    html += `<button class="btn secondary" id="cajaMostrarManualBtn" style="border:2px dashed var(--copper);width:100%;padding:10px 20px;">+ Añadir coste manual</button>`;
+  } else {
+    html += `<div class="card" style="border:2px solid var(--copper);">
+      <h3>Añadir coste manual</h3>
+      <div class="grid two">
+        <div class="config-field"><label>Concepto *</label><input type="text" id="cajaManualConcepto" value="${c.manualForm.concept}" placeholder="Descripción…"></div>
+        <div class="config-field"><label>Importe (€) *</label><input type="text" id="cajaManualImporte" value="${c.manualForm.amount}" placeholder="150,00"></div>
+      </div>
+      <div class="config-field"><label>Categoría *</label><select id="cajaManualCategoria">
+        <option value="">— seleccionar —</option>${cajaGasCatOpts().map(o=>`<option value="${o}" ${o===c.manualForm.category?'selected':''}>${o}</option>`).join('')}
+      </select></div>
+      <button class="btn" id="cajaManualGuardarBtn">Añadir</button>
+      <button class="btn secondary" id="cajaManualCancelarBtn">Cancelar</button>
+    </div>`;
+  }
+  html += `</div>`;
+
+  if(toCat.gastos.length>0){
+    html += `<div style="margin-bottom:20px;"><div style="color:var(--negative);font-weight:700;font-size:13px;margin-bottom:10px;">Gastos sin categorizar (${toCat.gastos.length})</div><div style="display:flex;flex-direction:column;gap:6px;">`;
+    toCat.gastos.forEach(m=>{
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${c.pending[m.id]?'var(--positive)11':'var(--surface-2)'};border-radius:8px;border:1px solid ${c.pending[m.id]?'var(--positive)44':'var(--line)'};flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;"><div style="color:var(--text);font-size:12px;">${m.concept}</div>
+          <div style="display:flex;gap:6px;margin-top:2px;align-items:center;"><span class="hint" style="font-family:monospace;">${m.month}</span>${m.isAdelanto?'<span style="background:var(--copper)33;color:var(--copper);font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px;">ADELANTO SOCIO</span>':''}</div>
+        </div>
+        <div style="color:var(--negative);font-family:monospace;font-weight:700;font-size:12px;white-space:nowrap;">${cajaFmt(m.amount)}</div>
+        ${cajaCatSelectHtml(m.id, c.pending[m.id]||'', cajaGasCatOpts(), '— categorizar —')}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+  if(toCat.ingresos.length>0){
+    html += `<div><div style="color:var(--positive);font-weight:700;font-size:13px;margin-bottom:10px;">Ingresos sin categorizar (${toCat.ingresos.length})</div><div style="display:flex;flex-direction:column;gap:6px;">`;
+    toCat.ingresos.forEach(m=>{
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${c.pending[m.id]?'var(--positive)11':'var(--surface-2)'};border-radius:8px;border:1px solid ${c.pending[m.id]?'var(--positive)44':'var(--line)'};flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;"><div style="color:var(--text);font-size:12px;">${m.concept}</div><div class="hint" style="font-family:monospace;margin-top:2px;">${m.month}</div></div>
+        <div style="color:var(--positive);font-family:monospace;font-weight:700;font-size:12px;white-space:nowrap;">${cajaFmt(m.amount)}</div>
+        ${cajaCatSelectHtml(m.id, c.pending[m.id]||'', cajaIncCatOpts(), '— categorizar —')}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
+  attachCajaCatSelectHandlers(el);
+  const aplicarBtn = document.getElementById('cajaAplicarBtn'); if(aplicarBtn) aplicarBtn.addEventListener('click', cajaApplyPending);
+  const mostrarBtn = document.getElementById('cajaMostrarManualBtn'); if(mostrarBtn) mostrarBtn.addEventListener('click', ()=>{ c.showManualForm=true; renderCajaTabContent(); });
+  const cancelarBtn = document.getElementById('cajaManualCancelarBtn'); if(cancelarBtn) cancelarBtn.addEventListener('click', ()=>{ c.showManualForm=false; renderCajaTabContent(); });
+  const guardarManualBtn = document.getElementById('cajaManualGuardarBtn');
+  if(guardarManualBtn) guardarManualBtn.addEventListener('click', ()=>{
+    c.manualForm = { concept:document.getElementById('cajaManualConcepto').value, amount:document.getElementById('cajaManualImporte').value, category:document.getElementById('cajaManualCategoria').value };
+    cajaAddManualCost();
+  });
+}
+
+function renderCajaMovimientosTab(el){
+  const c = STATE.caja;
+  const q = c.search.toLowerCase();
+  const filtered = c.data.movements.filter(m=>!q||m.concept.toLowerCase().includes(q)||m.category.toLowerCase().includes(q));
+  const pendingCount = Object.keys(c.pending).length;
+  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+      <input type="text" id="cajaBuscarInput" placeholder="Buscar…" value="${c.search}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;width:100%;max-width:340px;">
+      ${pendingCount>0?`<button class="btn" id="cajaAplicarBtn2">Aplicar ${pendingCount} cambio${pendingCount>1?'s':''}</button>`:''}
+    </div>
+    <div class="card" style="padding:0;overflow:auto;">
+      <table><thead><tr><th>Mes</th><th>Concepto</th><th>Categoría</th><th>Importe</th><th></th></tr></thead>
+      <tbody>${filtered.slice(0,400).map(m=>`
+        <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">${m.month}</td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.concept}</td>
+        <td>${cajaCatSelectHtml(m.id, c.pending[m.id]||'', m.amount<0?cajaGasCatOpts():cajaIncCatOpts(), m.category)}</td>
+        <td class="num" style="font-family:monospace;font-weight:700;color:${m.amount<0?'var(--negative)':'var(--positive)'};white-space:nowrap;">${cajaFmt(m.amount)}</td>
+        <td style="text-align:center;font-size:11px;">${m.isManual?'✍️':m.autoCat?'🤖':'✋'}</td></tr>
+      `).join('')}</tbody></table>
+      ${filtered.length>400?`<p class="hint" style="padding:10px;text-align:center;">Mostrando 400 de ${filtered.length}</p>`:''}
+      ${filtered.length===0?`<p class="hint" style="padding:40px 0;text-align:center;">Sin resultados</p>`:''}
+    </div>`;
+  attachCajaCatSelectHandlers(el);
+  document.getElementById('cajaBuscarInput').addEventListener('input', (e)=>{ c.search=e.target.value; renderCajaTabContent(); });
+  const aplicarBtn2 = document.getElementById('cajaAplicarBtn2'); if(aplicarBtn2) aplicarBtn2.addEventListener('click', cajaApplyPending);
+}
+
+function renderCajaBalancesTab(el){
+  const c = STATE.caja;
+  if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
+  if(c.savedMonths.length===0){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">No hay balances guardados.</p>'; return; }
+  el.innerHTML = [...c.savedMonths].reverse().map(m=>{
+    const bal = m.totalIncome + m.totalExpense;
+    return `<div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div><div style="color:var(--copper);font-weight:700;font-size:17px;">${m.title||m.month}</div><p class="hint" style="margin-top:2px;">Guardado: ${new Date(m.savedAt).toLocaleDateString('es-ES')}</p></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span style="color:var(--negative);font-family:monospace;font-size:13px;font-weight:700;">↓ ${cajaFmt(Math.abs(m.totalExpense))}</span>
+          <span style="color:var(--positive);font-family:monospace;font-size:13px;font-weight:700;">↑ ${cajaFmt(m.totalIncome)}</span>
+          <span style="color:${bal>=0?'var(--positive)':'var(--negative)'};font-family:monospace;font-size:13px;font-weight:700;">${cajaFmt(bal)}</span>
+          <button class="btn secondary" data-caja-editar-mes="${m.month}" style="padding:6px 12px;font-size:12px;">Editar</button>
+          ${c.confirmDelete===m.month
+            ? `<span style="color:var(--negative);font-size:11px;">¿Seguro? <button class="btn danger" data-caja-borrar-si="${m.month}" style="padding:4px 8px;font-size:11px;">Sí</button> <button class="btn secondary" data-caja-borrar-no="1" style="padding:4px 8px;font-size:11px;">No</button></span>`
+            : `<button class="btn danger" data-caja-borrar="${m.month}" style="padding:6px 12px;font-size:12px;">Borrar</button>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-caja-editar-mes]').forEach(btn=>btn.addEventListener('click', ()=>cajaEditMonth(btn.getAttribute('data-caja-editar-mes'))));
+  el.querySelectorAll('[data-caja-borrar]').forEach(btn=>btn.addEventListener('click', ()=>{ c.confirmDelete=btn.getAttribute('data-caja-borrar'); renderCajaTabContent(); }));
+  el.querySelectorAll('[data-caja-borrar-si]').forEach(btn=>btn.addEventListener('click', ()=>cajaDeleteMonth(btn.getAttribute('data-caja-borrar-si'))));
+  el.querySelectorAll('[data-caja-borrar-no]').forEach(btn=>btn.addEventListener('click', ()=>{ c.confirmDelete=null; renderCajaTabContent(); }));
+}
+
+function renderCajaProveedoresTab(el){
+  const c = STATE.caja;
+  el.innerHTML = `
+    <div class="card" style="border:1px solid var(--negative)44;margin-bottom:18px;">
+      <p class="hint" style="margin-bottom:8px;">Proveedores que <b>siempre</b> son gasto personal del socio (sin importar el importe):</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="cajaNuevoPersonalProv" placeholder="Nombre del proveedor…" style="flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
+        <button class="btn danger" id="cajaAddPersonalProvBtn" style="padding:6px 14px;font-size:12px;">+ Añadir</button>
+      </div>
+      <div id="cajaPersonalProvsList">${c.savedPersonalProvs.length>0 ? c.savedPersonalProvs.map(p=>`<span class="pill noident" style="margin-right:5px;">👤 ${p} <a href="#" data-del-personal-prov="${p}" style="color:var(--text-muted);">✕</a></span>`).join('') : '<span class="hint">No hay proveedores personales permanentes.</span>'}</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div style="color:var(--copper);font-weight:700;font-size:14px;">Proveedores y categorías <span class="hint" style="font-weight:400;">(${c.savedProviders.length} guardados)</span></div>
+    </div>
+    <div class="card" style="border:1px solid var(--copper)55;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <input type="text" id="cajaNuevoProvNombre" placeholder="Proveedor…" style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
+      <input type="text" id="cajaNuevoProvCategoria" placeholder="Categoría…" style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
+      <button class="btn" id="cajaAddProvBtn" style="padding:6px 14px;font-size:12px;">+ Añadir</button>
+    </div>
+    ${c.savedProviders.length===0 ? '<p class="hint" style="text-align:center;padding:40px;">No hay proveedores guardados.</p>' : `
+    <div class="card" style="padding:0;overflow:auto;">
+      <table><thead><tr><th>Proveedor</th><th>Categoría</th><th></th></tr></thead>
+      <tbody>${c.savedProviders.map((p,i)=>`
+        <tr><td>${p.prov}</td><td><span class="pill noident">${p.cat}</span></td>
+        <td><button class="btn danger" data-del-prov="${i}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+      `).join('')}</tbody></table>
+    </div>`}
+  `;
+  document.getElementById('cajaAddPersonalProvBtn').addEventListener('click', ()=>{
+    const v = document.getElementById('cajaNuevoPersonalProv').value.trim().toLowerCase();
+    if(v && !c.savedPersonalProvs.includes(v)){ c.savedPersonalProvs=[...c.savedPersonalProvs,v]; cajaSet('personal_provs', c.savedPersonalProvs); renderCajaTabContent(); }
+  });
+  el.querySelectorAll('[data-del-personal-prov]').forEach(a=>a.addEventListener('click', (e)=>{
+    e.preventDefault();
+    c.savedPersonalProvs = c.savedPersonalProvs.filter(x=>x!==a.getAttribute('data-del-personal-prov'));
+    cajaSet('personal_provs', c.savedPersonalProvs); renderCajaTabContent();
+  }));
+  document.getElementById('cajaAddProvBtn').addEventListener('click', ()=>{
+    const prov = document.getElementById('cajaNuevoProvNombre').value.trim();
+    const cat = document.getElementById('cajaNuevoProvCategoria').value.trim();
+    if(!prov||!cat) return;
+    c.savedProviders = [...c.savedProviders, {prov,cat}];
+    cajaSet('providers', c.savedProviders); renderCajaTabContent();
+  });
+  el.querySelectorAll('[data-del-prov]').forEach(btn=>btn.addEventListener('click', ()=>{
+    const i = parseInt(btn.getAttribute('data-del-prov'),10);
+    c.savedProviders = c.savedProviders.filter((_,j)=>j!==i);
+    cajaSet('providers', c.savedProviders); renderCajaTabContent();
+  }));
+}
+
+function renderCaja(){
+  const c = STATE.caja;
+  document.getElementById('cajaUploadScreen').style.display = c.data ? 'none' : 'block';
+  document.getElementById('cajaWorkingView').style.display = c.data ? 'block' : 'none';
+  if(!c.data){ renderCajaUploadScreen(); return; }
+  renderCajaHeaderExtra();
+  renderCajaCheckBarsKpis();
+  renderCajaTabBar();
+  renderCajaTabContent();
+}
+document.getElementById('cajaProcesarBtn').addEventListener('click', cajaProcess);
+document.getElementById('cajaInicioBtn').addEventListener('click', ()=>{ STATE.caja.data=null; STATE.caja.pending={}; STATE.caja.tab='categorizar'; renderCaja(); });
+document.getElementById('cajaExportarBtn').addEventListener('click', ()=>{ toast('La exportación llega en la siguiente etapa.'); });
+let cajaInicializada = false;
+async function initCajaSiHaceFalta(){
+  if(cajaInicializada) return;
+  cajaInicializada = true;
+  await cajaLoadStorage();
+  renderCaja();
 }
 
 /* =========================================================
