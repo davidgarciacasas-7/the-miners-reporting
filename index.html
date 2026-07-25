@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.29</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.30</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -6002,11 +6002,19 @@ function sugerenciasSimilares(texto, candidatos){
     .slice(0,3)
     .map(x=>x.nombre);
 }
+let casosSeleccionadosSet = new Set();
+function actualizarBarraSeleccionCasos(){
+  const n = casosSeleccionadosSet.size;
+  const countEl = document.getElementById('casosSeleccionCount');
+  const btnEl = document.getElementById('casosBorrarSeleccionBtn');
+  if(countEl) countEl.textContent = n>0 ? n+' seleccionado'+(n>1?'s':'') : '';
+  if(btnEl) btnEl.disabled = n===0;
+}
 function renderCasosACorregir(){
   const el = document.getElementById('mermasCasosCorregir');
   if(!el) return;
   const casos = getCasosACorregir();
-  if(casos.length===0){ el.innerHTML=''; return; }
+  if(casos.length===0){ el.innerHTML=''; casosSeleccionadosSet = new Set(); return; }
   const squareProducts = [...getSquareProductNames()].sort();
   const ingredientesConocidos = [...new Set(STATE.mermas.filter(m=>m.tipo==='ingrediente').map(m=>m.producto))].sort();
   const candidatosSugerencia = [...squareProducts, ...ingredientesConocidos];
@@ -6014,6 +6022,11 @@ function renderCasosACorregir(){
     <div class="card" style="border-color:var(--negative);margin-bottom:14px;">
       <h3 style="color:var(--negative);">⚠ Casos a revisar en Mermas (${casos.length})</h3>
       <p class="hint">Estos textos no coinciden con ningún producto de Square. Marca cada uno como un producto real (con autocompletado) o como un ingrediente, corrige el nombre si hace falta, y guarda — se actualizan todas las entradas con ese texto. También puedes borrar el caso entero si no tiene sentido.</p>
+      <div style="display:flex;align-items:center;gap:10px;margin:10px 0;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);"><input type="checkbox" id="casosCheckAll"> Seleccionar todos</label>
+        <span class="hint" id="casosSeleccionCount"></span>
+        <button class="btn danger" id="casosBorrarSeleccionBtn" style="padding:6px 12px;font-size:12px;" disabled>Borrar seleccionados</button>
+      </div>
       <div id="casosCorregirList" style="margin-top:10px;"></div>
       <datalist id="casoDatalistProductos">${squareProducts.map(p=>'<option value="'+p.replace(/"/g,'&quot;')+'">').concat(ingredientesConocidos.map(p=>'<option value="'+p.replace(/"/g,'&quot;')+'">')).join('')}</datalist>
     </div>`;
@@ -6024,7 +6037,7 @@ function renderCasosACorregir(){
     return `
     <div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <b>"${c.producto}"</b><span class="hint">${c.count} registro${c.count>1?'s':''}</span>
+        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" class="caso-check" data-idx-caso="${i}" ${casosSeleccionadosSet.has(i)?'checked':''}><b>"${c.producto}"</b></label><span class="hint">${c.count} registro${c.count>1?'s':''}</span>
       </div>
       ${chips ? '<div style="margin-bottom:8px;">'+chips+'</div>' : ''}
       <div class="subfilter" style="margin-bottom:0;">
@@ -6035,6 +6048,41 @@ function renderCasosACorregir(){
       </div>
     </div>`;
   }).join('');
+  listEl.querySelectorAll('.caso-check').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const i = parseInt(cb.getAttribute('data-idx-caso'),10);
+      if(cb.checked) casosSeleccionadosSet.add(i); else casosSeleccionadosSet.delete(i);
+      actualizarBarraSeleccionCasos();
+    });
+  });
+  const checkAllCasos = document.getElementById('casosCheckAll');
+  checkAllCasos.checked = casos.length>0 && casos.every((_,i)=>casosSeleccionadosSet.has(i));
+  checkAllCasos.addEventListener('change', (e)=>{
+    if(e.target.checked) casos.forEach((_,i)=>casosSeleccionadosSet.add(i));
+    else casosSeleccionadosSet.clear();
+    renderCasosACorregir();
+  });
+  document.getElementById('casosBorrarSeleccionBtn').addEventListener('click', async ()=>{
+    const n = casosSeleccionadosSet.size;
+    if(n===0) return;
+    const totalRegistros = [...casosSeleccionadosSet].reduce((s,i)=>s+(casos[i]?casos[i].count:0),0);
+    if(!confirm('¿Borrar '+n+' caso(s) seleccionados ('+totalRegistros+' registro(s) de merma en total)? No se puede deshacer.')) return;
+    const btn = document.getElementById('casosBorrarSeleccionBtn');
+    btn.textContent = 'Borrando...'; btn.disabled = true;
+    try{
+      const idsABorrar = [...casosSeleccionadosSet].flatMap(i=>casos[i]?casos[i].ids:[]);
+      for(const id of idsABorrar){ await sbDelete('mermas', id); }
+      STATE.mermas = STATE.mermas.filter(m=>!idsABorrar.includes(m.id));
+      toast('Borrados '+n+' caso(s), '+idsABorrar.length+' registro(s) en total.');
+      casosSeleccionadosSet = new Set();
+      renderCasosACorregir();
+      renderMermas();
+    }catch(e){
+      toast('Error: '+e.message, true);
+      btn.textContent = 'Borrar seleccionados'; btn.disabled = false;
+    }
+  });
+  actualizarBarraSeleccionCasos();
   listEl.querySelectorAll('[data-caso-sugerencia]').forEach(chip=>{
     chip.addEventListener('click', ()=>{
       const i = chip.getAttribute('data-caso-sugerencia');
@@ -6051,6 +6099,7 @@ function renderCasosACorregir(){
         for(const id of caso.ids){ await sbDelete('mermas', id); }
         STATE.mermas = STATE.mermas.filter(m=>!caso.ids.includes(m.id));
         toast('Borrados '+caso.count+' registro(s).');
+        casosSeleccionadosSet = new Set();
         renderCasosACorregir();
         renderMermas();
       }catch(e){
