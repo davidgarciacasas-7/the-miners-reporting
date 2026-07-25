@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.24</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.25</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -5108,7 +5108,7 @@ function renderCajaTabContent(){
   if(c.tab==='movimientos' && c.data && !c.data.quickView){ renderCajaMovimientosTab(el); return; }
   if(c.tab==='balances'){ renderCajaBalancesTab(el); return; }
   if(c.tab==='proveedores'){ renderCajaProveedoresTab(el); return; }
-  if(c.tab==='tendencias'){ el.innerHTML = '<p class="hint">Próximamente en esta reconstrucción.</p>'; return; }
+  if(c.tab==='tendencias'){ renderCajaTendenciasTab(el); return; }
   if(c.tab==='graficos'){ el.innerHTML = '<p class="hint">Próximamente en esta reconstrucción.</p>'; return; }
   el.innerHTML = '';
 }
@@ -5286,6 +5286,142 @@ function renderCajaProveedoresTab(el){
     c.savedProviders = c.savedProviders.filter((_,j)=>j!==i);
     cajaSet('providers', c.savedProviders); renderCajaTabContent();
   }));
+}
+
+function cajaPeriodoFiltrado(grafPeriod, grafFrom, grafTo){
+  const c = STATE.caja;
+  return c.savedMonths.filter(m=>{
+    const month = m.title||m.month;
+    if(grafPeriod==='3m') return c.savedMonths.slice(-3).some(x=>(x.title||x.month)===month);
+    if(grafPeriod==='6m') return c.savedMonths.slice(-6).some(x=>(x.title||x.month)===month);
+    if(grafPeriod==='custom'){
+      const from = grafFrom || (c.savedMonths[0]?.title||c.savedMonths[0]?.month||'');
+      const to = grafTo || (c.savedMonths[c.savedMonths.length-1]?.title||c.savedMonths[c.savedMonths.length-1]?.month||'');
+      return month>=from && month<=to;
+    }
+    return true;
+  });
+}
+function cajaSquareIncomeDeMes(m){
+  return (m.movements||[]).filter(mv=>{
+    if(mv.amount<0) return false;
+    const tt=[mv.rawG,mv.concept,mv.concept?.split(' · ')[0],mv.concept?.split(' · ')[1],mv.category].filter(Boolean);
+    return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t));
+  }).reduce((s,mv)=>s+mv.amount,0);
+}
+function cajaFiltroPeriodoHtml(grafPeriod, grafFrom, grafTo, savedMonths){
+  return `<span class="hint">Periodo:</span>` +
+    [['all','Todo'],['3m','3 meses'],['6m','6 meses'],['custom','Manual']].map(([v,l])=>
+      `<button class="btn ${(grafPeriod===v||(!grafPeriod&&v==='all'))?'':'secondary'}" data-graf-period="${v}" style="padding:5px 10px;font-size:11px;">${l}</button>`
+    ).join('') +
+    (grafPeriod==='custom' ? `
+      <select id="cajaGrafFrom" style="background:var(--surface-2);border:1px solid var(--copper);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;"><option value="">Desde...</option>${savedMonths.map(m=>`<option value="${m.title||m.month}" ${((m.title||m.month)===grafFrom)?'selected':''}>${m.title||m.month}</option>`).join('')}</select>
+      <select id="cajaGrafTo" style="background:var(--surface-2);border:1px solid var(--copper);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;"><option value="">Hasta...</option>${savedMonths.map(m=>`<option value="${m.title||m.month}" ${((m.title||m.month)===grafTo)?'selected':''}>${m.title||m.month}</option>`).join('')}</select>
+    ` : '');
+}
+function attachCajaFiltroPeriodoHandlers(el, onChange){
+  el.querySelectorAll('[data-graf-period]').forEach(btn=>btn.addEventListener('click', ()=>{ STATE.caja.grafPeriod = btn.getAttribute('data-graf-period'); onChange(); }));
+  const gfFrom = document.getElementById('cajaGrafFrom'); if(gfFrom) gfFrom.addEventListener('change', e=>{ STATE.caja.grafFrom=e.target.value; onChange(); });
+  const gfTo = document.getElementById('cajaGrafTo'); if(gfTo) gfTo.addEventListener('change', e=>{ STATE.caja.grafTo=e.target.value; onChange(); });
+}
+
+function renderCajaTendenciasTab(el){
+  const c = STATE.caja;
+  if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
+  if(c.savedMonths.length<2){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Necesitas al menos 2 balances guardados. Tienes '+c.savedMonths.length+'.</p>'; return; }
+
+  const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod||'all', c.grafFrom, c.grafTo);
+  const sqByMonth = {};
+  tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  const excludedCats = c.excludedCats||[];
+  const toVal = (rawVal, month) => {
+    if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0 ? +(rawVal/sq*100).toFixed(1) : 0; }
+    return rawVal;
+  };
+  const gastosDeMes = m => excludedCats.length>0 ? (m.catData||[]).filter(x=>!excludedCats.includes(x.name)).reduce((s,x)=>s+x.value,0) : Math.abs(m.totalExpense);
+  const series = [
+    { title:'Gastos totales'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':''), color:'var(--negative)', colorHex:'#C1613F',
+      data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(gastosDeMes(m), m.title||m.month) })) },
+    { title:'Ingresos Square + Efectivo', color:'var(--positive)', colorHex:'#3DD68C',
+      data: tendPeriod.map(m=>({ month:m.title||m.month, value: c.tendView==='pct' ? 100 : (sqByMonth[m.title||m.month]||0) })) },
+    { title:'Balance mensual'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':''), color:'var(--copper)', colorHex:'#C17F3C',
+      data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(m.totalIncome-gastosDeMes(m), m.title||m.month) })) },
+  ];
+
+  el.innerHTML = `
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+      <span class="hint">Ver como:</span>
+      <button class="btn ${c.tendView!=='pct'?'':'secondary'}" data-tend-view="abs" style="padding:6px 14px;font-size:12px;">€ Euros</button>
+      <button class="btn ${c.tendView==='pct'?'':'secondary'}" data-tend-view="pct" style="padding:6px 14px;font-size:12px;">% sobre Square</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+      <div style="position:relative;">
+        <button class="btn secondary" id="cajaExcluirCatsBtn" style="padding:5px 12px;font-size:12px;">Excluir categorías${excludedCats.length>0?' ('+excludedCats.length+')':''}</button>
+        <div id="cajaExcluirCatsMenu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:260px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+      </div>
+      ${cajaFiltroPeriodoHtml(c.grafPeriod, c.grafFrom, c.grafTo, c.savedMonths)}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;" id="cajaTendenciasCharts"></div>
+  `;
+
+  const excluirBtn = document.getElementById('cajaExcluirCatsBtn');
+  const excluirMenu = document.getElementById('cajaExcluirCatsMenu');
+  const todasCats = [...new Set(c.savedMonths.flatMap(m=>(m.catData||[]).map(x=>x.name)))].sort();
+  excluirMenu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Excluir de gastos totales:</div>` +
+    todasCats.map(cat=>{
+      const isExcl = excludedCats.includes(cat);
+      return `<div data-toggle-excl="${cat.replace(/"/g,'&quot;')}" style="padding:7px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;background:${isExcl?'var(--negative)22':'transparent'};">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${isExcl?'var(--negative)':'var(--line)'};background:${isExcl?'var(--negative)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${isExcl?'✕':''}</span>
+        <span style="color:${isExcl?'var(--negative)':'var(--text)'};">${cat}</span>
+      </div>`;
+    }).join('') +
+    (excludedCats.length>0 ? `<div data-limpiar-excl="1" style="padding:7px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Limpiar exclusiones</div>` : '');
+  excluirBtn.addEventListener('click', ()=>{ excluirMenu.style.display = excluirMenu.style.display==='none'?'block':'none'; });
+  excluirMenu.querySelectorAll('[data-toggle-excl]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const cat = div.getAttribute('data-toggle-excl');
+      c.excludedCats = excludedCats.includes(cat) ? excludedCats.filter(x=>x!==cat) : [...excludedCats, cat];
+      renderCajaTabContent();
+    });
+  });
+  const limpiarExcl = excluirMenu.querySelector('[data-limpiar-excl]');
+  if(limpiarExcl) limpiarExcl.addEventListener('click', ()=>{ c.excludedCats=[]; renderCajaTabContent(); });
+
+  el.querySelectorAll('[data-tend-view]').forEach(btn=>btn.addEventListener('click', ()=>{ c.tendView = btn.getAttribute('data-tend-view'); renderCajaTabContent(); }));
+  attachCajaFiltroPeriodoHandlers(el, renderCajaTabContent);
+
+  const chartsContainer = document.getElementById('cajaTendenciasCharts');
+  chartsContainer.innerHTML = series.map((s,i)=>`
+    <div class="card">
+      <p class="hint" style="text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${s.title}</p>
+      <div id="cajaTendStats_${i}" style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;"></div>
+      <div class="chart-wrap" style="height:200px;"><canvas id="cajaTendChart_${i}"></canvas></div>
+    </div>
+  `).join('');
+
+  const c2 = chartColors();
+  series.forEach((s,i)=>{
+    const vals = s.data.map(d=>d.value).filter(v=>v!==null && !isNaN(v));
+    const ultimo = s.data[s.data.length-1]?.value;
+    const total = vals.reduce((a,b)=>a+b,0);
+    const max = vals.length?Math.max(...vals):0;
+    const min = vals.length?Math.min(...vals):0;
+    const media = vals.length ? total/vals.length : 0;
+    const fmtStat = (v) => c.tendView==='pct' ? (v??0).toFixed(1)+'%' : cajaFmt(v||0);
+    document.getElementById('cajaTendStats_'+i).innerHTML = [['Último',ultimo],['Total',total],['Máx',max],['Mín',min],['Media',media]].map(([l,v])=>
+      `<div><span class="hint">${l}: </span><span style="color:${s.color};font-family:monospace;font-weight:700;font-size:13px;">${fmtStat(v)}</span></div>`
+    ).join('');
+
+    destroyChart('cajaTend'+i);
+    STATE.charts['cajaTend'+i] = safeNewChart('cajaTendChart_'+i, {
+      type:'line',
+      data:{ labels: s.data.map(d=>d.month), datasets:[{ label:s.title, data:s.data.map(d=>d.value), borderColor:s.colorHex, backgroundColor:s.colorHex, tension:.3 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{
+        x:{ ticks:{color:c2.muted}, grid:{display:false} },
+        y:{ ticks:{color:c2.muted, callback: v => c.tendView==='pct' ? v+'%' : v+'€'}, grid:{color:c2.grid} }
+      } }
+    });
+  });
 }
 
 function renderCaja(){
