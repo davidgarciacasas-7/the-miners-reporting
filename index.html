@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.26</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.29</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -368,6 +368,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <button class="btn secondary" id="pnlExportBtn">Exportar CSV</button>
             <button class="btn" id="pnlPrintBtn">Imprimir / PDF</button>
           </div>
+        </div>
+        <div class="subfilter" style="margin-bottom:10px;">
+          <div class="filter-group"><label>Línea de nóminas</label><select id="pnlLineaNominaSelect"><option value="">(ninguna)</option></select></div>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="pnlExcluirPropinasNomina"> Excluir propinas de esa línea</label>
         </div>
         <p class="hint" id="pnlRangoLabel" style="margin-bottom:6px;"></p>
         <p class="hint" id="pnlStatus"></p>
@@ -802,6 +806,20 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <div class="section-title">Periodos cargados</div>
         <div class="card" id="periodsList"><p class="hint">No hay periodos cargados todavía.</p></div>
+
+        <div class="section-title">Propinas</div>
+        <div class="card">
+          <p class="hint" style="margin-bottom:10px;">Registro de referencia — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago). No afecta a ningún cálculo de esta app; para eso está la pestaña Caja, que trabaja con el extracto bancario real.</p>
+          <div class="subfilter">
+            <input type="date" id="propinaFecha">
+            <input type="number" step="0.01" min="0" id="propinaImporte" placeholder="Importe (€)" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <input type="text" id="propinaNota" placeholder="Nota (opcional, ej. 'junio')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="propinaAddBtn" style="padding:5px 10px;font-size:12px;">Guardar</button>
+          </div>
+          <div style="max-height:280px;overflow:auto;margin-top:12px;">
+            <table id="tablaPropinas"><thead><tr><th>Fecha</th><th>Importe</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
       </div>
 
       <!-- CONFIG -->
@@ -1118,6 +1136,7 @@ async function loadAllData(){
     STATE.productCosts = (await sbList('product_costs', 'select=*&order=product_name.asc,effective_from.asc')).map(r=>({ id:r.id, productName:r.product_name, unitCost:parseFloat(r.unit_cost), effectiveFrom:r.effective_from, source:r.source }));
     STATE.otherCosts = (await sbList('other_costs', 'select=*&order=effective_from.asc')).map(r=>({ id:r.id, lineId:r.line_id, amount:parseFloat(r.amount), effectiveFrom:r.effective_from, source:r.source }));
     STATE.employees = (await sbList('empleados', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre, activo:r.activo }));
+    STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), nota:r.nota }));
   }catch(e){
     console.error('Error cargando datos de PNL/COGS', e);
   }
@@ -1127,6 +1146,7 @@ async function loadAllData(){
   renderPnl();
   renderCostes();
   renderEmpleados();
+  renderPropinas();
 }
 
 /* =========================================================
@@ -1425,6 +1445,48 @@ function renderPeriodsList(){
     });
   });
 }
+
+/* =========================================================
+   PROPINAS (registro de referencia — no afecta a ningún cálculo de esta app)
+   ========================================================= */
+STATE.propinas = [];
+async function loadAndRenderPropinas(){
+  try{
+    const rows = await sbList('propinas', 'select=*&order=fecha.desc');
+    STATE.propinas = rows.map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), nota:r.nota }));
+  }catch(e){ toast('No se pudo cargar propinas: '+e.message, true); STATE.propinas=[]; }
+  renderPropinas();
+}
+function renderPropinas(){
+  const tbody = document.querySelector('#tablaPropinas tbody');
+  if(!tbody) return;
+  tbody.innerHTML = STATE.propinas.map(p=>`
+    <tr><td>${p.fecha}</td><td class="num">${eur(Math.round(p.importe*100))}</td><td class="hint">${p.nota||''}</td>
+    <td><button class="btn danger" data-del-propina="${p.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+  `).join('') || '<tr><td colspan="4" class="hint">Sin propinas registradas todavía.</td></tr>';
+  tbody.querySelectorAll('[data-del-propina]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Eliminar este registro de propinas?')) return;
+      const id = btn.getAttribute('data-del-propina');
+      await sbDelete('propinas', id);
+      STATE.propinas = STATE.propinas.filter(p=>p.id!==id);
+      renderPropinas();
+    });
+  });
+}
+document.getElementById('propinaAddBtn').addEventListener('click', async ()=>{
+  const fecha = document.getElementById('propinaFecha').value;
+  const importe = parseFloat(document.getElementById('propinaImporte').value);
+  const nota = document.getElementById('propinaNota').value.trim();
+  if(!fecha || isNaN(importe)){ toast('Rellena fecha e importe.', true); return; }
+  try{
+    const saved = await sbInsert('propinas', { fecha, importe, nota: nota||null });
+    STATE.propinas.unshift({ id:saved.id, fecha:saved.fecha, importe:parseFloat(saved.importe), nota:saved.nota });
+    document.getElementById('propinaImporte').value=''; document.getElementById('propinaNota').value='';
+    renderPropinas();
+    toast('Guardado.');
+  }catch(e){ toast('Error: '+e.message, true); }
+});
 
 /* =========================================================
    CONFIGURACION
@@ -1882,6 +1944,23 @@ function trendDataset(label, data, color){
 function getShowDataLabels(){ return localStorage.getItem('miners_show_datalabels')==='true'; }
 /* excluir "Fuera de horario" de los cálculos/gráficos de Performance, Rentabilidad y Rendimiento */
 function getExcluirFueraHorario(){ return localStorage.getItem('miners_excluir_fuera_horario')==='true'; }
+/* propinas — suma en un rango de fechas (para PNL), y por mes concreto (para Caja) */
+function sumaPropinasEnRango(desde, hasta){
+  return (STATE.propinas||[]).filter(p=>p.fecha>=desde && p.fecha<=hasta).reduce((s,p)=>s+p.importe,0);
+}
+function cajaPropinasDelMes(monthStr){
+  return (STATE.propinas||[]).filter(p=>p.fecha.slice(0,7)===monthStr).reduce((s,p)=>s+p.importe,0);
+}
+/* PNL: línea designada como "nóminas" (para poder restarle las propinas), preferencia local */
+function getPnlLineaNomina(){ return localStorage.getItem('miners_pnl_linea_nomina') || ''; }
+function setPnlLineaNomina(v){ localStorage.setItem('miners_pnl_linea_nomina', v); }
+function getExcluirPropinasNominaPnl(){ return localStorage.getItem('miners_pnl_excluir_propinas')==='true'; }
+function setExcluirPropinasNominaPnl(v){ localStorage.setItem('miners_pnl_excluir_propinas', v?'true':'false'); }
+/* Caja: categoría designada como "nóminas" */
+function getCajaCategoriaNomina(){ return localStorage.getItem('miners_caja_categoria_nomina') || ''; }
+function setCajaCategoriaNomina(v){ localStorage.setItem('miners_caja_categoria_nomina', v); }
+function getExcluirPropinasNominaCaja(){ return localStorage.getItem('miners_caja_excluir_propinas')==='true'; }
+function setExcluirPropinasNominaCaja(v){ localStorage.setItem('miners_caja_excluir_propinas', v?'true':'false'); }
 function setExcluirFueraHorario(v){ localStorage.setItem('miners_excluir_fuera_horario', v?'true':'false'); }
 function franjaOrderNegocioFiltrado(){
   const orden = franjaOrderFor('negocio');
@@ -3305,6 +3384,9 @@ const RE_WIDGET_TYPES = {
   perfNoBebidaLVPct:   { label:'Performance — Tickets con algo más, L-V (%)', tipo:'snapshot' },
   perfNoBebidaSDAbs:   { label:'Performance — Tickets con algo más, S-D (nº)', tipo:'snapshot' },
   perfNoBebidaSDPct:   { label:'Performance — Tickets con algo más, S-D (%)', tipo:'snapshot' },
+  cajaGastos:    { label:'Caja — Gastos totales por mes', tipo:'snapshot-async' },
+  cajaIngresos:  { label:'Caja — Ingresos Square + Efectivo por mes', tipo:'snapshot-async' },
+  cajaBalance:   { label:'Caja — Balance mensual', tipo:'snapshot-async' },
 };
 function getReWidgets(){
   try{
@@ -3375,6 +3457,17 @@ function calcularCogsTotalMensual(buckets){
   const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
   getAllSalesLinesRaw().forEach(l=>{ const b=buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax); if(b) porBucket[b.label]+=l.cant*costAtDate(costHistory,l.articulo,l.fecha); });
   return porBucket;
+}
+async function calcularCajaSerieMensual(desde, hasta, tipo){
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+  const mesesFiltrados = STATE.caja.savedMonths.filter(m=> m.month>=desde.slice(0,7) && m.month<=hasta.slice(0,7));
+  const labels = mesesFiltrados.map(m=>m.title||m.month);
+  const data = mesesFiltrados.map(m=>{
+    if(tipo==='gastos') return +Math.abs(m.totalExpense).toFixed(2);
+    if(tipo==='ingresos') return +cajaSquareIncomeDeMes(m).toFixed(2);
+    return +(m.totalIncome + m.totalExpense).toFixed(2);
+  });
+  return { labels, data };
 }
 function reLineOptions(esEuro){
   const c = chartColors();
@@ -3507,6 +3600,15 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
         trendDataset('Con algo más', franjaOrder.map(f=>byFranja[f].noBebida), c.copper)
       ]}, options:reLineOptionsLegend(false) });
     }
+  } else if(typeId==='cajaGastos' || typeId==='cajaIngresos' || typeId==='cajaBalance'){
+    const tipo = typeId==='cajaGastos'?'gastos':(typeId==='cajaIngresos'?'ingresos':'balance');
+    const d = await calcularCajaSerieMensual(desde, hasta, tipo);
+    const color = tipo==='gastos' ? '#C1613F' : (tipo==='ingresos' ? c.verdigris : c.copper);
+    if(d.labels.length===0){
+      destroyChart(chartKey);
+    } else {
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(true) });
+    }
   }
 }
 async function renderResumenEjecutivo(){
@@ -3638,20 +3740,24 @@ document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
 });
 
 function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCostHistory){
+  let valor;
   if(line.esAuto && line.name==='Ventas'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum+=l.bruto; });
-    return sum/100;
-  }
-  if(line.esAuto && line.name==='COGS'){
+    valor = sum/100;
+  } else if(line.esAuto && line.name==='COGS'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
-    return sum;
+    valor = sum;
+  } else if(line.esRecurrente){
+    valor = otherCostValueForBucket(line.id, bucket, otherCostHistory);
+  } else {
+    let sum=0;
+    STATE.pnlValues.filter(v=>v.lineId===line.id).forEach(v=>{ sum += allocateToBucket(v.dateMin, v.dateMax, bucket.dateMin, bucket.dateMax, v.amount); });
+    valor = sum;
   }
-  if(line.esRecurrente){
-    return otherCostValueForBucket(line.id, bucket, otherCostHistory);
+  if(getExcluirPropinasNominaPnl() && line.id===getPnlLineaNomina()){
+    valor -= sumaPropinasEnRango(bucket.dateMin, bucket.dateMax);
   }
-  let sum=0;
-  STATE.pnlValues.filter(v=>v.lineId===line.id).forEach(v=>{ sum += allocateToBucket(v.dateMin, v.dateMax, bucket.dateMin, bucket.dateMax, v.amount); });
-  return sum;
+  return valor;
 }
 async function ensureDefaultPnlLines(){
   let changed=false;
@@ -3715,6 +3821,11 @@ async function renderPnl(){
   const costHistory = buildCostHistoryMap();
   const otherCostHistory = buildOtherCostHistoryMap();
   const lines = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+
+  const nominaSel = document.getElementById('pnlLineaNominaSelect');
+  const nominaActual = getPnlLineaNomina();
+  nominaSel.innerHTML = '<option value="">(ninguna)</option>' + lines.filter(l=>l.tipo==='coste').map(l=>`<option value="${l.id}" ${l.id===nominaActual?'selected':''}>${l.name}</option>`).join('');
+  document.getElementById('pnlExcluirPropinasNomina').checked = getExcluirPropinasNominaPnl();
 
   document.querySelector('#tablaPnl thead tr').innerHTML = '<th>Línea</th>'+buckets.map(b=>'<th class="num">'+b.label+'</th>').join('')+'<th></th>';
 
@@ -3934,6 +4045,8 @@ function renderCostes(){
 document.getElementById('pnlGranularidad').addEventListener('change', renderPnl);
 document.getElementById('pnlDesde').addEventListener('change', renderPnl);
 document.getElementById('pnlHasta').addEventListener('change', renderPnl);
+document.getElementById('pnlLineaNominaSelect').addEventListener('change', (e)=>{ setPnlLineaNomina(e.target.value); renderPnl(); });
+document.getElementById('pnlExcluirPropinasNomina').addEventListener('change', (e)=>{ setExcluirPropinasNominaPnl(e.target.checked); renderPnl(); });
 document.getElementById('pnlAddLineBtn').addEventListener('click', async ()=>{
   const name = prompt('Nombre de la nueva línea (ej. "Alquiler", "Nóminas"):');
   if(!name) return;
@@ -5349,21 +5462,38 @@ function renderCajaTendenciasTab(el){
     if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0 ? +(rawVal/sq*100).toFixed(1) : 0; }
     return rawVal;
   };
-  const gastosDeMes = m => excludedCats.length>0 ? (m.catData||[]).filter(x=>!excludedCats.includes(x.name)).reduce((s,x)=>s+x.value,0) : Math.abs(m.totalExpense);
+  const gastosDeMes = m => {
+    let g = excludedCats.length>0 ? (m.catData||[]).filter(x=>!excludedCats.includes(x.name)).reduce((s,x)=>s+x.value,0) : Math.abs(m.totalExpense);
+    const catNomina = getCajaCategoriaNomina();
+    if(getExcluirPropinasNominaCaja() && catNomina && !excludedCats.includes(catNomina)){
+      g -= cajaPropinasDelMes(m.month);
+    }
+    return g;
+  };
+  const nominaTitleSuffix = (getExcluirPropinasNominaCaja() && getCajaCategoriaNomina()) ? ' · propinas de nóminas excluidas' : '';
   const series = [
-    { title:'Gastos totales'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':''), color:'var(--negative)', colorHex:'#C1613F',
+    { title:'Gastos totales'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':'')+nominaTitleSuffix, color:'var(--negative)', colorHex:'#C1613F',
       data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(gastosDeMes(m), m.title||m.month) })) },
     { title:'Ingresos Square + Efectivo', color:'var(--positive)', colorHex:'#3DD68C',
       data: tendPeriod.map(m=>({ month:m.title||m.month, value: c.tendView==='pct' ? 100 : (sqByMonth[m.title||m.month]||0) })) },
-    { title:'Balance mensual'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':''), color:'var(--copper)', colorHex:'#C17F3C',
+    { title:'Balance mensual'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':'')+nominaTitleSuffix, color:'var(--copper)', colorHex:'#C17F3C',
       data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(m.totalIncome-gastosDeMes(m), m.title||m.month) })) },
   ];
 
+  const todasCatsNomina = [...new Set(c.savedMonths.flatMap(m=>(m.catData||[]).map(x=>x.name)))].sort();
   el.innerHTML = `
     <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
       <span class="hint">Ver como:</span>
       <button class="btn ${c.tendView!=='pct'?'':'secondary'}" data-tend-view="abs" style="padding:6px 14px;font-size:12px;">€ Euros</button>
       <button class="btn ${c.tendView==='pct'?'':'secondary'}" data-tend-view="pct" style="padding:6px 14px;font-size:12px;">% sobre Square</button>
+    </div>
+    <div class="card" style="margin-bottom:16px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <span class="hint">Categoría de nóminas:</span>
+      <select id="cajaCategoriaNominaSelect" style="background:var(--surface-2);border:1px solid var(--line);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;">
+        <option value="">(ninguna)</option>
+        ${todasCatsNomina.map(cat=>`<option value="${cat.replace(/"/g,'&quot;')}" ${cat===getCajaCategoriaNomina()?'selected':''}>${cat}</option>`).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="cajaExcluirPropinasNomina" ${getExcluirPropinasNominaCaja()?'checked':''}> Excluir propinas de esa categoría</label>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
       <div style="position:relative;">
@@ -5374,6 +5504,9 @@ function renderCajaTendenciasTab(el){
     </div>
     <div style="display:flex;flex-direction:column;gap:16px;" id="cajaTendenciasCharts"></div>
   `;
+
+  document.getElementById('cajaCategoriaNominaSelect').addEventListener('change', (e)=>{ setCajaCategoriaNomina(e.target.value); renderCajaTabContent(); });
+  document.getElementById('cajaExcluirPropinasNomina').addEventListener('change', (e)=>{ setExcluirPropinasNominaCaja(e.target.checked); renderCajaTabContent(); });
 
   const excluirBtn = document.getElementById('cajaExcluirCatsBtn');
   const excluirMenu = document.getElementById('cajaExcluirCatsMenu');
@@ -6166,6 +6299,7 @@ function showApp(){
   EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.checked = getExcluirFueraHorario(); });
   const hoy = new Date().toISOString().slice(0,10);
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
+  const propinaFechaEl = document.getElementById('propinaFecha'); if(propinaFechaEl && !propinaFechaEl.value) propinaFechaEl.value = hoy;
   const hxFechaEl = document.getElementById('hxFecha'); if(hxFechaEl && !hxFechaEl.value) hxFechaEl.value = hoy;
 }
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
