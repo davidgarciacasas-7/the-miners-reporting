@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.8</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.18</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -257,10 +257,11 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <div class="filter-group"><label>Franja horaria</label><select id="fFranjaTipo"><option value="negocio" selected>Franjas del negocio</option><option value="1">Bloques 1h</option><option value="2">Bloques 2h</option><option value="4">Bloques 4h</option></select></div>
       <div class="filter-group"><label>Día</label><select id="fDiaTipo"><option value="">Todos los días</option><option value="semana">Entre semana (L–V)</option><option value="finde">Fin de semana (S–D)</option></select></div>
       <div class="filter-group"><label>Día de la semana</label><select id="fDiaSemana"><option value="">Todos</option><option value="Lunes">Lunes</option><option value="Martes">Martes</option><option value="Miércoles">Miércoles</option><option value="Jueves">Jueves</option><option value="Viernes">Viernes</option><option value="Sábado">Sábado</option><option value="Domingo">Domingo</option></select></div>
-      <div class="filter-group"><label>Métrica</label><select id="fMetrica"><option value="absoluto" selected>Valor absoluto</option><option value="porcentual">% sobre el total</option></select></div>
+      <div class="filter-group"><label>Métrica</label><select id="fMetrica" title="El 100% es siempre el total de lo que esté filtrado ahora mismo (fechas, categoría, artículo, franja, día...), no el total histórico de la empresa."><option value="absoluto" selected>Valor absoluto</option><option value="porcentual">% sobre el total</option></select></div>
 
       <button class="clear-btn" id="clearFilters">Limpiar filtros</button>
     </div>
+    <p class="hint" id="metricaHint" style="display:none;margin:-10px 0 16px 0;">ℹ️ El 100% es el total de <b>lo que ves ahora mismo con los filtros puestos</b> (fechas, categoría, artículo, franja, día...) — no el total histórico de la empresa. Si cambias los filtros, el 100% también cambia.</p>
 
     <div id="noDataState" class="hint warn" style="display:none;background:var(--surface);border:1px solid var(--negative);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;">
       Todavía no hay datos cargados. Ve a <b>Subir datos</b> para importar tu primer export de Square (o a <b>Configuración</b> si aún no has conectado Supabase).
@@ -474,10 +475,16 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <select id="mermasCosteGranularidad"><option value="dia">Diario</option><option value="semana" selected>Semanal</option><option value="mes">Mensual</option></select>
         </div>
         <div class="card"><div class="chart-wrap"><canvas id="chartMermasCosteTendencia"></canvas></div></div>
-        <div class="section-title">Detalle</div>
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Detalle</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="hint" id="mermasSeleccionCount"></span>
+            <button class="btn danger" id="mermasBorrarSeleccionBtn" style="padding:6px 12px;font-size:12px;" disabled>Borrar seleccionadas</button>
+          </div>
+        </div>
         <div class="card">
           <div style="max-height:420px;overflow:auto;">
-            <table id="tablaMermas"><thead><tr><th>Fecha</th><th>Hora</th><th>Empleado</th><th>Producto</th><th>Cantidad</th><th>Categoría</th><th>Dicho originalmente</th><th></th></tr></thead><tbody></tbody></table>
+            <table id="tablaMermas"><thead><tr><th><input type="checkbox" id="mermasCheckAll"></th><th>Fecha</th><th>Hora</th><th>Empleado</th><th>Producto</th><th>Cantidad</th><th>Categoría</th><th>Dicho originalmente</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </div>
@@ -489,6 +496,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div class="filter-group"><label>Desde</label><input type="date" id="perfDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="perfHasta"></div>
             <div class="filter-group"><label>Tipo de gráfico</label><select id="perfChartTypeSelect"><option value="barras">Barras</option><option value="lineas">Líneas</option></select></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="perfExcluirFuera"> Excluir "Fuera de horario"</label>
           </div>
           <button class="btn" id="perfExportPdfBtn">Exportar PDF</button>
         </div>
@@ -523,18 +531,28 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="rentDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="rentHasta"></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rentExcluirFuera"> Excluir "Fuera de horario"</label>
           </div>
           <p class="hint" id="rentSemanaLabel" style="margin-top:8px;"></p>
         </div>
 
         <div class="card" style="margin-bottom:14px;">
           <h3>Plantilla de personal</h3>
-          <p class="hint" style="margin-bottom:6px;"><b>Nº de empleados</b>: total trabajando en esa franja (baristas + cocina). <b>€/hora</b>: el coste por hora <u>de cada empleado</u> (no la suma de todos) — la app ya multiplica nº empleados × €/hora × duración de la franja para sacar el coste laboral total.</p>
+          <p class="hint" style="margin-bottom:6px;"><b>Cocina</b> y <b>Baristas</b> se cuentan por separado, cada uno con su propio coste por hora — la app multiplica nº personas × €/hora × duración de la franja para cada uno, y la columna "Coste total" te enseña la suma de ambos para esa línea y ese patrón (L-V o S-D).</p>
+          <p class="hint" style="margin-bottom:6px;">El coste por hora es siempre <u>por persona</u> (no la suma de todas).</p>
+          <p class="hint" style="margin-bottom:8px;">Genera las líneas de horario automáticamente eligiendo apertura, cierre (puede ser distinto entre semana y fin de semana) y cada cuánto tiempo quieres una línea nueva. Se generan franjas hasta el cierre más tardío de los dos, así puedes poner 0 empleados en las franjas donde uno de los dos tipos de día no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div class="filter-group"><label>Apertura</label><input type="time" id="rentAperturaInput" value="08:00"></div>
+            <div class="filter-group"><label>Cierre L–V</label><input type="time" id="rentCierreLVInput" value="21:00"></div>
+            <div class="filter-group"><label>Cierre S–D</label><input type="time" id="rentCierreSDInput" value="21:00"></div>
+            <div class="filter-group"><label>Cada</label><select id="rentGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
+            <button class="btn secondary" id="rentGenerarFranjasBtn">Generar franjas</button>
+          </div>
           <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rentPlantillaDia" style="max-width:200px;"></div>
           <div style="overflow-x:auto;">
             <table id="tablaPlantilla">
-              <thead><tr><th>Franja</th><th colspan="2">Entre semana (L–V)</th><th colspan="2">Fin de semana (S–D)</th></tr>
-              <tr><th></th><th>Nº empleados</th><th>€/hora por empleado</th><th>Nº empleados</th><th>€/hora por empleado</th></tr></thead>
+              <thead><tr><th>Franja</th><th colspan="5">Entre semana (L–V)</th><th colspan="5">Fin de semana (S–D)</th></tr>
+              <tr><th></th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -559,13 +577,22 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="rendDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="rendHasta"></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rendExcluirFuera"> Excluir "Fuera de horario"</label>
           </div>
           <p class="hint" id="rendSemanaLabel" style="margin-top:8px;"></p>
         </div>
 
         <div class="card" style="margin-bottom:14px;">
           <h3>Baristas por franja horaria</h3>
-          <p class="hint" style="margin-bottom:10px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón entre semana y otro fin de semana.</p>
+          <p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón entre semana y otro fin de semana.</p>
+          <p class="hint" style="margin-bottom:8px;">Genera las líneas de horario automáticamente eligiendo apertura, cierre (puede ser distinto entre semana y fin de semana) y cada cuánto tiempo quieres una línea nueva. Se generan franjas hasta el cierre más tardío de los dos, así puedes poner 0 baristas en las franjas donde uno de los dos tipos de día no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div class="filter-group"><label>Apertura</label><input type="time" id="rendAperturaInput" value="08:00"></div>
+            <div class="filter-group"><label>Cierre L–V</label><input type="time" id="rendCierreLVInput" value="21:00"></div>
+            <div class="filter-group"><label>Cierre S–D</label><input type="time" id="rendCierreSDInput" value="21:00"></div>
+            <div class="filter-group"><label>Cada</label><select id="rendGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
+            <button class="btn secondary" id="rendGenerarFranjasBtn">Generar franjas</button>
+          </div>
           <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rendPlantillaDia" style="max-width:200px;"></div>
           <div style="overflow-x:auto;">
             <table id="tablaBaristas">
@@ -582,33 +609,33 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <div class="grid split">
           <div class="card"><h3>Bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartBebidasBarista"></canvas></div></div>
-          <div class="card"><h3>Tickets por barista y por hora</h3><div class="chart-wrap"><canvas id="chartTicketsBarista"></canvas></div></div>
+          <div class="card"><h3>Tickets por barista y por hora (todos)</h3><div class="chart-wrap"><canvas id="chartTicketsBarista"></canvas></div></div>
         </div>
+        <div class="card" style="margin-top:14px;"><h3>Tickets de bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartTicketsBebidaBarista"></canvas></div></div>
         <div class="card" style="margin-top:14px;">
-          <table id="tablaRendimiento"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Tickets/barista/h</th></tr></thead><tbody></tbody></table>
+          <table id="tablaRendimiento"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets (todos)</th><th>Tickets con bebida</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Tickets/barista/h</th><th>Tickets bebida/barista/h</th></tr></thead><tbody></tbody></table>
         </div>
       </div>
 
       <!-- RESUMEN EJECUTIVO -->
       <div class="tabpanel" id="tab-resumenejecutivo">
+        <div style="text-align:center;margin-bottom:16px;padding:14px 0;border-bottom:1px solid var(--line);">
+          <h1 style="font-family:'Fraunces',serif;font-size:24px;margin:0;color:var(--text);">The Miners <span style="color:var(--copper);">Plaza de España</span></h1>
+          <p class="hint" style="margin-top:4px;">Resumen Ejecutivo</p>
+        </div>
         <div class="topbar" style="margin-bottom:10px;">
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="reDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="reHasta"></div>
+            <div class="filter-group"><label>+ Añadir gráfico</label><select id="reAddWidgetSelect"><option value="">Elegir...</option></select></div>
           </div>
-          <button class="btn secondary" id="reCopyClaudeBtn">Copiar para preguntar a Claude</button>
-          <button class="btn" id="reExportPdfBtn">Exportar PDF</button>
+          <div>
+            <button class="btn secondary" id="reCopyClaudeBtn">Copiar para preguntar a Claude</button>
+            <button class="btn" id="reExportPdfBtn">Exportar PDF</button>
+          </div>
         </div>
-        <p class="hint" style="margin-bottom:14px;">Todos los gráficos son tendencia mensual, pensados para compartir con inversores.</p>
-        <div class="grid split">
-          <div class="card"><h3>Ventas brutas</h3><div class="chart-wrap"><canvas id="chartReVentas"></canvas></div></div>
-          <div class="card"><h3>Nº de tickets</h3><div class="chart-wrap"><canvas id="chartReTickets"></canvas></div></div>
-        </div>
-        <div class="grid split" style="margin-top:14px;">
-          <div class="card"><h3>Ticket medio</h3><div class="chart-wrap"><canvas id="chartReTicketMedio"></canvas></div></div>
-          <div class="card"><h3>Clientes por tipo — Nº de tickets</h3><div class="chart-wrap"><canvas id="chartReClientesTickets"></canvas></div></div>
-        </div>
-        <div class="card" style="margin-top:14px;"><h3>Clientes por tipo — % de ventas</h3><div class="chart-wrap"><canvas id="chartReClientesVentas"></canvas></div></div>
+        <p class="hint" style="margin-bottom:14px;">Todos los gráficos usan el mismo periodo elegido arriba. Arrastra una tarjeta por su cabecera (✥) para reordenarla.</p>
+        <div id="reWidgetsContainer" class="grid split"></div>
       </div>
 
       <!-- VACACIONES Y HORAS EXTRAS -->
@@ -623,19 +650,19 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <h3 style="margin-bottom:10px;">Vacaciones</h3>
         <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Marca un <b>valor de referencia</b> ("a esta fecha, tenía X días disponibles") y la app suma sola <b>2.5 días por cada mes completo</b> trabajado desde entonces. Cuando el empleado usa vacaciones, añade una entrada de tipo "Usada" para restarlo del saldo.</p>
+          <p class="hint" style="margin-bottom:10px;">Marca un <b>valor de referencia</b> ("a esta fecha, tenía X días disponibles") y la app suma sola <b>2.5 días por cada mes completo</b> trabajado desde entonces. Cuando el empleado usa vacaciones, añade una entrada de tipo "Usada" para restarlo del saldo. Para sumar (o restar, con un número negativo) días sueltos al saldo actual sin tocar la referencia — por ejemplo un bono o una corrección — usa "Ajuste".</p>
           <div class="subfilter" style="margin-bottom:0;">
             <select id="vacEmpleado"></select>
             <input type="date" id="vacFecha">
-            <select id="vacTipo"><option value="referencia">Valor de referencia</option><option value="usada">Usada</option></select>
-            <input type="number" step="0.5" min="0" id="vacDias" placeholder="Días" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <select id="vacTipo"><option value="referencia">Valor de referencia</option><option value="usada">Usada</option><option value="ajuste">Ajuste (sumar/restar días)</option></select>
+            <input type="number" step="0.5" id="vacDias" placeholder="Días" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
             <input type="text" id="vacNota" placeholder="Nota (opcional)" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
             <button class="btn secondary" id="vacAddBtn" style="padding:5px 10px;font-size:12px;">Guardar</button>
           </div>
         </div>
         <div class="section-title">Saldo por empleado (a día de hoy)</div>
         <div class="card" style="margin-bottom:14px;">
-          <table id="tablaVacSaldo"><thead><tr><th>Empleado</th><th>Referencia</th><th>Meses desde entonces</th><th>Acumulado (×2.5)</th><th>Usado desde la referencia</th><th>Saldo disponible</th></tr></thead><tbody></tbody></table>
+          <table id="tablaVacSaldo"><thead><tr><th>Empleado</th><th>Referencia</th><th>Meses desde entonces</th><th>Acumulado (×2.5)</th><th>Usado desde la referencia</th><th>Saldo disponible</th><th></th></tr></thead><tbody></tbody></table>
         </div>
         <div class="section-title">Histórico de vacaciones</div>
         <div class="card" style="margin-bottom:26px;">
@@ -1659,6 +1686,7 @@ setupMultiSelect('segmento', ['nuevo','repetido','fidelidad','noident'], v=>SEGM
     STATE.filters.franjaTipo = document.getElementById('fFranjaTipo').value;
     STATE.filters.diaTipo = document.getElementById('fDiaTipo').value;
     STATE.filters.diaSemana = document.getElementById('fDiaSemana').value;
+    document.getElementById('metricaHint').style.display = (document.getElementById('fMetrica').value==='porcentual') ? 'block' : 'none';
     renderAll();
   });
 });
@@ -1826,6 +1854,14 @@ function trendDataset(label, data, color){
 
 /* etiquetas de datos (el valor encima de cada punto/barra), activables como preferencia global */
 function getShowDataLabels(){ return localStorage.getItem('miners_show_datalabels')==='true'; }
+/* excluir "Fuera de horario" de los cálculos/gráficos de Performance, Rentabilidad y Rendimiento */
+function getExcluirFueraHorario(){ return localStorage.getItem('miners_excluir_fuera_horario')==='true'; }
+function setExcluirFueraHorario(v){ localStorage.setItem('miners_excluir_fuera_horario', v?'true':'false'); }
+function franjaOrderNegocioFiltrado(){
+  const orden = franjaOrderFor('negocio');
+  return getExcluirFueraHorario() ? orden.filter(f=>f!=='Fuera de horario') : orden;
+}
+const EXCLUIR_FUERA_CHECKBOX_IDS = ['perfExcluirFuera','rentExcluirFuera','rendExcluirFuera'];
 function setShowDataLabels(v){
   localStorage.setItem('miners_show_datalabels', v?'true':'false');
   if(window.Chart && Chart.defaults.plugins && Chart.defaults.plugins.datalabels) Chart.defaults.plugins.datalabels.display = v;
@@ -2174,7 +2210,7 @@ function getAllSalesLinesRaw(){
     const pd = STATE.periodsData[periodId];
     pd.lines.forEach(row=>{
       const [fecha, hora, catIdx, artIdx, cant, bruto, neto, ticketIdx, esPago] = row;
-      out.push({ fecha, hora, articulo: pd.arts[artIdx], cant, bruto, neto });
+      out.push({ fecha, hora, articulo: pd.arts[artIdx], categoria: pd.cats[catIdx], cant, bruto, neto });
     });
   }
   return out;
@@ -2369,7 +2405,7 @@ function renderTicketsNoBebida(){
   if(!desde || !hasta) return;
   document.getElementById('bebidaCategoriasResumen').textContent = getBebidaCategorias().join(', ');
   const tickets = ticketsConCategoriaNoBebida(desde, hasta);
-  const franjaOrder = franjaOrderFor('negocio');
+  const franjaOrder = franjaOrderNegocioFiltrado();
   const c = chartColors();
 
   function aggregate(esFinde){
@@ -2429,6 +2465,15 @@ document.getElementById('dataLabelsSelect').addEventListener('change', (e)=>{
   setShowDataLabels(e.target.value==='si');
   refrescarTodosLosGraficos();
   toast('Preferencia actualizada.');
+});
+EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id=>{
+  document.getElementById(id).addEventListener('change', (e)=>{
+    setExcluirFueraHorario(e.target.checked);
+    EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id2=>{ document.getElementById(id2).checked = e.target.checked; });
+    renderPerformanceEquipo();
+    renderRentabilidad();
+    renderRendimiento();
+  });
 });
 
 document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
@@ -2513,29 +2558,135 @@ document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
    RENTABILIDAD POR FRANJA HORARIA
    ========================================================= */
 STATE.staffingWeek = []; // plantilla cargada de la semana que se está EDITANDO (rentPlantillaDia)
+/* franjas horarias PERSONALIZADAS, independientes por pestaña (Rentabilidad y Rendimiento
+   pueden tener granularidades distintas) — no tocan las BUSINESS_FRANJAS fijas que usan
+   Ventas/Tickets/Performance. Cada franja: {id (estable), start, end (minutos), label}. */
+function minutosAHora(min){ const h=Math.floor(min/60), m=min%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function horaAMinutos(hhmm){ const [h,m] = (hhmm||'0:0').split(':').map(Number); return (h||0)*60+(m||0); }
+function generarListaFranjas(apertura, cierre, gran){
+  const franjas = []; let t = apertura, i=1;
+  while(t<cierre){
+    const fin = Math.min(t+gran, cierre);
+    franjas.push({ id:'f'+i, start:t, end:fin, label:minutosAHora(t)+'–'+minutosAHora(fin) });
+    t = fin; i++;
+  }
+  return franjas;
+}
+function getRentFranjas(){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_rent_franjas'));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return BUSINESS_FRANJAS.map((f,i)=>({ id:'f'+(i+1), start:f.start, end:f.end, label:f.label }));
+}
+function setRentFranjas(list){ localStorage.setItem('miners_rent_franjas', JSON.stringify(list)); }
+function getRendFranjas(){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_rend_franjas'));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return BUSINESS_FRANJAS.map((f,i)=>({ id:'f'+(i+1), start:f.start, end:f.end, label:f.label }));
+}
+function setRendFranjas(list){ localStorage.setItem('miners_rend_franjas', JSON.stringify(list)); }
+
 function franjaDuracionHoras(franjaLabel){
   const f = BUSINESS_FRANJAS.find(x=>x.label===franjaLabel);
   return f ? (f.end-f.start)/60 : 0;
 }
 function renderTablaPlantilla(){
   const tbody = document.querySelector('#tablaPlantilla tbody');
-  const franjas = BUSINESS_FRANJAS.map(f=>f.label);
-  const buscar = (franja,tipo) => STATE.staffingWeek.find(s=>s.franja===franja && s.tipoDia===tipo) || {numEmpleados:0, costeHora:0};
+  const franjas = getRentFranjas();
+  const buscar = (id,tipo) => STATE.staffingWeek.find(s=>s.franja===id && s.tipoDia===tipo) || {numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0};
+  const inputTiempo = (val, attr, id) => `<input type="time" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
+  const inputNum = (val, campo, id, tipo) => `<input type="number" step="${campo.startsWith('coste')?'0.5':'1'}" min="0" value="${val}" data-plantilla="${id}|${tipo}|${campo}" style="width:60px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 5px;text-align:right;">`;
+  const costeTotalFranja = (d, horas) => (d.numCocina*d.costeCocina + d.numBaristas*d.costeBarista) * horas;
+
   tbody.innerHTML = franjas.map(f=>{
-    const lv = buscar(f,'semana'), fd = buscar(f,'finde');
+    const lv = buscar(f.id,'semana'), fd = buscar(f.id,'finde');
+    const horas = (f.end-f.start)/60;
     return `<tr>
-      <td>${f}</td>
-      <td class="num"><input type="number" step="1" min="0" value="${lv.numEmpleados}" data-plantilla="${f}|semana|num" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="0.5" min="0" value="${lv.costeHora}" data-plantilla="${f}|semana|coste" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="1" min="0" value="${fd.numEmpleados}" data-plantilla="${f}|finde|num" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="0.5" min="0" value="${fd.costeHora}" data-plantilla="${f}|finde|coste" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'franja-fin',f.id)} <button class="btn danger" data-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
+      <td class="num">${inputNum(lv.numCocina,'numCocina',f.id,'semana')}</td>
+      <td class="num">${inputNum(lv.costeCocina,'costeCocina',f.id,'semana')}</td>
+      <td class="num">${inputNum(lv.numBaristas,'numBaristas',f.id,'semana')}</td>
+      <td class="num">${inputNum(lv.costeBarista,'costeBarista',f.id,'semana')}</td>
+      <td class="num"><b data-coste-total="${f.id}|semana">${eur(Math.round(costeTotalFranja(lv,horas)*100))}</b></td>
+      <td class="num">${inputNum(fd.numCocina,'numCocina',f.id,'finde')}</td>
+      <td class="num">${inputNum(fd.costeCocina,'costeCocina',f.id,'finde')}</td>
+      <td class="num">${inputNum(fd.numBaristas,'numBaristas',f.id,'finde')}</td>
+      <td class="num">${inputNum(fd.costeBarista,'costeBarista',f.id,'finde')}</td>
+      <td class="num"><b data-coste-total="${f.id}|finde">${eur(Math.round(costeTotalFranja(fd,horas)*100))}</b></td>
     </tr>`;
-  }).join('');
+  }).join('') + `<tr><td colspan="11" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+
+  /* recalcular el "Coste total" en vivo según se va escribiendo, sin necesidad de guardar */
+  tbody.querySelectorAll('[data-plantilla]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const [id, tipo] = inp.getAttribute('data-plantilla').split('|');
+      const f = franjas.find(x=>x.id===id);
+      if(!f) return;
+      const horas = (f.end-f.start)/60;
+      const leer = (campo) => parseFloat(tbody.querySelector('[data-plantilla="'+id+'|'+tipo+'|'+campo+'"]').value)||0;
+      const total = (leer('numCocina')*leer('costeCocina') + leer('numBaristas')*leer('costeBarista')) * horas;
+      const span = tbody.querySelector('[data-coste-total="'+id+'|'+tipo+'"]');
+      if(span) span.textContent = eur(Math.round(total*100));
+    });
+  });
+
+  tbody.querySelectorAll('[data-franja-inicio]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const id = inp.getAttribute('data-franja-inicio');
+      const fr = getRentFranjas();
+      const f = fr.find(x=>x.id===id);
+      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRentFranjas(fr); renderTablaPlantilla(); renderRentabilidad(); }
+    });
+  });
+  tbody.querySelectorAll('[data-franja-fin]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const id = inp.getAttribute('data-franja-fin');
+      const fr = getRentFranjas();
+      const f = fr.find(x=>x.id===id);
+      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRentFranjas(fr); renderTablaPlantilla(); renderRentabilidad(); }
+    });
+  });
+  tbody.querySelectorAll('[data-franja-quitar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!confirm('¿Quitar esta línea de horario? El personal guardado para ella dejará de contarse.')) return;
+      setRentFranjas(getRentFranjas().filter(f=>f.id!==btn.getAttribute('data-franja-quitar')));
+      renderTablaPlantilla(); renderRentabilidad();
+    });
+  });
+  const addBtn = document.getElementById('rentFranjaAddBtn');
+  if(addBtn) addBtn.addEventListener('click', ()=>{
+    const fr = getRentFranjas();
+    const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
+    const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
+    const nuevoFin = Math.min(lastEnd+60, 23*60+59);
+    fr.push({ id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) });
+    setRentFranjas(fr);
+    renderTablaPlantilla(); renderRentabilidad();
+  });
 }
+document.getElementById('rentGenerarFranjasBtn').addEventListener('click', ()=>{
+  const franjasActuales = getRentFranjas();
+  if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
+  const apertura = horaAMinutos(document.getElementById('rentAperturaInput').value);
+  const cierreLV = horaAMinutos(document.getElementById('rentCierreLVInput').value);
+  const cierreSD = horaAMinutos(document.getElementById('rentCierreSDInput').value);
+  const cierre = Math.max(cierreLV, cierreSD);
+  const gran = parseInt(document.getElementById('rentGranularidadFranja').value,10);
+  if(!(cierre>apertura)){ toast('Al menos uno de los dos cierres debe ser posterior a la apertura.', true); return; }
+  const franjas = generarListaFranjas(apertura, cierre, gran);
+  setRentFranjas(franjas);
+  renderTablaPlantilla();
+  renderRentabilidad();
+  const nota = cierreLV!==cierreSD ? ' Recuerda poner 0 empleados en las franjas de '+(cierreLV<cierreSD?'L–V':'S–D')+' donde ya esté cerrado.' : '';
+  toast('Franjas generadas: '+franjas.length+' líneas.'+nota);
+});
 async function cargarPlantillaSemana(weekStart){
   try{
     const rows = await sbList('staffing_weeks', 'select=*&week_start=eq.'+weekStart);
-    STATE.staffingWeek = rows.map(r=>({ id:r.id, franja:r.franja, tipoDia:r.tipo_dia, numEmpleados:parseFloat(r.num_empleados), costeHora:parseFloat(r.coste_hora) }));
+    STATE.staffingWeek = rows.map(r=>({ id:r.id, franja:r.franja, tipoDia:r.tipo_dia, numCocina:parseFloat(r.num_cocina)||0, costeCocina:parseFloat(r.coste_cocina)||0, numBaristas:parseFloat(r.num_baristas)||0, costeBarista:parseFloat(r.coste_barista)||0 }));
   }catch(e){
     STATE.staffingWeek = [];
     toast('No se pudo cargar la plantilla: '+e.message, true);
@@ -2547,20 +2698,30 @@ async function cargarPlantillasEnRango(desde, hasta){
   const wsDesde = isoMonday(desde), wsHasta = isoMonday(hasta);
   try{
     const rows = await sbList('staffing_weeks', 'select=*&week_start=gte.'+wsDesde+'&week_start=lte.'+wsHasta);
-    return rows.map(r=>({ weekStart:r.week_start, franja:r.franja, tipoDia:r.tipo_dia, numEmpleados:parseFloat(r.num_empleados), costeHora:parseFloat(r.coste_hora) }));
+    return rows.map(r=>({ weekStart:r.week_start, franja:r.franja, tipoDia:r.tipo_dia, numCocina:parseFloat(r.num_cocina)||0, costeCocina:parseFloat(r.coste_cocina)||0, numBaristas:parseFloat(r.num_baristas)||0, costeBarista:parseFloat(r.coste_barista)||0 }));
   }catch(e){ toast('No se pudieron cargar las plantillas del periodo: '+e.message, true); return []; }
 }
 async function calcularRentabilidadPeriodo(desde, hasta){
-  const franjaOrder = franjaOrderFor('negocio');
+  const franjasCustom = getRentFranjas();
+  const incluirFuera = !getExcluirFueraHorario();
+  const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasCustom.forEach(f=>labelDe[f.id]=f.label); labelDe['fuera']='Fuera de horario';
+  const duracionDe = {}; franjasCustom.forEach(f=>duracionDe[f.id]=(f.end-f.start)/60);
+  const clasificar = (horaStr) => {
+    const min = horaAMinutos(horaStr);
+    const f = franjasCustom.find(x=>min>=x.start && min<x.end);
+    return f ? f.id : 'fuera';
+  };
+
   const costHistory = buildCostHistoryMap();
-  const resultado = {}; franjaOrder.forEach(f=>resultado[f]={ventas:0,cogs:0,laboral:0});
+  const resPorId = {}; idsOrder.forEach(id=>resPorId[id]={ventas:0,cogs:0,laboral:0});
 
   getAllSalesLinesRaw().forEach(l=>{
     if(l.fecha<desde || l.fecha>hasta) return;
-    const franja = franjaLabelFor(l.hora, 'negocio');
-    if(!resultado[franja]) return;
-    resultado[franja].ventas += l.bruto;
-    resultado[franja].cogs += l.cant * costAtDate(costHistory, l.articulo, l.fecha) * 100; // a céntimos, igual que ventas
+    const id = clasificar(l.hora);
+    if(!resPorId[id]) return;
+    resPorId[id].ventas += l.bruto;
+    resPorId[id].cogs += l.cant * costAtDate(costHistory, l.articulo, l.fecha) * 100; // a céntimos, igual que ventas
   });
 
   const plantillas = await cargarPlantillasEnRango(desde, hasta);
@@ -2568,7 +2729,7 @@ async function calcularRentabilidadPeriodo(desde, hasta){
   const patronMap = {};
   plantillas.forEach(p=>{ patronMap[p.weekStart+'|'+p.franja+'|'+p.tipoDia] = p; });
 
-  let semanasSinPlantilla = new Set();
+  const semanasSinPlantilla = new Set();
   let d = new Date(desde+'T00:00:00');
   const end = new Date(hasta+'T00:00:00');
   while(d<=end){
@@ -2577,12 +2738,16 @@ async function calcularRentabilidadPeriodo(desde, hasta){
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
     const esFinde = (d.getDay()===0 || d.getDay()===6);
     const tipoDia = esFinde ? 'finde' : 'semana';
-    franjaOrder.forEach(f=>{
-      const p = patronMap[ws+'|'+f+'|'+tipoDia];
-      if(p) resultado[f].laboral += p.numEmpleados * p.costeHora * franjaDuracionHoras(f) * 100; // a céntimos
+    idsOrder.forEach(id=>{
+      if(id==='fuera') return; // no se planifica personal fuera de horario
+      const p = patronMap[ws+'|'+id+'|'+tipoDia];
+      if(p) resPorId[id].laboral += (p.numCocina*p.costeCocina + p.numBaristas*p.costeBarista) * (duracionDe[id]||0) * 100; // a céntimos
     });
     d.setDate(d.getDate()+1);
   }
+
+  const franjaOrder = idsOrder.map(id=>labelDe[id]);
+  const resultado = {}; idsOrder.forEach(id=>resultado[labelDe[id]] = resPorId[id]);
   return { franjaOrder, resultado, semanasSinPlantilla: [...semanasSinPlantilla].sort() };
 }
 async function renderRentabilidad(){
@@ -2631,12 +2796,11 @@ document.getElementById('rentGuardarBtn').addEventListener('click', async ()=>{
     inputs.forEach(inp=>{
       const [franja,tipo,campo] = inp.getAttribute('data-plantilla').split('|');
       const key = franja+'|'+tipo;
-      if(!porFranja[key]) porFranja[key] = { franja, tipoDia:tipo, numEmpleados:0, costeHora:0 };
-      if(campo==='num') porFranja[key].numEmpleados = parseFloat(inp.value)||0;
-      else porFranja[key].costeHora = parseFloat(inp.value)||0;
+      if(!porFranja[key]) porFranja[key] = { franja, tipoDia:tipo, numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0 };
+      porFranja[key][campo] = parseFloat(inp.value)||0;
     });
     for(const row of Object.values(porFranja)){
-      await sbUpsert('staffing_weeks', { week_start:weekStart, franja:row.franja, tipo_dia:row.tipoDia, num_empleados:row.numEmpleados, coste_hora:row.costeHora }, 'week_start,franja,tipo_dia');
+      await sbUpsert('staffing_weeks', { week_start:weekStart, franja:row.franja, tipo_dia:row.tipoDia, num_cocina:row.numCocina, coste_cocina:row.costeCocina, num_baristas:row.numBaristas, coste_barista:row.costeBarista }, 'week_start,franja,tipo_dia');
     }
     await cargarPlantillaSemana(weekStart);
     statusEl.innerHTML = '<span style="color:var(--positive)">Guardado para la semana del '+weekStart+'.</span>';
@@ -2661,15 +2825,14 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
     inputs.forEach(inp=>{
       const [franja,tipo,campo] = inp.getAttribute('data-plantilla').split('|');
       const key = franja+'|'+tipo;
-      if(!porFranja[key]) porFranja[key] = { franja, tipoDia:tipo, numEmpleados:0, costeHora:0 };
-      if(campo==='num') porFranja[key].numEmpleados = parseFloat(inp.value)||0;
-      else porFranja[key].costeHora = parseFloat(inp.value)||0;
+      if(!porFranja[key]) porFranja[key] = { franja, tipoDia:tipo, numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0 };
+      porFranja[key][campo] = parseFloat(inp.value)||0;
     });
     let ws = wsDesde, hechas = 0;
     while(ws<=wsHasta){
       statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
       for(const row of Object.values(porFranja)){
-        await sbUpsert('staffing_weeks', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_empleados:row.numEmpleados, coste_hora:row.costeHora }, 'week_start,franja,tipo_dia');
+        await sbUpsert('staffing_weeks', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_cocina:row.numCocina, coste_cocina:row.costeCocina, num_baristas:row.numBaristas, coste_barista:row.costeBarista }, 'week_start,franja,tipo_dia');
       }
       hechas++;
       const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
@@ -2688,17 +2851,68 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
 STATE.baristaWeek = []; // plantilla cargada de la semana que se está EDITANDO (rendPlantillaDia)
 function renderTablaBaristas(){
   const tbody = document.querySelector('#tablaBaristas tbody');
-  const franjas = BUSINESS_FRANJAS.map(f=>f.label);
-  const buscar = (franja,tipo) => STATE.baristaWeek.find(s=>s.franja===franja && s.tipoDia===tipo) || {numBaristas:0};
+  const franjas = getRendFranjas();
+  const buscar = (id,tipo) => STATE.baristaWeek.find(s=>s.franja===id && s.tipoDia===tipo) || {numBaristas:0};
+  const inputTiempo = (val, attr, id) => `<input type="time" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
   tbody.innerHTML = franjas.map(f=>{
-    const lv = buscar(f,'semana'), fd = buscar(f,'finde');
+    const lv = buscar(f.id,'semana'), fd = buscar(f.id,'finde');
     return `<tr>
-      <td>${f}</td>
-      <td class="num"><input type="number" step="1" min="0" value="${lv.numBaristas}" data-barista="${f}|semana" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="1" min="0" value="${fd.numBaristas}" data-barista="${f}|finde" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'rend-franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'rend-franja-fin',f.id)} <button class="btn danger" data-rend-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
+      <td class="num"><input type="number" step="1" min="0" value="${lv.numBaristas}" data-barista="${f.id}|semana" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td class="num"><input type="number" step="1" min="0" value="${fd.numBaristas}" data-barista="${f.id}|finde" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
     </tr>`;
-  }).join('');
+  }).join('') + `<tr><td colspan="3" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+
+  tbody.querySelectorAll('[data-rend-franja-inicio]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const id = inp.getAttribute('data-rend-franja-inicio');
+      const fr = getRendFranjas();
+      const f = fr.find(x=>x.id===id);
+      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRendFranjas(fr); renderTablaBaristas(); renderRendimiento(); }
+    });
+  });
+  tbody.querySelectorAll('[data-rend-franja-fin]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const id = inp.getAttribute('data-rend-franja-fin');
+      const fr = getRendFranjas();
+      const f = fr.find(x=>x.id===id);
+      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRendFranjas(fr); renderTablaBaristas(); renderRendimiento(); }
+    });
+  });
+  tbody.querySelectorAll('[data-rend-franja-quitar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!confirm('¿Quitar esta línea de horario? El personal guardado para ella dejará de contarse.')) return;
+      setRendFranjas(getRendFranjas().filter(f=>f.id!==btn.getAttribute('data-rend-franja-quitar')));
+      renderTablaBaristas(); renderRendimiento();
+    });
+  });
+  const addBtn = document.getElementById('rendFranjaAddBtn');
+  if(addBtn) addBtn.addEventListener('click', ()=>{
+    const fr = getRendFranjas();
+    const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
+    const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
+    const nuevoFin = Math.min(lastEnd+60, 23*60+59);
+    fr.push({ id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) });
+    setRendFranjas(fr);
+    renderTablaBaristas(); renderRendimiento();
+  });
 }
+document.getElementById('rendGenerarFranjasBtn').addEventListener('click', ()=>{
+  const franjasActuales = getRendFranjas();
+  if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
+  const apertura = horaAMinutos(document.getElementById('rendAperturaInput').value);
+  const cierreLV = horaAMinutos(document.getElementById('rendCierreLVInput').value);
+  const cierreSD = horaAMinutos(document.getElementById('rendCierreSDInput').value);
+  const cierre = Math.max(cierreLV, cierreSD);
+  const gran = parseInt(document.getElementById('rendGranularidadFranja').value,10);
+  if(!(cierre>apertura)){ toast('Al menos uno de los dos cierres debe ser posterior a la apertura.', true); return; }
+  const franjas = generarListaFranjas(apertura, cierre, gran);
+  setRendFranjas(franjas);
+  renderTablaBaristas();
+  renderRendimiento();
+  const nota = cierreLV!==cierreSD ? ' Recuerda poner 0 baristas en las franjas de '+(cierreLV<cierreSD?'L–V':'S–D')+' donde ya esté cerrado.' : '';
+  toast('Franjas generadas: '+franjas.length+' líneas.'+nota);
+});
 async function cargarBaristasSemana(weekStart){
   try{
     const rows = await sbList('barista_weeks', 'select=*&week_start=eq.'+weekStart);
@@ -2718,22 +2932,37 @@ async function cargarBaristasEnRango(desde, hasta){
   }catch(e){ toast('No se pudieron cargar las plantillas del periodo: '+e.message, true); return []; }
 }
 async function calcularRendimientoPeriodo(desde, hasta){
-  const franjaOrder = franjaOrderFor('negocio');
+  const franjasCustom = getRendFranjas();
+  const incluirFuera = !getExcluirFueraHorario();
+  const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasCustom.forEach(f=>labelDe[f.id]=f.label); labelDe['fuera']='Fuera de horario';
+  const duracionDe = {}; franjasCustom.forEach(f=>duracionDe[f.id]=(f.end-f.start)/60);
+  const clasificar = (horaStr) => {
+    const min = horaAMinutos(horaStr);
+    const f = franjasCustom.find(x=>min>=x.start && min<x.end);
+    return f ? f.id : 'fuera';
+  };
   const bebidasCats = getBebidaCategorias();
-  const resultado = {}; franjaOrder.forEach(f=>resultado[f]={bebidas:0, tickets:0, baristaHoras:0});
+  const resPorId = {}; idsOrder.forEach(id=>resPorId[id]={bebidas:0, tickets:0, ticketsBebida:0, baristaHoras:0});
 
   for(const periodId in STATE.periodsData){
     const pd = STATE.periodsData[periodId];
-    const vistos = new Set();
+    const porTicket = {}; // ticketIdx -> {franjaId, tieneBebida}
     pd.lines.forEach(row=>{
       const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
       if(fecha<desde || fecha>hasta) return;
       if(!esPago) return;
-      const franja = franjaLabelFor(hora,'negocio');
-      if(!resultado[franja]) return;
-      if(bebidasCats.includes(pd.cats[catIdx])) resultado[franja].bebidas += cant;
-      const ticketKey = periodId+'_'+ticketIdx;
-      if(!vistos.has(ticketKey)){ vistos.add(ticketKey); resultado[franja].tickets++; }
+      const id = clasificar(hora);
+      if(!resPorId[id]) return;
+      const esBebida = bebidasCats.includes(pd.cats[catIdx]);
+      if(esBebida) resPorId[id].bebidas += cant;
+      if(!porTicket[ticketIdx]) porTicket[ticketIdx] = { franjaId:id, tieneBebida:false };
+      if(esBebida) porTicket[ticketIdx].tieneBebida = true;
+    });
+    Object.values(porTicket).forEach(t=>{
+      if(!resPorId[t.franjaId]) return;
+      resPorId[t.franjaId].tickets++;
+      if(t.tieneBebida) resPorId[t.franjaId].ticketsBebida++;
     });
   }
 
@@ -2751,12 +2980,16 @@ async function calcularRendimientoPeriodo(desde, hasta){
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
     const esFinde = (d.getDay()===0 || d.getDay()===6);
     const tipoDia = esFinde ? 'finde' : 'semana';
-    franjaOrder.forEach(f=>{
-      const p = patronMap[ws+'|'+f+'|'+tipoDia];
-      if(p) resultado[f].baristaHoras += p.numBaristas * franjaDuracionHoras(f);
+    idsOrder.forEach(id=>{
+      if(id==='fuera') return;
+      const p = patronMap[ws+'|'+id+'|'+tipoDia];
+      if(p) resPorId[id].baristaHoras += p.numBaristas * (duracionDe[id]||0);
     });
     d.setDate(d.getDate()+1);
   }
+
+  const franjaOrder = idsOrder.map(id=>labelDe[id]);
+  const resultado = {}; idsOrder.forEach(id=>resultado[labelDe[id]] = resPorId[id]);
   return { franjaOrder, resultado, semanasSinPlantilla: [...semanasSinPlantilla].sort() };
 }
 async function renderRendimiento(){
@@ -2774,6 +3007,7 @@ async function renderRendimiento(){
   const c = chartColors();
   const bebidasPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.bebidas/r.baristaHoras : 0; });
   const ticketsPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.tickets/r.baristaHoras : 0; });
+  const ticketsBebidaPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.ticketsBebida/r.baristaHoras : 0; });
 
   destroyChart('bebidasBarista');
   STATE.charts.bebidasBarista = safeNewChart('chartBebidasBarista', {
@@ -2787,10 +3021,16 @@ async function renderRendimiento(){
     data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets/barista/h', ticketsPorHora.map(v=>+v.toFixed(1)), c.verdigris) ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
   });
+  destroyChart('ticketsBebidaBarista');
+  STATE.charts.ticketsBebidaBarista = safeNewChart('chartTicketsBebidaBarista', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets bebida/barista/h', ticketsBebidaPorHora.map(v=>+v.toFixed(1)), '#8B6A46') ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  });
 
   document.querySelector('#tablaRendimiento tbody').innerHTML = franjaOrder.map((f,i)=>{
     const r = resultado[f];
-    return `<tr><td>${f}</td><td class="num">${r.bebidas.toFixed(0)}</td><td class="num">${r.tickets}</td><td class="num">${r.baristaHoras.toFixed(0)}</td><td class="num">${bebidasPorHora[i].toFixed(1)}</td><td class="num">${ticketsPorHora[i].toFixed(1)}</td></tr>`;
+    return `<tr><td>${f}</td><td class="num">${r.bebidas.toFixed(0)}</td><td class="num">${r.tickets}</td><td class="num">${r.ticketsBebida}</td><td class="num">${r.baristaHoras.toFixed(0)}</td><td class="num">${bebidasPorHora[i].toFixed(1)}</td><td class="num">${ticketsPorHora[i].toFixed(1)}</td><td class="num">${ticketsBebidaPorHora[i].toFixed(1)}</td></tr>`;
   }).join('');
 }
 document.getElementById('rendDesde').addEventListener('change', renderRendimiento);
@@ -2909,21 +3149,141 @@ function calcularResumenEjecutivo(buckets){
   }
   return porBucket;
 }
-function lineChart(chartKey, canvasId, labels, data, color, formatoEuro){
-  const c = chartColors();
-  destroyChart(chartKey);
-  STATE.charts[chartKey] = safeNewChart(canvasId, {
-    type:'line',
-    data:{ labels, datasets:[{ data, borderColor:color, backgroundColor:color, tension:.3, fill:false }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{
-      x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} },
-      y:{ ticks:{color:c.muted, callback: v => formatoEuro ? v+'€' : v}, grid:{color:c.grid} }
-    } }
+/* =========================================================
+   RESUMEN EJECUTIVO — sistema de widgets (añadir / quitar / arrastrar)
+   ========================================================= */
+const RE_WIDGET_TYPES = {
+  ventas:          { label:'Ventas brutas', tipo:'trend' },
+  tickets:         { label:'Nº de tickets', tipo:'trend' },
+  ticketMedio:     { label:'Ticket medio', tipo:'trend' },
+  clientesTickets: { label:'Clientes por tipo — Nº de tickets', tipo:'trend' },
+  clientesVentas:  { label:'Clientes por tipo — % de ventas', tipo:'trend' },
+  cogsTotal:       { label:'Evolución del COGS total', tipo:'trend' },
+  franjaVentas:    { label:'Ventas por franja horaria', tipo:'snapshot' },
+  diaSemanaVentas: { label:'Ventas por día de la semana', tipo:'snapshot' },
+  categorias:      { label:'Categorías por ventas', tipo:'snapshot' },
+};
+function getReWidgets(){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_re_widgets'));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return [
+    { instanceId:'w1', typeId:'ventas' }, { instanceId:'w2', typeId:'tickets' }, { instanceId:'w3', typeId:'ticketMedio' },
+    { instanceId:'w4', typeId:'clientesTickets' }, { instanceId:'w5', typeId:'clientesVentas' },
+  ];
+}
+function setReWidgets(list){ localStorage.setItem('miners_re_widgets', JSON.stringify(list)); }
+function renderReAddWidgetSelect(){
+  const sel = document.getElementById('reAddWidgetSelect');
+  sel.innerHTML = '<option value="">Elegir...</option>' + Object.entries(RE_WIDGET_TYPES).map(([id,t])=>'<option value="'+id+'">'+t.label+'</option>').join('');
+}
+document.getElementById('reAddWidgetSelect').addEventListener('change', (e)=>{
+  const typeId = e.target.value;
+  if(!typeId) return;
+  const widgets = getReWidgets();
+  widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId });
+  setReWidgets(widgets);
+  e.target.value = '';
+  renderResumenEjecutivo();
+});
+let reDragSrc = null;
+function attachReDragHandlers(){
+  document.querySelectorAll('#reWidgetsContainer [data-re-instance]').forEach(card=>{
+    card.addEventListener('dragstart', ()=>{ reDragSrc = card.getAttribute('data-re-instance'); card.style.opacity='0.4'; });
+    card.addEventListener('dragend', ()=>{ card.style.opacity=''; });
+    card.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+    card.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const targetId = card.getAttribute('data-re-instance');
+      if(!reDragSrc || reDragSrc===targetId) return;
+      const widgets = getReWidgets();
+      const fromIdx = widgets.findIndex(w=>w.instanceId===reDragSrc);
+      const toIdx = widgets.findIndex(w=>w.instanceId===targetId);
+      if(fromIdx<0||toIdx<0) return;
+      const [moved] = widgets.splice(fromIdx,1);
+      widgets.splice(toIdx,0,moved);
+      setReWidgets(widgets);
+      renderResumenEjecutivo();
+    });
   });
 }
+
+function calcularVentasPorFranjaPeriodo(desde, hasta){
+  const franjaOrder = franjaOrderNegocioFiltrado();
+  const byFranja = {}; franjaOrder.forEach(f=>byFranja[f]=0);
+  getAllSalesLinesRaw().forEach(l=>{ if(l.fecha<desde||l.fecha>hasta) return; const f=franjaLabelFor(l.hora,'negocio'); if(byFranja[f]!==undefined) byFranja[f]+=l.bruto; });
+  return { labels:franjaOrder, data:franjaOrder.map(f=>byFranja[f]/100) };
+}
+function calcularVentasPorDiaSemanaPeriodo(desde, hasta){
+  const dowOrder = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  const byDow = {}; dowOrder.forEach(d=>byDow[d]=0);
+  getAllSalesLinesRaw().forEach(l=>{ if(l.fecha<desde||l.fecha>hasta) return; const n=diaSemanaInfo(l.fecha).nombre; byDow[n]=(byDow[n]||0)+l.bruto; });
+  return { labels:dowOrder, data:dowOrder.map(d=>byDow[d]/100) };
+}
+function calcularCategoriasPeriodo(desde, hasta){
+  const byCat = {};
+  getAllSalesLinesRaw().forEach(l=>{ if(l.fecha<desde||l.fecha>hasta) return; const disp=displayCategoryFor(l.categoria); byCat[disp]=(byCat[disp]||0)+l.bruto; });
+  const entries = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  return { labels:entries.map(e=>e[0]), data:entries.map(e=>e[1]/100) };
+}
+function calcularCogsTotalMensual(buckets){
+  const costHistory = buildCostHistoryMap();
+  const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
+  getAllSalesLinesRaw().forEach(l=>{ const b=buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax); if(b) porBucket[b.label]+=l.cant*costAtDate(costHistory,l.articulo,l.fecha); });
+  return porBucket;
+}
+function reLineOptions(esEuro){
+  const c = chartColors();
+  return { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esEuro?v+'€':v}, grid:{color:c.grid} } } };
+}
+function reLineOptionsLegend(esPct){
+  const c = chartColors();
+  return { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
+}
+function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, desde, hasta){
+  const c = chartColors();
+  destroyChart(chartKey);
+  if(typeId==='ventas'){
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ventas', labels.map(l=>+ (resultado[l].ventas/100).toFixed(2)), c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='tickets'){
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Tickets', labels.map(l=>resultado[l].tickets), c.verdigris)] }, options:reLineOptions(false) });
+  } else if(typeId==='ticketMedio'){
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ticket medio', labels.map(l=>{ const r=resultado[l]; return r.tickets? +((r.ventas/r.tickets)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='clientesTickets'){
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[
+      { label:'Nuevo', data:labels.map(l=>resultado[l].segCount.nuevo), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
+      { label:'Repetido sin fidelidad', data:labels.map(l=>resultado[l].segCount.repetido), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
+      { label:'Con fidelidad', data:labels.map(l=>resultado[l].segCount.fidelidad), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
+      { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 }
+    ]}, options:reLineOptionsLegend(false) });
+  } else if(typeId==='clientesVentas'){
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[
+      { label:'Nuevo', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.nuevo/r.ventas*100).toFixed(1):0; }), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
+      { label:'Repetido sin fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.repetido/r.ventas*100).toFixed(1):0; }), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
+      { label:'Con fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.fidelidad/r.ventas*100).toFixed(1):0; }), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
+      { label:'No identificable (efectivo)', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.noident/r.ventas*100).toFixed(1):0; }), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 }
+    ]}, options:reLineOptionsLegend(true) });
+  } else if(typeId==='cogsTotal'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const porBucket = calcularCogsTotalMensual(buckets);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS total', buckets.map(b=>+porBucket[b.label].toFixed(2)), c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='franjaVentas'){
+    const d = calcularVentasPorFranjaPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='diaSemanaVentas'){
+    const d = calcularVentasPorDiaSemanaPeriodo(desde, hasta);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.verdigris)] }, options:reLineOptions(true) });
+  } else if(typeId==='categorias'){
+    const d = calcularCategoriasPeriodo(desde, hasta);
+    const paleta = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968'];
+    const valoresPorEtiqueta = Object.fromEntries(d.labels.map((l,i)=>[l,d.data[i]]));
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'doughnut', data:{ labels:d.labels, datasets:[{ data:d.data, backgroundColor:paleta }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:legendConLeyendaValores('bottom', {color:c.muted, boxWidth:11, font:{size:10}}, valoresPorEtiqueta, v=>eur(Math.round(v*100)))} } });
+  }
+}
 function renderResumenEjecutivo(){
-  const canvas = document.getElementById('chartReVentas');
-  if(!canvas) return;
+  const container = document.getElementById('reWidgetsContainer');
+  if(!container) return;
   let desde = document.getElementById('reDesde').value;
   let hasta = document.getElementById('reHasta').value;
   if(!desde || !hasta){
@@ -2935,38 +3295,33 @@ function renderResumenEjecutivo(){
     document.getElementById('reDesde').value = desde;
     document.getElementById('reHasta').value = hasta;
   }
+  renderReAddWidgetSelect();
   const buckets = monthBucketsInRange(desde, hasta);
   const resultado = calcularResumenEjecutivo(buckets);
   const labels = buckets.map(b=>b.label);
-  const c = chartColors();
+  const widgets = getReWidgets();
 
-  lineChart('reVentas','chartReVentas', labels, labels.map(l=>resultado[l].ventas/100), c.copper, true);
-  lineChart('reTickets','chartReTickets', labels, labels.map(l=>resultado[l].tickets), c.verdigris, false);
-  lineChart('reTicketMedio','chartReTicketMedio', labels, labels.map(l=>{ const r=resultado[l]; return r.tickets? (r.ventas/r.tickets)/100 : 0; }), c.copper, true);
+  container.innerHTML = widgets.map(w=>{
+    const type = RE_WIDGET_TYPES[w.typeId];
+    if(!type) return '';
+    return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <h3 style="cursor:grab;margin:0;">✥ ${type.label}</h3>
+        <button class="btn danger" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+      </div>
+      <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
+    </div>`;
+  }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
 
-  destroyChart('reClientesTickets');
-  STATE.charts.reClientesTickets = safeNewChart('chartReClientesTickets', {
-    type:'line',
-    data:{ labels, datasets:[
-      { label:'Nuevo', data:labels.map(l=>resultado[l].segCount.nuevo), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
-      { label:'Repetido sin fidelidad', data:labels.map(l=>resultado[l].segCount.repetido), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
-      { label:'Con fidelidad', data:labels.map(l=>resultado[l].segCount.fidelidad), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
-      { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 }
-    ]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  widgets.forEach(w=>pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta));
+
+  container.querySelectorAll('[data-re-quitar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      setReWidgets(getReWidgets().filter(w=>w.instanceId!==btn.getAttribute('data-re-quitar')));
+      renderResumenEjecutivo();
+    });
   });
-
-  destroyChart('reClientesVentas');
-  STATE.charts.reClientesVentas = safeNewChart('chartReClientesVentas', {
-    type:'line',
-    data:{ labels, datasets:[
-      { label:'Nuevo', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.nuevo/r.ventas*100).toFixed(1) : 0; }), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
-      { label:'Repetido sin fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.repetido/r.ventas*100).toFixed(1) : 0; }), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
-      { label:'Con fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.fidelidad/r.ventas*100).toFixed(1) : 0; }), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
-      { label:'No identificable (efectivo)', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.noident/r.ventas*100).toFixed(1) : 0; }), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 }
-    ]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
-  });
+  attachReDragHandlers();
 }
 document.getElementById('reDesde').addEventListener('change', renderResumenEjecutivo);
 document.getElementById('reHasta').addEventListener('change', renderResumenEjecutivo);
@@ -3002,39 +3357,49 @@ document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const margin = 14;
-
-  doc.setFillColor(23,19,15);
-  doc.rect(0,0,W,H,'F');
-  doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(16);
-  doc.text('The Miners Plaza de España — Resumen Ejecutivo', margin, margin+4);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
   const desde = document.getElementById('reDesde').value, hasta = document.getElementById('reHasta').value;
   const hoy = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
-  doc.text('Periodo: '+desde+' a '+hasta+'  ·  Generado el '+hoy, margin, margin+10);
-  doc.setDrawColor(58,47,36);
-  doc.line(margin, margin+14, W-margin, margin+14);
+  const widgets = getReWidgets();
+  const totalPaginas = Math.max(1, Math.ceil(widgets.length/4));
 
-  const addChart = (chartKey, titulo, x, y, w, h) => {
+  const cabecera = (pagina) => {
+    doc.setFillColor(23,19,15);
+    doc.rect(0,0,W,H,'F');
+    doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text('The Miners Plaza de España', margin, margin+4);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
+    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta+'  ·  Generado el '+hoy+'  ·  Página '+pagina+'/'+totalPaginas, margin, margin+10);
+    doc.setDrawColor(58,47,36);
+    doc.line(margin, margin+14, W-margin, margin+14);
+  };
+  const addChart = (typeId, canvasKey, titulo, x, y, w, h) => {
     doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
     doc.text(titulo, x, y);
     doc.setFont('helvetica','normal');
-    const chart = STATE.charts[chartKey];
+    const chart = STATE.charts[canvasKey];
     if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+3, w, h); }
     else { doc.setDrawColor(58,47,36); doc.rect(x,y+3,w,h); }
   };
 
   const chartW = (W - margin*2 - 8)/2;
-  const chartH = chartW*0.75;
-  let y = margin+22;
+  const chartH = chartW*0.72;
 
-  addChart('reVentas', 'Ventas brutas', margin, y, chartW, chartH);
-  addChart('reTickets', 'Nº de tickets', margin+chartW+8, y, chartW, chartH);
-  y += chartH + 16;
-  addChart('reTicketMedio', 'Ticket medio', margin, y, chartW, chartH);
-  addChart('reClientesTickets', 'Clientes por tipo — Nº de tickets', margin+chartW+8, y, chartW, chartH);
-  y += chartH + 16;
-  const fullW = W - margin*2, fullH = fullW*0.42;
-  addChart('reClientesVentas', 'Clientes por tipo — % de ventas', margin, y, fullW, fullH);
+  for(let pagina=0; pagina<totalPaginas; pagina++){
+    if(pagina>0) doc.addPage();
+    cabecera(pagina+1);
+    let y = margin+22;
+    for(let fila=0; fila<2; fila++){
+      const idx = pagina*4 + fila*2;
+      for(let col=0; col<2; col++){
+        const w = widgets[idx+col];
+        if(!w) continue;
+        const type = RE_WIDGET_TYPES[w.typeId];
+        const x = margin + col*(chartW+8);
+        addChart(w.typeId, 'reW_'+w.instanceId, type?type.label:'', x, y, chartW, chartH);
+      }
+      y += chartH + 16;
+    }
+  }
 
   doc.setFontSize(8); doc.setTextColor(120,110,95);
   doc.text('Generado automáticamente desde el panel de The Miners Plaza de España.', margin, H-margin+2);
@@ -3681,8 +4046,22 @@ function calcularSaldoVacaciones(empleado){
   const meses = mesesCompletosEntre(ref.fecha, hoy);
   const acumulado = meses*2.5;
   const usadas = entradas.filter(v=>v.tipo==='usada' && v.fecha>ref.fecha).reduce((s,v)=>s+v.dias,0);
-  const saldo = ref.dias + acumulado - usadas;
-  return { refFecha:ref.fecha, refDias:ref.dias, meses, acumulado, usadas, saldo };
+  const ajustes = entradas.filter(v=>v.tipo==='ajuste' && v.fecha>ref.fecha).reduce((s,v)=>s+v.dias,0);
+  const saldo = ref.dias + acumulado + ajustes - usadas;
+  return { refFecha:ref.fecha, refDias:ref.dias, meses, acumulado, usadas, ajustes, saldo };
+}
+async function ajusteRapidoVacaciones(empleado){
+  const input = prompt('¿Cuántos días quieres sumar a '+empleado+'? (pon un número negativo para restar)');
+  if(input===null) return;
+  const dias = parseFloat(input.replace(',','.'));
+  if(isNaN(dias) || dias===0){ toast('Escribe un número válido, distinto de 0.', true); return; }
+  try{
+    const fecha = new Date().toISOString().slice(0,10);
+    const saved = await sbInsert('vacaciones', { empleado, fecha, tipo:'ajuste', dias, nota:'Ajuste rápido' });
+    STATE.vacaciones.unshift({ id:saved.id, empleado:saved.empleado, fecha:saved.fecha, tipo:saved.tipo, dias:parseFloat(saved.dias), nota:saved.nota });
+    renderVacaciones();
+    toast((dias>0?'+':'')+dias+' día(s) aplicados a '+empleado+'.');
+  }catch(e){ toast('Error: '+e.message, true); }
 }
 function renderVacaciones(){
   const tbodySaldo = document.querySelector('#tablaVacSaldo tbody');
@@ -3690,12 +4069,16 @@ function renderVacaciones(){
   const nombres = [...new Set(STATE.vacaciones.map(v=>v.empleado))].sort();
   tbodySaldo.innerHTML = nombres.map(n=>{
     const s = calcularSaldoVacaciones(n);
-    if(!s) return `<tr><td>${n}</td><td colspan="5" class="hint">Sin valor de referencia todavía — añade uno para calcular el saldo.</td></tr>`;
-    return `<tr><td>${n}</td><td>${s.refFecha}: ${s.refDias} días</td><td class="num">${s.meses}</td><td class="num">${s.acumulado}</td><td class="num">${s.usadas}</td><td class="num" style="color:${s.saldo>=0?'var(--positive)':'var(--negative)'}"><b>${s.saldo}</b></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="hint">Sin registros todavía.</td></tr>';
+    const botonRapido = `<button class="btn secondary" data-ajuste-rapido="${n.replace(/"/g,'&quot;')}" style="padding:3px 10px;font-size:11px;">+ / − días</button>`;
+    if(!s) return `<tr><td>${n}</td><td colspan="5" class="hint">Sin valor de referencia todavía — añade uno para calcular el saldo.</td></tr><td>${botonRapido}</td></tr>`;
+    return `<tr><td>${n}</td><td>${s.refFecha}: ${s.refDias} días</td><td class="num">${s.meses}</td><td class="num">${s.acumulado}${s.ajustes?' '+(s.ajustes>0?'+':'')+s.ajustes+' aj.':''}</td><td class="num">${s.usadas}</td><td class="num" style="color:${s.saldo>=0?'var(--positive)':'var(--negative)'}"><b>${s.saldo}</b></td><td>${botonRapido}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="hint">Sin registros todavía.</td></tr>';
+  tbodySaldo.querySelectorAll('[data-ajuste-rapido]').forEach(btn=>{
+    btn.addEventListener('click', ()=>ajusteRapidoVacaciones(btn.getAttribute('data-ajuste-rapido')));
+  });
 
   document.querySelector('#tablaVacHistorico tbody').innerHTML = STATE.vacaciones.map(v=>`
-    <tr><td>${v.fecha}</td><td>${v.empleado}</td><td><span class="pill ${v.tipo==='referencia'?'nuevo':'noident'}">${v.tipo}</span></td><td class="num">${v.dias}</td><td class="hint">${v.nota||''}</td>
+    <tr><td>${v.fecha}</td><td>${v.empleado}</td><td><span class="pill ${v.tipo==='referencia'?'nuevo':(v.tipo==='ajuste'?'repetido':'noident')}">${v.tipo}</span></td><td class="num">${v.dias}</td><td class="hint">${v.nota||''}</td>
     <td><button class="btn danger" data-del-vac="${v.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
   `).join('') || '<tr><td colspan="6" class="hint">Sin registros todavía.</td></tr>';
   document.querySelectorAll('[data-del-vac]').forEach(btn=>{
@@ -4263,6 +4646,38 @@ function renderMermasCosteTendencia(filtradas){
   });
 }
 document.getElementById('mermasCosteGranularidad').addEventListener('change', renderMermas);
+/* selección múltiple en la tabla de detalle de Mermas, para borrar varias de golpe */
+let mermasSeleccionadasSet = new Set();
+function getMermasSeleccionadas(){ return mermasSeleccionadasSet; }
+function setMermasSeleccionadas(set){ mermasSeleccionadasSet = set; }
+function actualizarBarraSeleccionMermas(){
+  const n = mermasSeleccionadasSet.size;
+  document.getElementById('mermasSeleccionCount').textContent = n>0 ? n+' seleccionada'+(n>1?'s':'') : '';
+  document.getElementById('mermasBorrarSeleccionBtn').disabled = n===0;
+}
+document.getElementById('mermasCheckAll').addEventListener('change', (e)=>{
+  const filtradas = getFilteredMermas();
+  if(e.target.checked) filtradas.forEach(m=>mermasSeleccionadasSet.add(m.id));
+  else filtradas.forEach(m=>mermasSeleccionadasSet.delete(m.id));
+  renderMermas();
+});
+document.getElementById('mermasBorrarSeleccionBtn').addEventListener('click', async ()=>{
+  const n = mermasSeleccionadasSet.size;
+  if(n===0) return;
+  if(!confirm('¿Eliminar '+n+' registro(s) de merma seleccionados? No se puede deshacer.')) return;
+  const btn = document.getElementById('mermasBorrarSeleccionBtn');
+  btn.textContent = 'Borrando...'; btn.disabled = true;
+  try{
+    for(const id of mermasSeleccionadasSet){ await sbDelete('mermas', id); }
+    STATE.mermas = STATE.mermas.filter(m=>!mermasSeleccionadasSet.has(m.id));
+    mermasSeleccionadasSet = new Set();
+    toast('Borrados '+n+' registro(s).');
+    renderMermas();
+  }catch(e){
+    toast('Error: '+e.message, true);
+  }
+  btn.textContent = 'Borrar seleccionadas';
+});
 function renderMermas(){
   const filtradas = getFilteredMermas();
   const c = chartColors();
@@ -4296,9 +4711,10 @@ function renderMermas(){
 
   renderMermasCosteTendencia(filtradas);
 
+  const seleccionadas = getMermasSeleccionadas();
   document.querySelector('#tablaMermas tbody').innerHTML = filtradas.map(m=>`
-    <tr><td>${m.fecha}</td><td>${(m.hora||'').slice(0,5)}</td><td>${m.empleado||'—'}</td><td>${m.producto}</td><td class="num">${m.cantidad} ${m.unidad}</td><td><span class="pill noident">${m.categoria}</span></td><td class="hint">${m.textoOriginal||''}</td><td><button class="btn danger" data-del-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="8" class="hint">Sin registros para este filtro.</td></tr>';
+    <tr><td><input type="checkbox" class="mermas-check" data-id-merma="${m.id}" ${seleccionadas.has(m.id)?'checked':''}></td><td>${m.fecha}</td><td>${(m.hora||'').slice(0,5)}</td><td>${m.empleado||'—'}</td><td>${m.producto}</td><td class="num">${m.cantidad} ${m.unidad}</td><td><span class="pill noident">${m.categoria}</span></td><td class="hint">${m.textoOriginal||''}</td><td><button class="btn danger" data-del-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+  `).join('') || '<tr><td colspan="9" class="hint">Sin registros para este filtro.</td></tr>';
   document.querySelectorAll('[data-del-merma]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar este registro de merma?')) return;
@@ -4310,6 +4726,18 @@ function renderMermas(){
       }catch(e){ toast('Error: '+e.message, true); }
     });
   });
+  document.querySelectorAll('.mermas-check').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const id = cb.getAttribute('data-id-merma');
+      const sel = getMermasSeleccionadas();
+      if(cb.checked) sel.add(id); else sel.delete(id);
+      setMermasSeleccionadas(sel);
+      actualizarBarraSeleccionMermas();
+    });
+  });
+  const checkAll = document.getElementById('mermasCheckAll');
+  checkAll.checked = filtradas.length>0 && filtradas.every(m=>seleccionadas.has(m.id));
+  actualizarBarraSeleccionMermas();
 }
 ['mermasDesde','mermasHasta','mermasCategoria','mermasEmpleado'].forEach(id=>{
   document.getElementById(id).addEventListener('change', renderMermas);
@@ -4380,6 +4808,7 @@ function showApp(){
   const dataLabelsSelEl = document.getElementById('dataLabelsSelect');
   if(dataLabelsSelEl) dataLabelsSelEl.value = getShowDataLabels() ? 'si' : 'no';
   CHART_TYPE_SELECT_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value = getChartTrendType(); });
+  EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.checked = getExcluirFueraHorario(); });
   const hoy = new Date().toISOString().slice(0,10);
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
   const hxFechaEl = document.getElementById('hxFecha'); if(hxFechaEl && !hxFechaEl.value) hxFechaEl.value = hoy;
