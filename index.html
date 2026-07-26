@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.45</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.46</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -3546,16 +3546,21 @@ document.getElementById('rentGuardarBtn').addEventListener('click', async ()=>{
   const weekStart = isoMonday(fecha);
   const statusEl = document.getElementById('rentGuardarStatus');
   statusEl.textContent = 'Guardando...';
-  try{
-    for(const row of filasDesdeDraftPlantilla()){
+  const filas = filasDesdeDraftPlantilla();
+  let ok = 0; const errores = [];
+  for(const row of filas){
+    try{
       await sbUpsert('staffing_weeks', { week_start:weekStart, franja:row.franja, tipo_dia:row.tipoDia, num_cocina:row.numCocina, coste_cocina:row.costeCocina, num_baristas:row.numBaristas, coste_barista:row.costeBarista }, 'week_start,franja,tipo_dia');
-    }
-    await cargarPlantillaSemana(weekStart);
-    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado para la semana del '+weekStart+'.</span>';
-    renderRentabilidad();
-    renderHistorialPlantillas();
-  }catch(e){
-    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>';
+      ok++;
+    }catch(e){ errores.push(row.franja+'/'+row.tipoDia+': '+e.message); }
+  }
+  await cargarPlantillaSemana(weekStart);
+  renderRentabilidad();
+  renderHistorialPlantillas();
+  if(errores.length===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente: '+ok+' de '+filas.length+' filas, para la semana del '+weekStart+'.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+filas.length+' filas. Fallaron '+errores.length+' — la más probable es que falte ejecutar una migración pendiente. Detalle: '+errores.slice(0,3).join(' · ')+(errores.length>3?' ...':'')+'</span>';
   }
 });
 document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async ()=>{
@@ -3568,22 +3573,26 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
   const btn = document.getElementById('rentAplicarPeriodoBtn');
   const statusEl = document.getElementById('rentGuardarStatus');
   btn.disabled = true;
-  try{
-    const filas = filasDesdeDraftPlantilla();
-    let ws = wsDesde, hechas = 0;
-    while(ws<=wsHasta){
-      statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
-      for(const row of filas){
+  const filas = filasDesdeDraftPlantilla();
+  let ws = wsDesde, hechas = 0, ok = 0, fallos = 0;
+  const erroresMuestra = [];
+  while(ws<=wsHasta){
+    statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
+    for(const row of filas){
+      try{
         await sbUpsert('staffing_weeks', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_cocina:row.numCocina, coste_cocina:row.costeCocina, num_baristas:row.numBaristas, coste_barista:row.costeBarista }, 'week_start,franja,tipo_dia');
-      }
-      hechas++;
-      const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
+        ok++;
+      }catch(e){ fallos++; if(erroresMuestra.length<3) erroresMuestra.push(ws+' '+row.franja+'/'+row.tipoDia+': '+e.message); }
     }
-    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s).</span>';
-    renderRentabilidad();
-    renderHistorialPlantillas();
-  }catch(e){
-    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>';
+    hechas++;
+    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
+  }
+  renderRentabilidad();
+  renderHistorialPlantillas();
+  if(fallos===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s), '+ok+' filas guardadas.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">'+ok+' filas guardadas, '+fallos+' fallaron en '+hechas+' semana(s) — probablemente falte ejecutar una migración pendiente. Detalle: '+erroresMuestra.join(' · ')+'</span>';
   }
   btn.disabled = false;
 });
@@ -3794,18 +3803,22 @@ document.getElementById('rendGuardarBtn').addEventListener('click', async ()=>{
   const weekStart = isoMonday(fecha);
   const statusEl = document.getElementById('rendGuardarStatus');
   statusEl.textContent = 'Guardando...';
-  try{
-    const inputs = document.querySelectorAll('[data-barista]');
-    for(const inp of inputs){
-      const [franja, tipoDia] = inp.getAttribute('data-barista').split('|');
-      const numBaristas = parseFloat(inp.value)||0;
+  const inputs = document.querySelectorAll('[data-barista]');
+  let ok = 0; const errores = [];
+  for(const inp of inputs){
+    const [franja, tipoDia] = inp.getAttribute('data-barista').split('|');
+    const numBaristas = parseFloat(inp.value)||0;
+    try{
       await sbUpsert('barista_weeks', { week_start:weekStart, franja, tipo_dia:tipoDia, num_baristas:numBaristas }, 'week_start,franja,tipo_dia');
-    }
-    await cargarBaristasSemana(weekStart);
-    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado para la semana del '+weekStart+'.</span>';
-    renderRendimiento();
-  }catch(e){
-    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>';
+      ok++;
+    }catch(e){ errores.push(franja+'/'+tipoDia+': '+e.message); }
+  }
+  await cargarBaristasSemana(weekStart);
+  renderRendimiento();
+  if(errores.length===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente: '+ok+' de '+inputs.length+' filas, para la semana del '+weekStart+'.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+inputs.length+' filas. Fallaron '+errores.length+' — probablemente falte ejecutar una migración pendiente. Detalle: '+errores.slice(0,3).join(' · ')+(errores.length>3?' ...':'')+'</span>';
   }
 });
 document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async ()=>{
@@ -3818,26 +3831,30 @@ document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async
   const btn = document.getElementById('rendAplicarPeriodoBtn');
   const statusEl = document.getElementById('rendGuardarStatus');
   btn.disabled = true;
-  try{
-    const inputs = document.querySelectorAll('[data-barista]');
-    const patron = [];
-    inputs.forEach(inp=>{
-      const [franja, tipoDia] = inp.getAttribute('data-barista').split('|');
-      patron.push({ franja, tipoDia, numBaristas: parseFloat(inp.value)||0 });
-    });
-    let ws = wsDesde, hechas = 0;
-    while(ws<=wsHasta){
-      statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
-      for(const row of patron){
+  const inputs = document.querySelectorAll('[data-barista]');
+  const patron = [];
+  inputs.forEach(inp=>{
+    const [franja, tipoDia] = inp.getAttribute('data-barista').split('|');
+    patron.push({ franja, tipoDia, numBaristas: parseFloat(inp.value)||0 });
+  });
+  let ws = wsDesde, hechas = 0, ok = 0, fallos = 0;
+  const erroresMuestra = [];
+  while(ws<=wsHasta){
+    statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
+    for(const row of patron){
+      try{
         await sbUpsert('barista_weeks', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_baristas:row.numBaristas }, 'week_start,franja,tipo_dia');
-      }
-      hechas++;
-      const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
+        ok++;
+      }catch(e){ fallos++; if(erroresMuestra.length<3) erroresMuestra.push(ws+' '+row.franja+'/'+row.tipoDia+': '+e.message); }
     }
-    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s).</span>';
-    renderRendimiento();
-  }catch(e){
-    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>';
+    hechas++;
+    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
+  }
+  renderRendimiento();
+  if(fallos===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s), '+ok+' filas guardadas.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">'+ok+' filas guardadas, '+fallos+' fallaron en '+hechas+' semana(s) — probablemente falte ejecutar una migración pendiente. Detalle: '+erroresMuestra.join(' · ')+'</span>';
   }
   btn.disabled = false;
 });
