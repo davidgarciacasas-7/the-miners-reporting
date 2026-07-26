@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.44</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.45</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -420,6 +420,16 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           </div>
         </div>
         <div class="card" style="margin-bottom:26px;"><div class="chart-wrap"><canvas id="chartCogsTendencia"></canvas></div></div>
+
+        <div class="section-title">Evolución de Otros costes (total, mensual)</div>
+        <div class="card" style="margin-bottom:26px;"><div class="chart-wrap"><canvas id="chartOtrosCostesTendencia"></canvas></div></div>
+
+        <div class="section-title">COGS como % de Ventas Square + Efectivo (mensual)</div>
+        <p class="hint" style="margin-bottom:8px;">Usa los ingresos reales de Square+Efectivo guardados en la pestaña Caja, mes a mes. Si un mes no tiene balance guardado en Caja, sale en 0.</p>
+        <div class="card" style="margin-bottom:26px;"><div class="chart-wrap"><canvas id="chartCogsPctSquare"></canvas></div></div>
+
+        <div class="section-title">Otros costes como % de Ventas Square + Efectivo (mensual)</div>
+        <div class="card" style="margin-bottom:26px;"><div class="chart-wrap"><canvas id="chartOtrosCostesPctSquare"></canvas></div></div>
 
         <div class="section-title">Historial de costes por producto</div>
         <div class="card" style="margin-bottom:26px;">
@@ -4659,6 +4669,40 @@ function renderCogsTendencia(){
       x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} },
       y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} }
     } }
+  });
+
+  renderCostesExtra(desde, hasta);
+}
+async function renderCostesExtra(desde, hasta){
+  const canvasOtros = document.getElementById('chartOtrosCostesTendencia');
+  if(!canvasOtros) return;
+  const c = chartColors();
+  const buckets = monthBucketsInRange(desde, hasta);
+  const labels = buckets.map(b=>b.label);
+
+  const porBucketOtros = calcularOtrosCostesTotalMensual(buckets);
+  destroyChart('otrosCostesTendencia');
+  STATE.charts.otrosCostesTendencia = safeNewChart('chartOtrosCostesTendencia', {
+    type: trendChartType(),
+    data:{ labels, datasets:[ trendDataset('Otros costes', labels.map(l=>+porBucketOtros[l].toFixed(2)), '#8B6A46') ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} } } }
+  });
+
+  const porBucketCogs = calcularCogsTotalMensual(buckets);
+  const porBucketCogsPct = await calcularPctSobreSquareMensual(buckets, porBucketCogs);
+  destroyChart('cogsPctSquare');
+  STATE.charts.cogsPctSquare = safeNewChart('chartCogsPctSquare', {
+    type: trendChartType(),
+    data:{ labels, datasets:[ trendDataset('COGS (% Square+Efectivo)', labels.map(l=>porBucketCogsPct[l]), c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
+  });
+
+  const porBucketOtrosPct = await calcularPctSobreSquareMensual(buckets, porBucketOtros);
+  destroyChart('otrosCostesPctSquare');
+  STATE.charts.otrosCostesPctSquare = safeNewChart('chartOtrosCostesPctSquare', {
+    type: trendChartType(),
+    data:{ labels, datasets:[ trendDataset('Otros costes (% Square+Efectivo)', labels.map(l=>porBucketOtrosPct[l]), '#8B6A46') ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
   });
 }
 document.getElementById('cogsGranularidad').addEventListener('change', renderCogsTendencia);
