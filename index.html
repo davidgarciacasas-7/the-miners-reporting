@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.40</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.41</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -590,6 +590,12 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <button class="btn secondary" data-plantilla-tab="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
             <button class="btn secondary" id="rentCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde L–V (sin guardar)</button>
             <button class="btn secondary" id="rentCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar L–V → Sábado y Domingo (sin guardar)</button>
+          </div>
+          <div class="card" style="margin-bottom:12px;padding:10px 14px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <p class="hint" style="width:100%;margin-bottom:2px;">El €/hora suele ser el mismo para todas las franjas (lo que cambia es cuánta gente hay en cada una) — rellena aquí una vez y aplícalo de golpe a todas las franjas de esta pestaña.</p>
+            <div class="config-field" style="margin-bottom:0;"><label>€/h cocina (todas)</label><input type="number" step="0.5" min="0" id="rentCosteCocinaUnico" style="width:90px;"></div>
+            <div class="config-field" style="margin-bottom:0;"><label>€/h barista (todas)</label><input type="number" step="0.5" min="0" id="rentCosteBaristaUnico" style="width:90px;"></div>
+            <button class="btn secondary" id="rentAplicarCosteUnicoBtn">Aplicar a todas las franjas de esta pestaña</button>
           </div>
           <table id="tablaPlantilla">
             <thead><tr><th>Franja</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th></tr></thead>
@@ -3263,6 +3269,19 @@ document.getElementById('rentCopiarAmbosBtn').addEventListener('click', ()=>{
   });
   renderTablaPlantilla();
   toast('Copiado a Sábado y Domingo — recuerda guardar para que se quede.');
+});
+document.getElementById('rentAplicarCosteUnicoBtn').addEventListener('click', ()=>{
+  const costeCocina = document.getElementById('rentCosteCocinaUnico').value;
+  const costeBarista = document.getElementById('rentCosteBaristaUnico').value;
+  if(costeCocina==='' && costeBarista===''){ toast('Escribe al menos un €/hora antes de aplicar.', true); return; }
+  const tipoActivo = STATE.rentPlantillaTipoActivo || 'semana';
+  const nombreTipo = tipoActivo==='semana' ? 'Entre semana (L-V)' : (tipoActivo==='sabado' ? 'Sábado' : 'Domingo');
+  getRentFranjas().forEach(f=>{
+    if(costeCocina!=='') STATE.rentPlantillaDraft[f.id+'|'+tipoActivo+'|costeCocina'] = parseFloat(costeCocina)||0;
+    if(costeBarista!=='') STATE.rentPlantillaDraft[f.id+'|'+tipoActivo+'|costeBarista'] = parseFloat(costeBarista)||0;
+  });
+  renderTablaPlantilla();
+  toast('€/hora aplicado a todas las franjas de "'+nombreTipo+'" — recuerda guardar para que se quede.');
 });
 document.getElementById('rentCopiarARendimientoBtn').addEventListener('click', ()=>{
   if(!confirm('Esto copia la configuración de franjas de Rentabilidad a Rendimiento operacional (sustituyendo las franjas que tenga Rendimiento ahora mismo), y copia solo el nº de baristas de cada franja — no la cocina, ni los costes (Rendimiento no los necesita). Se queda sin guardar hasta que le des a "Guardar" en Rendimiento. ¿Continuar?')) return;
