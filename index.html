@@ -130,7 +130,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface-2);border:1px solid var(--copper);border-radius:8px;padding:12px 16px;font-size:13px;max-width:340px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4);}
 #legendTooltip{position:fixed;display:none;z-index:998;background:var(--surface-2);border:1px solid var(--copper);border-radius:8px;padding:6px 11px;font-size:12.5px;color:var(--text);pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap;}
 @media print{
-  #sidebar,.topbar,#legendTooltip,.toast,#loginScreen,#pnlHiddenRowsInfo,button,select,input[type=date],#filterbar{display:none !important;}
+  #sidebar,.topbar,#legendTooltip,.toast,#loginScreen,#pnlHiddenRowsInfo,button,select,input[type=date],#filterbar,.no-print{display:none !important;}
   #app{display:block !important;}
   #main{padding:0 !important;overflow:visible !important;}
   body{background:#fff !important;color:#111 !important;}
@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.30</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.36</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -376,6 +376,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <p class="hint" id="pnlRangoLabel" style="margin-bottom:6px;"></p>
         <p class="hint" id="pnlStatus"></p>
         <div id="pnlHiddenRowsInfo" style="margin-bottom:8px;"></div>
+        <div id="pnlHiddenBucketsInfo" style="margin-bottom:8px;"></div>
         <div class="card" style="overflow-x:auto;">
           <table id="tablaPnl" class="mono"><thead><tr></tr></thead><tbody></tbody><tfoot></tfoot></table>
         </div>
@@ -554,42 +555,65 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card" style="margin-bottom:14px;">
           <h3>Plantilla de personal</h3>
           <p class="hint" style="margin-bottom:6px;"><b>Cocina</b> y <b>Baristas</b> se cuentan por separado, cada uno con su propio coste por hora — la app multiplica nº personas × €/hora × duración de la franja para cada uno, y la columna "Coste total" te enseña la suma de ambos para esa línea y ese patrón.</p>
-          <p class="hint" style="margin-bottom:6px;">El coste por hora es siempre <u>por persona</u> (no la suma de todas).</p>
+          <p class="hint" style="margin-bottom:6px;">El coste por hora es siempre <u>por persona</u> (no la suma de todas) — el "Coste total" de cada franja es (nº cocina × €/h cocina + nº baristas × €/h barista) × duración de la franja en horas.</p>
           <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 personal en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
           <div class="subfilter" style="margin-bottom:6px;">
-            <div class="filter-group"><label>Apertura L–V</label><input type="time" id="rentAperturaLVInput" value="08:00"></div>
-            <div class="filter-group"><label>Cierre L–V</label><input type="time" id="rentCierreLVInput" value="21:00"></div>
+            <div class="filter-group"><label>Apertura L–V</label><input type="time" step="900" id="rentAperturaLVInput" value="08:00"></div>
+            <div class="filter-group"><label>Cierre L–V</label><input type="time" step="900" id="rentCierreLVInput" value="21:00"></div>
           </div>
           <div class="subfilter" style="margin-bottom:6px;">
-            <div class="filter-group"><label>Apertura Sábado</label><input type="time" id="rentAperturaSabInput" value="09:00"></div>
-            <div class="filter-group"><label>Cierre Sábado</label><input type="time" id="rentCierreSabInput" value="21:00"></div>
+            <div class="filter-group"><label>Apertura Sábado</label><input type="time" step="900" id="rentAperturaSabInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Sábado</label><input type="time" step="900" id="rentCierreSabInput" value="21:00"></div>
           </div>
           <div class="subfilter" style="margin-bottom:10px;">
-            <div class="filter-group"><label>Apertura Domingo</label><input type="time" id="rentAperturaDomInput" value="09:00"></div>
-            <div class="filter-group"><label>Cierre Domingo</label><input type="time" id="rentCierreDomInput" value="18:00"></div>
+            <div class="filter-group"><label>Apertura Domingo</label><input type="time" step="900" id="rentAperturaDomInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Domingo</label><input type="time" step="900" id="rentCierreDomInput" value="18:00"></div>
             <div class="filter-group"><label>Cada</label><select id="rentGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
             <button class="btn secondary" id="rentGenerarFranjasBtn">Generar franjas</button>
           </div>
           <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rentPlantillaDia" style="max-width:200px;"></div>
-          <div style="overflow-x:auto;">
-            <table id="tablaPlantilla">
-              <thead><tr><th>Franja</th><th colspan="5">Entre semana (L–V)</th><th colspan="5">Sábado</th><th colspan="5">Domingo</th></tr>
-              <tr><th></th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th></tr></thead>
-              <tbody></tbody>
-            </table>
+          <div id="rentHistorialPlantillasWrap" style="margin-bottom:14px;">
+            <p class="hint" style="margin-bottom:4px;">Semanas con plantilla guardada:</p>
+            <div id="rentHistorialPlantillas" class="card" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
           </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn" data-plantilla-tab="semana" style="padding:6px 14px;font-size:12px;">Entre semana (L–V)</button>
+            <button class="btn secondary" data-plantilla-tab="sabado" style="padding:6px 14px;font-size:12px;">Sábado</button>
+            <button class="btn secondary" data-plantilla-tab="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
+            <button class="btn secondary" id="rentCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde L–V (sin guardar)</button>
+            <button class="btn secondary" id="rentCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar L–V → Sábado y Domingo (sin guardar)</button>
+          </div>
+          <table id="tablaPlantilla">
+            <thead><tr><th>Franja</th><th>Nº cocina</th><th>€/h cocina</th><th>Nº baristas</th><th>€/h barista</th><th>Coste total</th></tr></thead>
+            <tbody></tbody>
+          </table>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
             <button class="btn secondary" id="rentGuardarBtn">Guardar solo esta semana</button>
             <button class="btn" id="rentAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta)</button>
+            <button class="btn secondary" id="rentCopiarARendimientoBtn">Copiar a Rendimiento operacional (solo baristas)</button>
           </div>
           <p class="hint" id="rentGuardarStatus" style="margin-top:8px;"></p>
         </div>
 
         <div class="section-title">Resultado por franja horaria (periodo completo)</div>
         <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartRentabilidad"></canvas></div></div>
-        <div class="card">
+        <div class="card" style="margin-bottom:14px;">
           <table id="tablaRentabilidad"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>COGS</th><th>Coste laboral</th><th>Resultado</th></tr></thead><tbody></tbody></table>
         </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Rentabilidad típica por franja (por día)</span>
+          <select id="rentMediaMedianaSelect"><option value="media" selected>Media</option><option value="mediana">Mediana</option></select>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">A diferencia del gráfico de arriba (que suma todo el periodo), este calcula el resultado de cada día por separado para cada franja, y muestra la media o la mediana de esos días — te da una idea de "un día normal" en esa franja.</p>
+        <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartRentabilidadTipica"></canvas></div></div>
+
+        <div class="section-title">Días rentables vs no rentables por franja (nº)</div>
+        <p class="hint" style="margin-bottom:8px;">De todos los días del periodo, cuántos tuvo esa franja un resultado positivo (rentable) frente a negativo (no rentable).</p>
+        <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartDiasRentables"></canvas></div></div>
+
+        <div class="section-title">Días rentables vs no rentables por franja (%)</div>
+        <div class="card"><div class="chart-wrap"><canvas id="chartDiasRentablesPct"></canvas></div></div>
       </div>
 
       <!-- RENDIMIENTO OPERACIONAL -->
@@ -657,6 +681,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div class="filter-group"><label>Desde</label><input type="date" id="reDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="reHasta"></div>
             <div class="filter-group"><label>+ Añadir gráfico</label><select id="reAddWidgetSelect"><option value="">Elegir...</option></select></div>
+            <div class="filter-group"><label>&nbsp;</label><button class="btn secondary" id="reAddTituloBtn" style="padding:6px 12px;">+ Añadir título / texto</button></div>
           </div>
           <div>
             <button class="btn secondary" id="reCopyClaudeBtn">Copiar para preguntar a Claude</button>
@@ -1832,6 +1857,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
         desdeInp.value = inicioSemana; hastaInp.value = finSemana; plantillaInp.value = hoy;
         cargarPlantillaSemana(inicioSemana).then(renderRentabilidad);
       }
+      renderHistorialPlantillas();
     }
     if(item.dataset.tab==='rendimiento'){
       const rDesdeInp = document.getElementById('rendDesde'), rHastaInp = document.getElementById('rendHasta'), rPlantillaInp = document.getElementById('rendPlantillaDia');
@@ -1930,6 +1956,28 @@ function renderPnlHiddenRowsInfo(){
   });
   const showAllBtn = document.getElementById('pnlShowAllBtn');
   if(showAllBtn) showAllBtn.addEventListener('click', ()=>{ setPnlHiddenRows(new Set()); renderPnl(); });
+}
+function getPnlHiddenBuckets(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_pnl_hidden_buckets')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setPnlHiddenBuckets(set){ localStorage.setItem('miners_pnl_hidden_buckets', JSON.stringify([...set])); }
+function renderPnlHiddenBucketsInfo(todosLosBuckets){
+  const el = document.getElementById('pnlHiddenBucketsInfo');
+  if(!el) return;
+  const hidden = getPnlHiddenBuckets();
+  if(hidden.size===0){ el.innerHTML=''; return; }
+  const ocultos = todosLosBuckets.filter(b=>hidden.has(b.dateMin));
+  el.innerHTML = '<p class="hint">'+ocultos.length+' columna(s) oculta(s): '+
+    ocultos.map(b=>'<button class="btn secondary" data-unhide-bucket="'+b.dateMin+'" style="padding:2px 8px;font-size:11px;margin:0 4px 4px 0;">👁 '+b.label+'</button>').join('')+
+    ' <button class="btn secondary" id="pnlShowAllBucketsBtn" style="padding:2px 8px;font-size:11px;">Mostrar todas</button></p>';
+  el.querySelectorAll('[data-unhide-bucket]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const h = getPnlHiddenBuckets(); h.delete(btn.getAttribute('data-unhide-bucket')); setPnlHiddenBuckets(h); renderPnl();
+    });
+  });
+  const showAllBucketsBtn = document.getElementById('pnlShowAllBucketsBtn');
+  if(showAllBucketsBtn) showAllBucketsBtn.addEventListener('click', ()=>{ setPnlHiddenBuckets(new Set()); renderPnl(); });
 }
 document.getElementById('pnlPrintBtn').addEventListener('click', ()=>window.print());
 
@@ -2790,42 +2838,54 @@ function franjaDuracionHoras(franjaLabel){
   const f = BUSINESS_FRANJAS.find(x=>x.label===franjaLabel);
   return f ? (f.end-f.start)/60 : 0;
 }
+STATE.rentPlantillaTipoActivo = 'semana';
+STATE.rentPlantillaDraft = {};
+function inicializarDraftPlantilla(){
+  const draft = {};
+  getRentFranjas().forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      const d = STATE.staffingWeek.find(s=>s.franja===f.id && s.tipoDia===tipo) || {numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0};
+      draft[f.id+'|'+tipo+'|numCocina'] = d.numCocina;
+      draft[f.id+'|'+tipo+'|costeCocina'] = d.costeCocina;
+      draft[f.id+'|'+tipo+'|numBaristas'] = d.numBaristas;
+      draft[f.id+'|'+tipo+'|costeBarista'] = d.costeBarista;
+    });
+  });
+  STATE.rentPlantillaDraft = draft;
+}
 function renderTablaPlantilla(){
   const tbody = document.querySelector('#tablaPlantilla tbody');
   const franjas = getRentFranjas();
-  const buscar = (id,tipo) => STATE.staffingWeek.find(s=>s.franja===id && s.tipoDia===tipo) || {numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0};
-  const inputTiempo = (val, attr, id) => `<input type="time" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
-  const inputNum = (val, campo, id, tipo) => `<input type="number" step="${campo.startsWith('coste')?'0.5':'1'}" min="0" value="${val}" data-plantilla="${id}|${tipo}|${campo}" style="width:60px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 5px;text-align:right;">`;
-  const costeTotalFranja = (d, horas) => (d.numCocina*d.costeCocina + d.numBaristas*d.costeBarista) * horas;
-  const TIPOS_DIA = ['semana','sabado','domingo'];
-  const bloqueTipo = (f, tipo, horas) => {
-    const d = buscar(f.id, tipo);
-    return `<td class="num">${inputNum(d.numCocina,'numCocina',f.id,tipo)}</td>
-      <td class="num">${inputNum(d.costeCocina,'costeCocina',f.id,tipo)}</td>
-      <td class="num">${inputNum(d.numBaristas,'numBaristas',f.id,tipo)}</td>
-      <td class="num">${inputNum(d.costeBarista,'costeBarista',f.id,tipo)}</td>
-      <td class="num"><b data-coste-total="${f.id}|${tipo}">${eur(Math.round(costeTotalFranja(d,horas)*100))}</b></td>`;
-  };
+  const tipoActivo = STATE.rentPlantillaTipoActivo || 'semana';
+  const draft = STATE.rentPlantillaDraft || {};
+  const leerDraft = (fid,campo) => draft[fid+'|'+tipoActivo+'|'+campo] ?? 0;
+  const inputTiempo = (val, attr, id) => `<input type="time" step="900" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
+  const inputNum = (val, campo, id) => `<input type="number" step="${campo.startsWith('coste')?'0.5':'1'}" min="0" value="${val}" data-plantilla="${id}|${campo}" style="width:65px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 5px;text-align:right;">`;
+  const costeTotalFranja = (fid, horas) => (leerDraft(fid,'numCocina')*leerDraft(fid,'costeCocina') + leerDraft(fid,'numBaristas')*leerDraft(fid,'costeBarista')) * horas;
 
   tbody.innerHTML = franjas.map(f=>{
     const horas = (f.end-f.start)/60;
     return `<tr>
       <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'franja-fin',f.id)} <button class="btn danger" data-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
-      ${TIPOS_DIA.map(tipo=>bloqueTipo(f,tipo,horas)).join('')}
+      <td class="num">${inputNum(leerDraft(f.id,'numCocina'),'numCocina',f.id)}</td>
+      <td class="num">${inputNum(leerDraft(f.id,'costeCocina'),'costeCocina',f.id)}</td>
+      <td class="num">${inputNum(leerDraft(f.id,'numBaristas'),'numBaristas',f.id)}</td>
+      <td class="num">${inputNum(leerDraft(f.id,'costeBarista'),'costeBarista',f.id)}</td>
+      <td class="num"><b data-coste-total="${f.id}">${eur(Math.round(costeTotalFranja(f.id,horas)*100))}</b></td>
     </tr>`;
-  }).join('') + `<tr><td colspan="16" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+  }).join('') + `<tr><td colspan="6" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
 
-  /* recalcular el "Coste total" en vivo según se va escribiendo, sin necesidad de guardar */
+  /* cada tecla escrita actualiza el borrador en memoria (los 3 tipos de día quedan a salvo
+     aunque solo se vea uno en pantalla) y recalcula el "Coste total" en vivo */
   tbody.querySelectorAll('[data-plantilla]').forEach(inp=>{
     inp.addEventListener('input', ()=>{
-      const [id, tipo] = inp.getAttribute('data-plantilla').split('|');
+      const [id, campo] = inp.getAttribute('data-plantilla').split('|');
+      STATE.rentPlantillaDraft[id+'|'+tipoActivo+'|'+campo] = parseFloat(inp.value)||0;
       const f = franjas.find(x=>x.id===id);
       if(!f) return;
       const horas = (f.end-f.start)/60;
-      const leer = (campo) => parseFloat(tbody.querySelector('[data-plantilla="'+id+'|'+tipo+'|'+campo+'"]').value)||0;
-      const total = (leer('numCocina')*leer('costeCocina') + leer('numBaristas')*leer('costeBarista')) * horas;
-      const span = tbody.querySelector('[data-coste-total="'+id+'|'+tipo+'"]');
-      if(span) span.textContent = eur(Math.round(total*100));
+      const span = tbody.querySelector('[data-coste-total="'+id+'"]');
+      if(span) span.textContent = eur(Math.round(costeTotalFranja(id,horas)*100));
     });
   });
 
@@ -2858,11 +2918,42 @@ function renderTablaPlantilla(){
     const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
     const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
     const nuevoFin = Math.min(lastEnd+60, 23*60+59);
-    fr.push({ id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) });
+    const nuevaFranja = { id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) };
+    fr.push(nuevaFranja);
     setRentFranjas(fr);
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|numCocina'] = 0;
+      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|costeCocina'] = 0;
+      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|numBaristas'] = 0;
+      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|costeBarista'] = 0;
+    });
     renderTablaPlantilla(); renderRentabilidad();
   });
 }
+document.querySelectorAll('[data-plantilla-tab]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    STATE.rentPlantillaTipoActivo = btn.getAttribute('data-plantilla-tab');
+    document.querySelectorAll('[data-plantilla-tab]').forEach(b=>{
+      const activo = b.getAttribute('data-plantilla-tab')===STATE.rentPlantillaTipoActivo;
+      b.classList.toggle('secondary', !activo);
+    });
+    document.getElementById('rentCopiarLVBtn').style.display = STATE.rentPlantillaTipoActivo==='semana' ? 'none' : 'inline-flex';
+    renderTablaPlantilla();
+  });
+});
+document.getElementById('rentCopiarLVBtn').addEventListener('click', ()=>{
+  const tipoDestino = STATE.rentPlantillaTipoActivo;
+  if(tipoDestino==='semana') return;
+  const nombreDestino = tipoDestino==='sabado' ? 'Sábado' : 'Domingo';
+  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye lo que tengas ahora en esta pestaña (todavía sin guardar).')) return;
+  getRentFranjas().forEach(f=>{
+    ['numCocina','costeCocina','numBaristas','costeBarista'].forEach(campo=>{
+      STATE.rentPlantillaDraft[f.id+'|'+tipoDestino+'|'+campo] = STATE.rentPlantillaDraft[f.id+'|semana|'+campo] ?? 0;
+    });
+  });
+  renderTablaPlantilla();
+  toast('Copiado desde L-V — recuerda guardar para que se quede.');
+});
 document.getElementById('rentGenerarFranjasBtn').addEventListener('click', ()=>{
   const franjasActuales = getRentFranjas();
   if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
@@ -2875,6 +2966,14 @@ document.getElementById('rentGenerarFranjasBtn').addEventListener('click', ()=>{
   if(!(cierre>apertura)){ toast('Al menos uno de los tres cierres debe ser posterior a su apertura.', true); return; }
   const franjas = generarListaFranjas(apertura, cierre, gran);
   setRentFranjas(franjas);
+  franjas.forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      if(STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina']===undefined){
+        STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina']=0; STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeCocina']=0;
+        STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0; STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeBarista']=0;
+      }
+    });
+  });
   renderTablaPlantilla();
   renderRentabilidad();
   const distintos = !(aLV===aSab && aSab===aDom && cLV===cSab && cSab===cDom);
@@ -2888,8 +2987,83 @@ async function cargarPlantillaSemana(weekStart){
     STATE.staffingWeek = [];
     toast('No se pudo cargar la plantilla: '+e.message, true);
   }
+  inicializarDraftPlantilla();
   renderTablaPlantilla();
 }
+async function renderHistorialPlantillas(){
+  const el = document.getElementById('rentHistorialPlantillas');
+  if(!el) return;
+  el.innerHTML = '<p class="hint">Cargando...</p>';
+  let semanas = [];
+  try{
+    const rows = await sbList('staffing_weeks', 'select=week_start&order=week_start.desc');
+    semanas = [...new Set(rows.map(r=>r.week_start))];
+  }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; return; }
+  if(semanas.length===0){ el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>'; return; }
+  el.innerHTML = semanas.map(ws=>{
+    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
+      <span class="hint">Semana del ${ws} al ${fin}</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn secondary" data-cargar-semana="${ws}" style="padding:3px 10px;font-size:11px;">Cargar</button>
+        <button class="btn danger" data-eliminar-semana="${ws}" style="padding:3px 10px;font-size:11px;">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-cargar-semana]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ws = btn.getAttribute('data-cargar-semana');
+      document.getElementById('rentPlantillaDia').value = ws;
+      await cargarPlantillaSemana(ws);
+      toast('Plantilla de la semana del '+ws+' cargada.');
+    });
+  });
+  el.querySelectorAll('[data-eliminar-semana]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ws = btn.getAttribute('data-eliminar-semana');
+      if(!confirm('¿Eliminar toda la plantilla guardada para la semana del '+ws+'? No se puede deshacer.')) return;
+      btn.textContent = 'Borrando...'; btn.disabled = true;
+      try{
+        const rows = await sbList('staffing_weeks', 'select=id&week_start=eq.'+ws);
+        for(const r of rows){ await sbDelete('staffing_weeks', r.id); }
+        toast('Plantilla eliminada.');
+        renderHistorialPlantillas();
+        const diaActual = document.getElementById('rentPlantillaDia').value;
+        if(diaActual && isoMonday(diaActual)===ws){ await cargarPlantillaSemana(ws); }
+      }catch(e){ toast('Error: '+e.message, true); btn.textContent='Eliminar'; btn.disabled=false; }
+    });
+  });
+}
+document.getElementById('rentCopiarAmbosBtn').addEventListener('click', ()=>{
+  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye lo que tengas ahora en ambas (todavía sin guardar).')) return;
+  getRentFranjas().forEach(f=>{
+    ['sabado','domingo'].forEach(tipoDestino=>{
+      ['numCocina','costeCocina','numBaristas','costeBarista'].forEach(campo=>{
+        STATE.rentPlantillaDraft[f.id+'|'+tipoDestino+'|'+campo] = STATE.rentPlantillaDraft[f.id+'|semana|'+campo] ?? 0;
+      });
+    });
+  });
+  renderTablaPlantilla();
+  toast('Copiado a Sábado y Domingo — recuerda guardar para que se quede.');
+});
+document.getElementById('rentCopiarARendimientoBtn').addEventListener('click', ()=>{
+  if(!confirm('Esto copia la configuración de franjas de Rentabilidad a Rendimiento operacional (sustituyendo las franjas que tenga Rendimiento ahora mismo), y copia solo el nº de baristas de cada franja — no la cocina, ni los costes (Rendimiento no los necesita). Se queda sin guardar hasta que le des a "Guardar" en Rendimiento. ¿Continuar?')) return;
+  const franjasRent = JSON.parse(JSON.stringify(getRentFranjas()));
+  setRendFranjas(franjasRent);
+  const nuevoBaristaWeek = [];
+  franjasRent.forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      const numBaristas = STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0;
+      nuevoBaristaWeek.push({ franja:f.id, tipoDia:tipo, numBaristas });
+    });
+  });
+  STATE.baristaWeek = nuevoBaristaWeek;
+  const diaActual = document.getElementById('rentPlantillaDia').value;
+  if(diaActual) document.getElementById('rendPlantillaDia').value = diaActual;
+  renderTablaBaristas();
+  renderRendimiento();
+  toast('Franjas y nº de baristas copiados a Rendimiento operacional — ve a esa pestaña, revisa, y pulsa "Guardar" para que se quede.');
+});
 /* trae TODAS las plantillas guardadas cuyas semanas caen dentro de [desde,hasta] */
 async function cargarPlantillasEnRango(desde, hasta){
   const wsDesde = isoMonday(desde), wsHasta = isoMonday(hasta);
@@ -2947,6 +3121,107 @@ async function calcularRentabilidadPeriodo(desde, hasta){
   const resultado = {}; idsOrder.forEach(id=>resultado[labelDe[id]] = resPorId[id]);
   return { franjaOrder, resultado, semanasSinPlantilla: [...semanasSinPlantilla].sort() };
 }
+/* igual que calcularRentabilidadPeriodo, pero en vez de un único total por franja,
+   devuelve el resultado de CADA DÍA por separado — para calcular medias/medianas y
+   contar días rentables vs no rentables. */
+async function calcularRentabilidadDiaria(desde, hasta){
+  const franjasCustom = getRentFranjas();
+  const incluirFuera = !getExcluirFueraHorario();
+  const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasCustom.forEach(f=>labelDe[f.id]=f.label); labelDe['fuera']='Fuera de horario';
+  const duracionDe = {}; franjasCustom.forEach(f=>duracionDe[f.id]=(f.end-f.start)/60);
+  const clasificar = (horaStr) => {
+    const min = horaAMinutos(horaStr);
+    const f = franjasCustom.find(x=>min>=x.start && min<x.end);
+    return f ? f.id : 'fuera';
+  };
+
+  const costHistory = buildCostHistoryMap();
+  const porDia = {}; idsOrder.forEach(id=>porDia[id]={});
+  getAllSalesLinesRaw().forEach(l=>{
+    if(l.fecha<desde || l.fecha>hasta) return;
+    const id = clasificar(l.hora);
+    if(!porDia[id]) return;
+    if(!porDia[id][l.fecha]) porDia[id][l.fecha] = {ventas:0, cogs:0};
+    porDia[id][l.fecha].ventas += l.bruto;
+    porDia[id][l.fecha].cogs += l.cant * costAtDate(costHistory, l.articulo, l.fecha) * 100;
+  });
+
+  const plantillas = await cargarPlantillasEnRango(desde, hasta);
+  const patronMap = {};
+  plantillas.forEach(p=>{ patronMap[p.weekStart+'|'+p.franja+'|'+p.tipoDia] = p; });
+
+  const resultadosPorId = {}; idsOrder.forEach(id=>resultadosPorId[id]=[]);
+  let d = new Date(desde+'T00:00:00');
+  const end = new Date(hasta+'T00:00:00');
+  while(d<=end){
+    const fechaStr = d.toISOString().slice(0,10);
+    const ws = isoMonday(fechaStr);
+    const dow = d.getDay();
+    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    idsOrder.forEach(id=>{
+      const vc = porDia[id][fechaStr] || {ventas:0, cogs:0};
+      let laboral = 0;
+      if(id!=='fuera'){
+        const p = patronMap[ws+'|'+id+'|'+tipoDia];
+        if(p) laboral = (p.numCocina*p.costeCocina + p.numBaristas*p.costeBarista) * (duracionDe[id]||0) * 100;
+      }
+      resultadosPorId[id].push((vc.ventas - vc.cogs - laboral)/100);
+    });
+    d.setDate(d.getDate()+1);
+  }
+  const franjaOrder = idsOrder.map(id=>labelDe[id]);
+  const resultadosPorFranja = {}; idsOrder.forEach(id=>resultadosPorFranja[labelDe[id]] = resultadosPorId[id]);
+  return { franjaOrder, resultadosPorFranja };
+}
+function mediaArray(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function medianaArray(arr){
+  if(!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b);
+  const mid = Math.floor(s.length/2);
+  return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+async function renderRentabilidadExtra(desde, hasta){
+  const { franjaOrder, resultadosPorFranja } = await calcularRentabilidadDiaria(desde, hasta);
+  const c = chartColors();
+
+  const usarMediana = document.getElementById('rentMediaMedianaSelect').value==='mediana';
+  const tipicos = franjaOrder.map(f=>{
+    const arr = resultadosPorFranja[f];
+    return +(usarMediana ? medianaArray(arr) : mediaArray(arr)).toFixed(2);
+  });
+  destroyChart('rentabilidadTipica');
+  STATE.charts.rentabilidadTipica = safeNewChart('chartRentabilidadTipica', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[ trendDataset(usarMediana?'Mediana diaria':'Media diaria', tipicos, c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} } } }
+  });
+
+  const rentablesCount = franjaOrder.map(f=>resultadosPorFranja[f].filter(v=>v>0).length);
+  const noRentablesCount = franjaOrder.map(f=>resultadosPorFranja[f].filter(v=>v<0).length);
+  destroyChart('diasRentables');
+  STATE.charts.diasRentables = safeNewChart('chartDiasRentables', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[
+      trendDataset('Rentables (>0)', rentablesCount, c.verdigris),
+      trendDataset('No rentables (<0)', noRentablesCount, '#C1613F')
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  });
+
+  const totalDias = franjaOrder.map(f=>resultadosPorFranja[f].length || 1);
+  const rentablesPct = franjaOrder.map((f,i)=>+(rentablesCount[i]/totalDias[i]*100).toFixed(1));
+  const noRentablesPct = franjaOrder.map((f,i)=>+(noRentablesCount[i]/totalDias[i]*100).toFixed(1));
+  destroyChart('diasRentablesPct');
+  STATE.charts.diasRentablesPct = safeNewChart('chartDiasRentablesPct', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[
+      trendDataset('% Rentables', rentablesPct, c.verdigris),
+      trendDataset('% No rentables', noRentablesPct, '#C1613F')
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
+  });
+}
 async function renderRentabilidad(){
   const desde = document.getElementById('rentDesde').value;
   const hasta = document.getElementById('rentHasta').value;
@@ -2981,7 +3256,13 @@ async function renderRentabilidad(){
   const totalResultado = totalVentas - totalCogs - totalLaboral;
   const tfoot = document.querySelector('#tablaRentabilidad tfoot') || (() => { const t=document.createElement('tfoot'); document.getElementById('tablaRentabilidad').appendChild(t); return t; })();
   tfoot.innerHTML = `<tr style="border-top:2px solid var(--line);font-weight:600;"><td>Total (todas las franjas)</td><td class="num">${eur(totalVentas)}</td><td class="num">${eur(totalCogs)}</td><td class="num">${eur(totalLaboral)}</td><td class="num" style="color:${totalResultado>=0?'var(--positive)':'var(--negative)'}"><b>${eur(totalResultado)}</b></td></tr>`;
+
+  await renderRentabilidadExtra(desde, hasta);
 }
+document.getElementById('rentMediaMedianaSelect').addEventListener('change', ()=>{
+  const desde = document.getElementById('rentDesde').value, hasta = document.getElementById('rentHasta').value;
+  if(desde && hasta) renderRentabilidadExtra(desde, hasta);
+});
 document.getElementById('rentDesde').addEventListener('change', renderRentabilidad);
 document.getElementById('rentHasta').addEventListener('change', renderRentabilidad);
 document.getElementById('rentPlantillaDia').addEventListener('change', async ()=>{
@@ -2989,6 +3270,21 @@ document.getElementById('rentPlantillaDia').addEventListener('change', async ()=
   if(!fecha) return;
   await cargarPlantillaSemana(isoMonday(fecha));
 });
+function filasDesdeDraftPlantilla(){
+  const filas = [];
+  getRentFranjas().forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      filas.push({
+        franja: f.id, tipoDia: tipo,
+        numCocina: STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina'] ?? 0,
+        costeCocina: STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeCocina'] ?? 0,
+        numBaristas: STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0,
+        costeBarista: STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeBarista'] ?? 0,
+      });
+    });
+  });
+  return filas;
+}
 document.getElementById('rentGuardarBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('rentPlantillaDia').value;
   if(!fecha){ toast('Elige primero qué semana estás editando.', true); return; }
@@ -2996,20 +3292,13 @@ document.getElementById('rentGuardarBtn').addEventListener('click', async ()=>{
   const statusEl = document.getElementById('rentGuardarStatus');
   statusEl.textContent = 'Guardando...';
   try{
-    const inputs = document.querySelectorAll('[data-plantilla]');
-    const porFranja = {};
-    inputs.forEach(inp=>{
-      const [franja,tipo,campo] = inp.getAttribute('data-plantilla').split('|');
-      const key = franja+'|'+tipo;
-      if(!porFranja[key]) porFranja[key] = { franja, tipoDia:tipo, numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0 };
-      porFranja[key][campo] = parseFloat(inp.value)||0;
-    });
-    for(const row of Object.values(porFranja)){
+    for(const row of filasDesdeDraftPlantilla()){
       await sbUpsert('staffing_weeks', { week_start:weekStart, franja:row.franja, tipo_dia:row.tipoDia, num_cocina:row.numCocina, coste_cocina:row.costeCocina, num_baristas:row.numBaristas, coste_barista:row.costeBarista }, 'week_start,franja,tipo_dia');
     }
     await cargarPlantillaSemana(weekStart);
     statusEl.innerHTML = '<span style="color:var(--positive)">Guardado para la semana del '+weekStart+'.</span>';
     renderRentabilidad();
+    renderHistorialPlantillas();
   }catch(e){
     statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>';
   }
@@ -3020,23 +3309,16 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
   if(!desde || !hasta){ toast('Elige primero el periodo Desde/Hasta arriba.', true); return; }
   const wsDesde = isoMonday(desde), wsHasta = isoMonday(hasta);
   const nSemanas = Math.round((new Date(wsHasta)-new Date(wsDesde))/(7*86400000))+1;
-  if(!confirm('Esto aplica la plantilla que ves ahora mismo a las '+nSemanas+' semana(s) entre '+desde+' y '+hasta+', sobrescribiendo lo que ya hubiera guardado en cada una. ¿Continuar?')) return;
+  if(!confirm('Esto aplica la plantilla que ves ahora mismo (los 3 patrones: L-V, Sábado y Domingo) a las '+nSemanas+' semana(s) entre '+desde+' y '+hasta+', sobrescribiendo lo que ya hubiera guardado en cada una. ¿Continuar?')) return;
   const btn = document.getElementById('rentAplicarPeriodoBtn');
   const statusEl = document.getElementById('rentGuardarStatus');
   btn.disabled = true;
   try{
-    const inputs = document.querySelectorAll('[data-plantilla]');
-    const porFranja = {};
-    inputs.forEach(inp=>{
-      const [franja,tipo,campo] = inp.getAttribute('data-plantilla').split('|');
-      const key = franja+'|'+tipo;
-      if(!porFranja[key]) porFranja[key] = { franja, tipoDia:tipo, numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0 };
-      porFranja[key][campo] = parseFloat(inp.value)||0;
-    });
+    const filas = filasDesdeDraftPlantilla();
     let ws = wsDesde, hechas = 0;
     while(ws<=wsHasta){
       statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
-      for(const row of Object.values(porFranja)){
+      for(const row of filas){
         await sbUpsert('staffing_weeks', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_cocina:row.numCocina, coste_cocina:row.costeCocina, num_baristas:row.numBaristas, coste_barista:row.costeBarista }, 'week_start,franja,tipo_dia');
       }
       hechas++;
@@ -3044,6 +3326,7 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
     }
     statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s).</span>';
     renderRentabilidad();
+    renderHistorialPlantillas();
   }catch(e){
     statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>';
   }
@@ -3412,6 +3695,12 @@ document.getElementById('reAddWidgetSelect').addEventListener('change', (e)=>{
   e.target.value = '';
   renderResumenEjecutivo();
 });
+document.getElementById('reAddTituloBtn').addEventListener('click', ()=>{
+  const widgets = getReWidgets();
+  widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'texto', contenido:'Nuevo título — haz clic para editarlo' });
+  setReWidgets(widgets);
+  renderResumenEjecutivo();
+});
 let reDragSrc = null;
 function attachReDragHandlers(){
   document.querySelectorAll('#reWidgetsContainer [data-re-instance]').forEach(card=>{
@@ -3632,20 +3921,39 @@ async function renderResumenEjecutivo(){
   const widgets = getReWidgets();
 
   container.innerHTML = widgets.map(w=>{
+    if(w.typeId==='texto'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}" style="grid-column:1 / -1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span class="no-print" style="cursor:grab;color:var(--text-muted);font-size:11px;">✥ arrastrar para reordenar</span>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <div contenteditable="true" draggable="false" data-re-texto="${w.instanceId}" style="font-family:'Fraunces',serif;font-size:20px;color:var(--text);outline:none;min-height:1.4em;">${w.contenido||''}</div>
+      </div>`;
+    }
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!type) return '';
     return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <h3 style="cursor:grab;margin:0;">✥ ${type.label}</h3>
-        <button class="btn danger" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
+        <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
       </div>
       <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
     </div>`;
   }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
 
   for(const w of widgets){
+    if(w.typeId==='texto') continue;
     await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta);
   }
+
+  container.querySelectorAll('[data-re-texto]').forEach(div=>{
+    div.addEventListener('input', ()=>{
+      const id = div.getAttribute('data-re-texto');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.contenido = div.innerHTML; setReWidgets(widgets2); }
+    });
+  });
 
   container.querySelectorAll('[data-re-quitar]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -3692,7 +4000,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
   const desde = document.getElementById('reDesde').value, hasta = document.getElementById('reHasta').value;
   const hoy = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
   const widgets = getReWidgets();
-  const totalPaginas = Math.max(1, Math.ceil(widgets.length/4));
+  let paginaActual = 1;
 
   const cabecera = (pagina) => {
     doc.setFillColor(23,19,15);
@@ -3700,37 +4008,51 @@ document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
     doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(16);
     doc.text('The Miners Plaza de España', margin, margin+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
-    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta+'  ·  Generado el '+hoy+'  ·  Página '+pagina+'/'+totalPaginas, margin, margin+10);
+    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta+'  ·  Generado el '+hoy+'  ·  Página '+pagina, margin, margin+10);
     doc.setDrawColor(58,47,36);
     doc.line(margin, margin+14, W-margin, margin+14);
   };
-  const addChart = (typeId, canvasKey, titulo, x, y, w, h) => {
-    doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
-    doc.text(titulo, x, y);
-    doc.setFont('helvetica','normal');
-    const chart = STATE.charts[canvasKey];
-    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+3, w, h); }
-    else { doc.setDrawColor(58,47,36); doc.rect(x,y+3,w,h); }
-  };
-
   const chartW = (W - margin*2 - 8)/2;
   const chartH = chartW*0.72;
+  const yInicio = margin+22;
+  const yLimite = H-margin-10;
 
-  for(let pagina=0; pagina<totalPaginas; pagina++){
-    if(pagina>0) doc.addPage();
-    cabecera(pagina+1);
-    let y = margin+22;
-    for(let fila=0; fila<2; fila++){
-      const idx = pagina*4 + fila*2;
-      for(let col=0; col<2; col++){
-        const w = widgets[idx+col];
-        if(!w) continue;
-        const type = RE_WIDGET_TYPES[w.typeId];
-        const x = margin + col*(chartW+8);
-        addChart(w.typeId, 'reW_'+w.instanceId, type?type.label:'', x, y, chartW, chartH);
-      }
-      y += chartH + 16;
+  cabecera(paginaActual);
+  let y = yInicio;
+  let colPendiente = null;
+
+  function nuevaPagina(){
+    paginaActual++;
+    doc.addPage();
+    cabecera(paginaActual);
+    y = yInicio;
+    colPendiente = null;
+  }
+
+  for(const w of widgets){
+    if(w.typeId==='texto'){
+      if(colPendiente){ y += chartH + 16; colPendiente = null; } // cerrar la fila de gráficos a medias antes de meter el texto
+      const textoPlano = (w.contenido||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim() || '(título vacío)';
+      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(242,234,217);
+      const lineas = doc.splitTextToSize(textoPlano, W-margin*2);
+      const altoTexto = lineas.length*7 + 6;
+      if(y + altoTexto > yLimite) nuevaPagina();
+      doc.text(lineas, margin, y+5);
+      y += altoTexto;
+      continue;
     }
+    const type = RE_WIDGET_TYPES[w.typeId];
+    if(!colPendiente && y + chartH + 12 > yLimite) nuevaPagina();
+    const x = colPendiente ? colPendiente.x : margin;
+    doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
+    doc.text(type?type.label:'', x, y+4);
+    doc.setFont('helvetica','normal');
+    const chart = STATE.charts['reW_'+w.instanceId];
+    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+7, chartW, chartH); }
+    else { doc.setDrawColor(58,47,36); doc.rect(x,y+7,chartW,chartH); }
+
+    if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
+    else { colPendiente = null; y += chartH + 16; }
   }
 
   doc.setFontSize(8); doc.setTextColor(120,110,95);
@@ -3816,7 +4138,9 @@ async function renderPnl(){
   await ensureDefaultPnlLines();
   const gran = document.getElementById('pnlGranularidad').value;
   const { desde, hasta } = pnlRango();
-  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const todosLosBuckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const hiddenBuckets = getPnlHiddenBuckets();
+  const buckets = todosLosBuckets.filter(b=>!hiddenBuckets.has(b.dateMin));
   const allSalesLines = getAllSalesLinesRaw();
   const costHistory = buildCostHistoryMap();
   const otherCostHistory = buildOtherCostHistoryMap();
@@ -3827,7 +4151,8 @@ async function renderPnl(){
   nominaSel.innerHTML = '<option value="">(ninguna)</option>' + lines.filter(l=>l.tipo==='coste').map(l=>`<option value="${l.id}" ${l.id===nominaActual?'selected':''}>${l.name}</option>`).join('');
   document.getElementById('pnlExcluirPropinasNomina').checked = getExcluirPropinasNominaPnl();
 
-  document.querySelector('#tablaPnl thead tr').innerHTML = '<th>Línea</th>'+buckets.map(b=>'<th class="num">'+b.label+'</th>').join('')+'<th></th>';
+  document.querySelector('#tablaPnl thead tr').innerHTML = '<th>Línea</th>'+buckets.map(b=>'<th class="num">'+b.label+' <button class="btn secondary" data-hide-bucket="'+b.dateMin+'" title="Quitar esta columna de la vista" style="padding:0 5px;font-size:10px;">✕</button></th>').join('')+'<th></th>';
+  renderPnlHiddenBucketsInfo(todosLosBuckets);
 
   let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
   const hiddenRows = getPnlHiddenRows();
@@ -3841,11 +4166,12 @@ async function renderPnl(){
       return '<td class="num"><input type="number" step="0.01" value="'+v.toFixed(2)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;text-align:right;"></td>';
     }).join('');
     const tag = line.esAuto ? 'auto' : (line.esRecurrente ? '<a href="#" data-goto-otroscoste="'+line.id+'" style="color:var(--copper);text-decoration:underline;">recurrente · editar</a>' : '');
-    const accionesBase = soloLectura ? '<span class="hint">'+tag+'</span>' : `<button class="btn secondary" data-move-up="${line.id}" style="padding:2px 6px;font-size:10px;">↑</button> <button class="btn secondary" data-move-down="${line.id}" style="padding:2px 6px;font-size:10px;">↓</button> <button class="btn danger" data-del-line="${line.id}" style="padding:2px 6px;font-size:10px;">✕</button>`;
+    const moveBtns = `<button class="btn secondary" data-move-up="${line.id}" title="Mover arriba" style="padding:2px 6px;font-size:10px;">↑</button> <button class="btn secondary" data-move-down="${line.id}" title="Mover abajo" style="padding:2px 6px;font-size:10px;">↓</button>`;
+    const accionesBase = soloLectura ? moveBtns+' <span class="hint">'+tag+'</span>' : moveBtns+` <button class="btn danger" data-del-line="${line.id}" style="padding:2px 6px;font-size:10px;">✕</button>`;
     const hideBtn = `<button class="btn secondary" data-hide-line="${line.id}" title="Ocultar esta fila (no sale ni en pantalla ni al imprimir)" style="padding:2px 6px;font-size:10px;">🙈</button>`;
     const indent = line.indent||0;
     const indentBtns = `<button class="btn secondary" data-indent-out="${line.id}" title="Quitar sangría" style="padding:2px 6px;font-size:10px;" ${indent<=0?'disabled':''}>←</button> <button class="btn secondary" data-indent-in="${line.id}" title="Sangrar (mover hacia la derecha)" style="padding:2px 6px;font-size:10px;">→</button>`;
-    const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-block;"><span class="pill ${line.tipo==='ingreso'?'nuevo':'noident'}">${line.tipo}</span> ${line.name}</span>`;
+    const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-flex;align-items:center;gap:6px;"><span class="pill ${line.tipo==='ingreso'?'nuevo':'noident'}">${line.tipo}</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
     return `<tr><td>${nombreCelda}</td>${cells}<td style="white-space:nowrap;">${indentBtns} ${accionesBase} ${hideBtn}</td></tr>`;
   }).filter(Boolean).join('');
   document.querySelector('#tablaPnl tbody').innerHTML = rows || '<tr><td class="hint">Sin líneas todavía (o todas están ocultas).</td></tr>';
@@ -3873,6 +4199,11 @@ async function renderPnl(){
   document.querySelectorAll('[data-hide-line]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const h = getPnlHiddenRows(); h.add(btn.getAttribute('data-hide-line')); setPnlHiddenRows(h); renderPnl();
+    });
+  });
+  document.querySelectorAll('[data-hide-bucket]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const h = getPnlHiddenBuckets(); h.add(btn.getAttribute('data-hide-bucket')); setPnlHiddenBuckets(h); renderPnl();
     });
   });
   document.querySelectorAll('[data-goto-otroscoste]').forEach(a=>{
@@ -3912,6 +4243,38 @@ async function renderPnl(){
     STATE.pnlLines = STATE.pnlLines.filter(l=>l.id!==btn.getAttribute('data-del-line'));
     renderPnl();
   }));
+  document.querySelectorAll('[data-editar-nombre]').forEach(btn=>{
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-editar-nombre');
+      const span = document.querySelector('[data-nombre-linea="'+id+'"]');
+      if(!span) return;
+      const nombreActual = span.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = nombreActual;
+      input.style.cssText = 'background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:4px;padding:3px 6px;font-size:13px;width:160px;';
+      span.replaceWith(input);
+      btn.style.display = 'none';
+      input.focus();
+      input.select();
+      const guardar = async () => {
+        const nuevoNombre = input.value.trim();
+        if(nuevoNombre && nuevoNombre!==nombreActual){
+          try{
+            await sbUpdate('pnl_lines', id, { name: nuevoNombre });
+            const line = STATE.pnlLines.find(l=>l.id===id);
+            if(line) line.name = nuevoNombre;
+          }catch(e){ toast('Error al renombrar: '+e.message, true); }
+        }
+        renderPnl();
+      };
+      input.addEventListener('blur', guardar);
+      input.addEventListener('keydown', (e)=>{
+        if(e.key==='Enter'){ e.preventDefault(); input.blur(); }
+        if(e.key==='Escape'){ input.value = nombreActual; input.blur(); }
+      });
+    });
+  });
 }
 
 function renderCogsTendencia(){
