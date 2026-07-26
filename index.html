@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.42</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.44</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -430,7 +430,12 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <h3 style="margin-bottom:10px;">2. Otros costes (alquiler, nóminas, suministros...)</h3>
         <div class="card" style="margin-bottom:14px;">
-          <p class="hint">CSV o Excel — columna 1: nombre del coste, columna 2: importe. Con o sin cabecera. Se entiende como un <b>importe mensual recurrente</b>: en cuanto lo subas, se aplica automáticamente cada mes desde hoy en adelante en el PNL (repartido por días si lo miras en semanal), sin que tengas que rellenar cada periodo a mano.</p>
+          <p class="hint">CSV o Excel — columna 1: nombre del coste, columna 2: importe. Con o sin cabecera. Se entiende como un <b>importe mensual recurrente</b>: se aplica automáticamente cada mes desde la fecha de vigencia en adelante en el PNL (repartido por días si lo miras en semanal), sin que tengas que rellenar cada periodo a mano.</p>
+          <p class="hint">Elige la fecha de vigencia que se aplicará a <b>todo el archivo</b> (todas las líneas del bloque, la misma fecha para todas). Los periodos pasados del PNL siguen usando el importe que estuviera vigente en su momento.</p>
+          <div class="config-field">
+            <label>Vigente desde</label>
+            <input type="date" id="otrosCostesFechaInput" style="max-width:200px;">
+          </div>
           <button class="btn secondary" id="otrosCostesPickBtn" type="button">Elegir archivo (CSV/Excel)</button>
           <input type="file" id="otrosCostesFile" accept=".csv,.xlsx,.xls" style="display:none;">
           <p class="hint" id="otrosCostesStatus" style="margin-top:8px;"></p>
@@ -3892,6 +3897,9 @@ const RE_WIDGET_TYPES = {
   clientesTickets: { label:'Clientes por tipo — Nº de tickets', tipo:'trend' },
   clientesVentas:  { label:'Clientes por tipo — % de ventas', tipo:'trend' },
   cogsTotal:       { label:'Evolución del COGS total', tipo:'trend' },
+  otrosCostesTotal:    { label:'Evolución de Otros costes (total)', tipo:'trend' },
+  cogsPctSquare:       { label:'COGS como % de Ventas Square+Efectivo', tipo:'snapshot-async' },
+  otrosCostesPctSquare:{ label:'Otros costes como % de Ventas Square+Efectivo', tipo:'snapshot-async' },
   franjaVentas:    { label:'Ventas por franja horaria', tipo:'snapshot' },
   diaSemanaVentas: { label:'Ventas por día de la semana', tipo:'snapshot' },
   categorias:      { label:'Categorías por ventas', tipo:'snapshot' },
@@ -4039,6 +4047,27 @@ function calcularCogsTotalMensual(buckets){
   getAllSalesLinesRaw().forEach(l=>{ const b=buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax); if(b) porBucket[b.label]+=l.cant*costAtDate(costHistory,l.articulo,l.fecha); });
   return porBucket;
 }
+function calcularOtrosCostesTotalMensual(buckets){
+  const otherCostHistory = buildOtherCostHistoryMap();
+  const lineasRecurrentes = STATE.pnlLines.filter(l=>l.esRecurrente);
+  const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
+  lineasRecurrentes.forEach(line=>{
+    buckets.forEach(b=>{ porBucket[b.label] += otherCostValueForBucket(line.id, b, otherCostHistory); });
+  });
+  return porBucket;
+}
+/* convierte un mapa de importes € por bucket mensual a % sobre los ingresos Square+Efectivo
+   de ese mismo mes en Caja (si no hay balance guardado para ese mes, sale 0) */
+async function calcularPctSobreSquareMensual(buckets, porBucketEuros){
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+  const resultado = {};
+  buckets.forEach(b=>{
+    const mesCaja = STATE.caja.savedMonths.find(m=>m.month===b.label);
+    const ingresos = mesCaja ? cajaSquareIncomeDeMes(mesCaja) : 0;
+    resultado[b.label] = ingresos>0 ? +(porBucketEuros[b.label]/ingresos*100).toFixed(1) : 0;
+  });
+  return resultado;
+}
 async function calcularCajaSerieMensual(desde, hasta, tipo){
   if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   const mesesFiltrados = STATE.caja.savedMonths.filter(m=> m.month>=desde.slice(0,7) && m.month<=hasta.slice(0,7));
@@ -4050,9 +4079,10 @@ async function calcularCajaSerieMensual(desde, hasta, tipo){
   });
   return { labels, data };
 }
-function reLineOptions(esEuro){
+function reLineOptions(modo){
   const c = chartColors();
-  return { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esEuro?v+'€':v}, grid:{color:c.grid} } } };
+  const callback = v => modo==='pct' ? v+'%' : (modo ? v+'€' : v);
+  return { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } };
 }
 function reLineOptionsLegend(esPct){
   const c = chartColors();
@@ -4123,6 +4153,20 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularCogsTotalMensual(buckets);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS total', buckets.map(b=>+porBucket[b.label].toFixed(2)), c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='otrosCostesTotal'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const porBucket = calcularOtrosCostesTotalMensual(buckets);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#8B6A46')] }, options:reLineOptions(true) });
+  } else if(typeId==='cogsPctSquare'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const porBucket = calcularCogsTotalMensual(buckets);
+    const porBucketPct = await calcularPctSobreSquareMensual(buckets, porBucket);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), c.copper)] }, options:reLineOptions('pct') });
+  } else if(typeId==='otrosCostesPctSquare'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const porBucket = calcularOtrosCostesTotalMensual(buckets);
+    const porBucketPct = await calcularPctSobreSquareMensual(buckets, porBucket);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), '#8B6A46')] }, options:reLineOptions('pct') });
   } else if(typeId==='franjaVentas'){
     const d = calcularVentasPorFranjaPeriodo(desde, hasta);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.copper)] }, options:reLineOptions(true) });
@@ -4904,9 +4948,10 @@ async function saveOtroCosteEntry(name, amount, effectiveFrom, source){
 document.getElementById('otrosCostesPickBtn').addEventListener('click', ()=>document.getElementById('otrosCostesFile').click());
 document.getElementById('otrosCostesFile').addEventListener('change', async (e)=>{
   const file = e.target.files[0]; if(!file) return;
+  if(!document.getElementById('otrosCostesFechaInput').value){ toast('Elige primero la fecha de vigencia para este bloque.', true); e.target.value=''; return; }
   const statusEl = document.getElementById('otrosCostesStatus');
   statusEl.textContent = 'Leyendo archivo...';
-  const hoy = new Date().toISOString().slice(0,10);
+  const fechaVigencia = document.getElementById('otrosCostesFechaInput').value;
   try{
     let rows;
     if(/\.xlsx?$/i.test(file.name)){
@@ -4929,11 +4974,11 @@ document.getElementById('otrosCostesFile').addEventListener('change', async (e)=
       const nombre = String(r[0]).trim();
       const amount = parseFloat(String(r[1]).replace(',','.').replace(/[^\d.-]/g,''));
       if(!nombre || isNaN(amount)) continue;
-      await saveOtroCosteEntry(nombre, amount, hoy, 'importado');
+      await saveOtroCosteEntry(nombre, amount, fechaVigencia, 'importado');
       actualizados++;
     }
     statusEl.innerHTML = actualizados>0
-      ? '<span style="color:var(--positive)">'+actualizados+' costes importados, vigentes desde hoy ('+hoy+').</span>'
+      ? '<span style="color:var(--positive)">'+actualizados+' costes importados, vigentes desde '+fechaVigencia+'.</span>'
       : '<span style="color:var(--negative)">No se ha reconocido ninguna fila válida (nombre + importe numérico).</span>';
     renderCostes(); renderPnl();
   }catch(err){
@@ -6996,6 +7041,8 @@ function showApp(){
   if(bebidaEl) bebidaEl.value = getBebidaCategorias().join('\n');
   const costeFechaEl = document.getElementById('costeFinalFechaInput');
   if(costeFechaEl && !costeFechaEl.value) costeFechaEl.value = new Date().toISOString().slice(0,10);
+  const otrosCostesFechaEl = document.getElementById('otrosCostesFechaInput');
+  if(otrosCostesFechaEl && !otrosCostesFechaEl.value) otrosCostesFechaEl.value = new Date().toISOString().slice(0,10);
   const trendSelEl = document.getElementById('trendChartTypeSelect');
   if(trendSelEl) trendSelEl.value = getChartTrendType();
   const dataLabelsSelEl = document.getElementById('dataLabelsSelect');
