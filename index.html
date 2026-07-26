@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.36</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.40</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -533,8 +533,16 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div class="filter-group"><label>Tipo de gráfico</label><select id="perfChartTypeSelect"><option value="barras">Barras</option><option value="lineas">Líneas</option></select></div>
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="perfExcluirFuera"> Excluir "Fuera de horario"</label>
             <div class="filter-group"><label>+ Añadir gráfico</label><select id="perfAddWidgetSelect"><option value="">Elegir...</option></select></div>
+            <div class="filter-group"><label>&nbsp;</label><button class="btn secondary" id="perfAddTituloBtn" style="padding:6px 12px;">+ Añadir título / texto</button></div>
           </div>
           <button class="btn" id="perfExportPdfBtn">Exportar PDF</button>
+        </div>
+        <div class="topbar no-print" style="margin-bottom:10px;">
+          <div class="subfilter" style="margin-bottom:0;">
+            <button class="btn secondary" id="perfGuardarPlantillaBtn">Guardar esta plantilla</button>
+            <div class="filter-group"><label>Plantillas guardadas</label><select id="perfCargarPlantillaSelect"><option value="">Cargar plantilla guardada...</option></select></div>
+            <button class="btn danger" id="perfBorrarPlantillaBtn" style="display:none;">Eliminar esta plantilla</button>
+          </div>
         </div>
         <p class="hint" style="margin-bottom:14px;">Categorías consideradas "bebida" (editable en Configuración): <span id="bebidaCategoriasResumen"></span>. Arrastra una tarjeta por su título (✥) para reordenarla.</p>
         <div id="perfWidgetsContainer" class="grid split"></div>
@@ -595,7 +603,14 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <p class="hint" id="rentGuardarStatus" style="margin-top:8px;"></p>
         </div>
 
-        <div class="section-title">Resultado por franja horaria (periodo completo)</div>
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Resultado por franja horaria (periodo completo)</span>
+          <div style="position:relative;">
+            <button class="btn secondary" id="rentFiltroFranjasBtn" style="padding:5px 12px;font-size:12px;">Filtrar franjas en los gráficos</button>
+            <div id="rentFiltroFranjasMenu" style="display:none;position:absolute;top:100%;right:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Afecta a los 4 gráficos de esta pestaña (no a la plantilla de personal, que sigue mostrando todas las franjas para poder rellenarlas).</p>
         <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartRentabilidad"></canvas></div></div>
         <div class="card" style="margin-bottom:14px;">
           <table id="tablaRentabilidad"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>COGS</th><th>Coste laboral</th><th>Resultado</th></tr></thead><tbody></tbody></table>
@@ -660,6 +675,14 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <p class="hint" id="rendGuardarStatus" style="margin-top:8px;"></p>
         </div>
 
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Gráficos por franja</span>
+          <div style="position:relative;">
+            <button class="btn secondary" id="rendFiltroFranjasBtn" style="padding:5px 12px;font-size:12px;">Filtrar franjas en los gráficos</button>
+            <div id="rendFiltroFranjasMenu" style="display:none;position:absolute;top:100%;right:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Afecta a los 3 gráficos de abajo (no a la plantilla de baristas, que sigue mostrando todas las franjas para poder rellenarlas).</p>
         <div class="grid split">
           <div class="card"><h3>Bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartBebidasBarista"></canvas></div></div>
           <div class="card"><h3>Tickets por barista y por hora (todos)</h3><div class="chart-wrap"><canvas id="chartTicketsBarista"></canvas></div></div>
@@ -686,6 +709,13 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div>
             <button class="btn secondary" id="reCopyClaudeBtn">Copiar para preguntar a Claude</button>
             <button class="btn" id="reExportPdfBtn">Exportar PDF</button>
+          </div>
+        </div>
+        <div class="topbar no-print" style="margin-bottom:10px;">
+          <div class="subfilter" style="margin-bottom:0;">
+            <button class="btn secondary" id="reGuardarPlantillaBtn">Guardar esta plantilla</button>
+            <div class="filter-group"><label>Plantillas guardadas</label><select id="reCargarPlantillaSelect"><option value="">Cargar plantilla guardada...</option></select></div>
+            <button class="btn danger" id="reBorrarPlantillaBtn" style="display:none;">Eliminar esta plantilla</button>
           </div>
         </div>
         <p class="hint" style="margin-bottom:14px;">Todos los gráficos usan el mismo periodo elegido arriba. Arrastra una tarjeta por su cabecera (✥) para reordenarla.</p>
@@ -2015,6 +2045,104 @@ function franjaOrderNegocioFiltrado(){
   return getExcluirFueraHorario() ? orden.filter(f=>f!=='Fuera de horario') : orden;
 }
 const EXCLUIR_FUERA_CHECKBOX_IDS = ['perfExcluirFuera','rentExcluirFuera','rendExcluirFuera'];
+/* qué franjas se muestran en los 4 gráficos de resultados de Rentabilidad (no afecta
+   a la plantilla de personal, que siempre muestra todas para poder rellenarla) */
+function getRentFranjasOcultasGraficos(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_rent_franjas_ocultas_graficos')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setRentFranjasOcultasGraficos(set){ localStorage.setItem('miners_rent_franjas_ocultas_graficos', JSON.stringify([...set])); }
+/* filtra un {franjaOrder, resultado-tipo-objeto-por-label} quitando las franjas ocultas */
+function aplicarFiltroFranjasGraficos(franjaOrder){
+  const ocultas = getRentFranjasOcultasGraficos();
+  if(ocultas.size===0) return franjaOrder;
+  return franjaOrder.filter(label=>!ocultas.has(label));
+}
+function renderRentFiltroFranjasMenu(){
+  const menu = document.getElementById('rentFiltroFranjasMenu');
+  if(!menu) return;
+  const franjas = getRentFranjas().map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
+  const ocultas = getRentFranjasOcultasGraficos();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en los gráficos:</div>` +
+    franjas.map(f=>{
+      const visible = !ocultas.has(f);
+      return `<div data-toggle-franja-grafico="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${f}</span>
+      </div>`;
+    }).join('') +
+    `<div data-franjas-marcar-todas="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todas</div>`;
+  menu.querySelectorAll('[data-toggle-franja-grafico]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-franja-grafico');
+      const o = getRentFranjasOcultasGraficos();
+      if(o.has(f)) o.delete(f); else o.add(f);
+      setRentFranjasOcultasGraficos(o);
+      renderRentFiltroFranjasMenu();
+      renderRentabilidad();
+    });
+  });
+  const marcarTodas = menu.querySelector('[data-franjas-marcar-todas]');
+  if(marcarTodas) marcarTodas.addEventListener('click', ()=>{
+    setRentFranjasOcultasGraficos(new Set());
+    renderRentFiltroFranjasMenu();
+    renderRentabilidad();
+  });
+}
+document.getElementById('rentFiltroFranjasBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('rentFiltroFranjasMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderRentFiltroFranjasMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
+/* lo mismo, para los gráficos de Rendimiento operacional */
+function getRendFranjasOcultasGraficos(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_rend_franjas_ocultas_graficos')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setRendFranjasOcultasGraficos(set){ localStorage.setItem('miners_rend_franjas_ocultas_graficos', JSON.stringify([...set])); }
+function aplicarFiltroFranjasGraficosRend(franjaOrder){
+  const ocultas = getRendFranjasOcultasGraficos();
+  if(ocultas.size===0) return franjaOrder;
+  return franjaOrder.filter(label=>!ocultas.has(label));
+}
+function renderRendFiltroFranjasMenu(){
+  const menu = document.getElementById('rendFiltroFranjasMenu');
+  if(!menu) return;
+  const franjas = getRendFranjas().map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
+  const ocultas = getRendFranjasOcultasGraficos();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en los gráficos:</div>` +
+    franjas.map(f=>{
+      const visible = !ocultas.has(f);
+      return `<div data-toggle-franja-grafico-rend="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${f}</span>
+      </div>`;
+    }).join('') +
+    `<div data-franjas-marcar-todas-rend="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todas</div>`;
+  menu.querySelectorAll('[data-toggle-franja-grafico-rend]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-franja-grafico-rend');
+      const o = getRendFranjasOcultasGraficos();
+      if(o.has(f)) o.delete(f); else o.add(f);
+      setRendFranjasOcultasGraficos(o);
+      renderRendFiltroFranjasMenu();
+      renderRendimiento();
+    });
+  });
+  const marcarTodasRend = menu.querySelector('[data-franjas-marcar-todas-rend]');
+  if(marcarTodasRend) marcarTodasRend.addEventListener('click', ()=>{
+    setRendFranjasOcultasGraficos(new Set());
+    renderRendFiltroFranjasMenu();
+    renderRendimiento();
+  });
+}
+document.getElementById('rendFiltroFranjasBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('rendFiltroFranjasMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderRendFiltroFranjasMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
 function setShowDataLabels(v){
   localStorage.setItem('miners_show_datalabels', v?'true':'false');
   if(window.Chart && Chart.defaults.plugins && Chart.defaults.plugins.datalabels) Chart.defaults.plugins.datalabels.display = v;
@@ -2563,6 +2691,62 @@ document.getElementById('perfAddWidgetSelect').addEventListener('change', (e)=>{
   e.target.value = '';
   renderPerformanceEquipo();
 });
+document.getElementById('perfAddTituloBtn').addEventListener('click', ()=>{
+  const widgets = getPerfWidgets();
+  widgets.push({ instanceId:'p'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'texto', contenido:'Nuevo título — haz clic para editarlo' });
+  setPerfWidgets(widgets);
+  renderPerformanceEquipo();
+});
+/* histórico de plantillas guardadas de Performance del equipo — igual que en Resumen Ejecutivo */
+function getPerfTemplates(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_perf_templates')); if(Array.isArray(v)) return v; }catch(e){}
+  return [];
+}
+function setPerfTemplates(list){ localStorage.setItem('miners_perf_templates', JSON.stringify(list)); }
+function renderPerfTemplateSelect(){
+  const sel = document.getElementById('perfCargarPlantillaSelect');
+  if(!sel) return;
+  const templates = getPerfTemplates();
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Cargar plantilla guardada...</option>' + templates.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  if(actual && templates.some(t=>t.id===actual)) sel.value = actual;
+  document.getElementById('perfBorrarPlantillaBtn').style.display = sel.value ? 'inline-flex' : 'none';
+}
+document.getElementById('perfGuardarPlantillaBtn').addEventListener('click', ()=>{
+  const nombre = prompt('Nombre para esta plantilla (ej. "Semanal equipo", "Revisión mensual"):');
+  if(!nombre || !nombre.trim()) return;
+  const templates = getPerfTemplates();
+  templates.push({ id:'t'+Date.now(), nombre:nombre.trim(), widgets:JSON.parse(JSON.stringify(getPerfWidgets())), savedAt:new Date().toISOString() });
+  setPerfTemplates(templates);
+  renderPerfTemplateSelect();
+  toast('Plantilla "'+nombre.trim()+'" guardada.');
+});
+document.getElementById('perfCargarPlantillaSelect').addEventListener('change', (e)=>{
+  const id = e.target.value;
+  const borrarBtn = document.getElementById('perfBorrarPlantillaBtn');
+  if(!id){ borrarBtn.style.display='none'; return; }
+  const t = getPerfTemplates().find(x=>x.id===id);
+  if(!t){ borrarBtn.style.display='none'; return; }
+  if(!confirm('¿Cargar la plantilla "'+t.nombre+'"? Sustituye los gráficos y títulos que tienes ahora mismo en pantalla (la plantilla guardada no se borra, puedes volver a ella cuando quieras).')){
+    e.target.value=''; borrarBtn.style.display='none'; return;
+  }
+  setPerfWidgets(JSON.parse(JSON.stringify(t.widgets)));
+  borrarBtn.style.display='inline-flex';
+  renderPerformanceEquipo();
+  toast('Plantilla "'+t.nombre+'" cargada.');
+});
+document.getElementById('perfBorrarPlantillaBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('perfCargarPlantillaSelect');
+  const id = sel.value;
+  if(!id) return;
+  const t = getPerfTemplates().find(x=>x.id===id);
+  if(!t) return;
+  if(!confirm('¿Eliminar la plantilla guardada "'+t.nombre+'"? No se puede deshacer.')) return;
+  setPerfTemplates(getPerfTemplates().filter(x=>x.id!==id));
+  sel.value = '';
+  renderPerfTemplateSelect();
+  toast('Plantilla eliminada.');
+});
 let perfDragSrc = null;
 function attachPerfDragHandlers(){
   document.querySelectorAll('#perfWidgetsContainer [data-perf-instance]').forEach(card=>{
@@ -2668,6 +2852,7 @@ function renderPerformanceEquipo(){
   const gran = document.getElementById('perfGranularidad').value;
   document.getElementById('bebidaCategoriasResumen').textContent = getBebidaCategorias().join(', ');
   renderPerfAddWidgetSelect();
+  renderPerfTemplateSelect();
 
   const tickets = ticketsConCategoriaNoBebida(desde, hasta);
   const franjaOrderBase = franjaOrderNegocioFiltrado();
@@ -2685,13 +2870,22 @@ function renderPerformanceEquipo(){
   const widgets = getPerfWidgets();
   const container = document.getElementById('perfWidgetsContainer');
   container.innerHTML = widgets.map(w=>{
+    if(w.typeId==='texto'){
+      return `<div class="card" draggable="true" data-perf-instance="${w.instanceId}" style="grid-column:1 / -1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span class="no-print" style="cursor:grab;color:var(--text-muted);font-size:11px;">✥ arrastrar para reordenar</span>
+          <button class="btn danger no-print" data-perf-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <div contenteditable="true" draggable="false" data-perf-texto="${w.instanceId}" style="font-family:'Fraunces',serif;font-size:20px;color:var(--text);outline:none;min-height:1.4em;">${w.contenido||''}</div>
+      </div>`;
+    }
     const type = PERF_WIDGET_TYPES[w.typeId];
     if(!type) return '';
     const extraTop = w.typeId==='fidelidadNueva' ? `<div class="grid kpi" id="kpiFidelidad_${w.instanceId}" style="margin-bottom:10px;"></div>` : '';
     return `<div class="card" draggable="true" data-perf-instance="${w.instanceId}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <h3 style="cursor:grab;margin:0;">✥ ${type.label}</h3>
-        <button class="btn danger" data-perf-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
+        <button class="btn danger no-print" data-perf-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
       </div>
       ${extraTop}
       <div class="chart-wrap"><canvas id="chartPerfW_${w.instanceId}"></canvas></div>
@@ -2699,6 +2893,7 @@ function renderPerformanceEquipo(){
   }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
 
   widgets.forEach(w=>{
+    if(w.typeId==='texto') return;
     const resultado = pintarWidgetPerf(w.typeId, 'chartPerfW_'+w.instanceId, 'perfW_'+w.instanceId, ctx);
     if(w.typeId==='fidelidadNueva' && resultado){
       const kpiEl = document.getElementById('kpiFidelidad_'+w.instanceId);
@@ -2707,6 +2902,15 @@ function renderPerformanceEquipo(){
         <div class="stub"><div class="label">Nuevas en el último tramo del periodo</div><div class="value">${resultado.ultimoTramo}</div></div>
       `;
     }
+  });
+
+  container.querySelectorAll('[data-perf-texto]').forEach(div=>{
+    div.addEventListener('input', ()=>{
+      const id = div.getAttribute('data-perf-texto');
+      const widgets2 = getPerfWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.contenido = div.innerHTML; setPerfWidgets(widgets2); }
+    });
   });
 
   container.querySelectorAll('[data-perf-quitar]').forEach(btn=>{
@@ -2750,8 +2954,8 @@ document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const margin = 14;
   const widgets = getPerfWidgets();
-  const totalPaginas = Math.max(1, Math.ceil(widgets.length/4));
   const hoy = new Date().toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+  let paginaActual = 1;
 
   const cabecera = (pagina) => {
     doc.setFillColor(23,19,15);
@@ -2760,37 +2964,51 @@ document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
     doc.text('The Miners Plaza de España', margin, margin+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
     const gran = document.getElementById('perfGranularidad').value==='mes' ? 'Mensual' : 'Semanal';
-    doc.text('Performance del equipo  ·  Vista '+gran+'  ·  Generado el '+hoy+'  ·  Página '+pagina+'/'+totalPaginas, margin, margin+10);
+    doc.text('Performance del equipo  ·  Vista '+gran+'  ·  Generado el '+hoy+'  ·  Página '+pagina, margin, margin+10);
     doc.setDrawColor(58,47,36);
     doc.line(margin, margin+14, W-margin, margin+14);
   };
-  const addChart = (typeId, canvasKey, titulo, x, y, w, h) => {
-    doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
-    doc.text(titulo, x, y);
-    doc.setFont('helvetica','normal');
-    const chart = STATE.charts[canvasKey];
-    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+3, w, h); }
-    else { doc.setDrawColor(58,47,36); doc.rect(x,y+3,w,h); }
-  };
-
   const chartW = (W - margin*2 - 8)/2;
   const chartH = chartW*0.72;
+  const yInicio = margin+22;
+  const yLimite = H-margin-10;
 
-  for(let pagina=0; pagina<totalPaginas; pagina++){
-    if(pagina>0) doc.addPage();
-    cabecera(pagina+1);
-    let y = margin+22;
-    for(let fila=0; fila<2; fila++){
-      const idx = pagina*4 + fila*2;
-      for(let col=0; col<2; col++){
-        const w = widgets[idx+col];
-        if(!w) continue;
-        const type = PERF_WIDGET_TYPES[w.typeId];
-        const x = margin + col*(chartW+8);
-        addChart(w.typeId, 'perfW_'+w.instanceId, type?type.label:'', x, y, chartW, chartH);
-      }
-      y += chartH + 16;
+  cabecera(paginaActual);
+  let y = yInicio;
+  let colPendiente = null;
+
+  function nuevaPagina(){
+    paginaActual++;
+    doc.addPage();
+    cabecera(paginaActual);
+    y = yInicio;
+    colPendiente = null;
+  }
+
+  for(const w of widgets){
+    if(w.typeId==='texto'){
+      if(colPendiente){ y += chartH + 16; colPendiente = null; }
+      const textoPlano = (w.contenido||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim() || '(título vacío)';
+      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(242,234,217);
+      const lineas = doc.splitTextToSize(textoPlano, W-margin*2);
+      const altoTexto = lineas.length*7 + 6;
+      if(y + altoTexto > yLimite) nuevaPagina();
+      doc.text(lineas, margin, y+5);
+      y += altoTexto;
+      continue;
     }
+    const type = PERF_WIDGET_TYPES[w.typeId];
+    if(!colPendiente && y + chartH + 12 > yLimite) nuevaPagina();
+    const x = colPendiente ? colPendiente.x : margin;
+    doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
+    doc.text(type?type.label:'', x, y+4);
+    doc.setFont('helvetica','normal');
+    const chart = STATE.charts['perfW_'+w.instanceId];
+    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+7, chartW, chartH); }
+    else { doc.setDrawColor(58,47,36); doc.rect(x,y+7,chartW,chartH); }
+
+    if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
+    else { colPendiente = null; y += chartH + 16; }
   }
 
   doc.setFontSize(8); doc.setTextColor(120,110,95);
@@ -3182,7 +3400,8 @@ function medianaArray(arr){
   return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
 async function renderRentabilidadExtra(desde, hasta){
-  const { franjaOrder, resultadosPorFranja } = await calcularRentabilidadDiaria(desde, hasta);
+  const { franjaOrder: franjaOrderCompleto, resultadosPorFranja } = await calcularRentabilidadDiaria(desde, hasta);
+  const franjaOrder = aplicarFiltroFranjasGraficos(franjaOrderCompleto);
   const c = chartColors();
 
   const usarMediana = document.getElementById('rentMediaMedianaSelect').value==='mediana';
@@ -3227,7 +3446,8 @@ async function renderRentabilidad(){
   const hasta = document.getElementById('rentHasta').value;
   if(!desde || !hasta) return;
 
-  const { franjaOrder, resultado, semanasSinPlantilla } = await calcularRentabilidadPeriodo(desde, hasta);
+  const { franjaOrder: franjaOrderCompleto, resultado, semanasSinPlantilla } = await calcularRentabilidadPeriodo(desde, hasta);
+  const franjaOrder = aplicarFiltroFranjasGraficos(franjaOrderCompleto);
   let label = 'Periodo: '+desde+' a '+hasta;
   if(semanasSinPlantilla.length>0){
     label += ' — <span style="color:var(--negative)">'+semanasSinPlantilla.length+' semana(s) sin plantilla de personal guardada (su coste laboral cuenta como 0): '+semanasSinPlantilla.join(', ')+'</span>';
@@ -3255,7 +3475,8 @@ async function renderRentabilidad(){
   const totalLaboral = franjaOrder.reduce((s,f)=>s+resultado[f].laboral,0);
   const totalResultado = totalVentas - totalCogs - totalLaboral;
   const tfoot = document.querySelector('#tablaRentabilidad tfoot') || (() => { const t=document.createElement('tfoot'); document.getElementById('tablaRentabilidad').appendChild(t); return t; })();
-  tfoot.innerHTML = `<tr style="border-top:2px solid var(--line);font-weight:600;"><td>Total (todas las franjas)</td><td class="num">${eur(totalVentas)}</td><td class="num">${eur(totalCogs)}</td><td class="num">${eur(totalLaboral)}</td><td class="num" style="color:${totalResultado>=0?'var(--positive)':'var(--negative)'}"><b>${eur(totalResultado)}</b></td></tr>`;
+  const etiquetaTotal = franjaOrder.length===franjaOrderCompleto.length ? 'Total (todas las franjas)' : 'Total (franjas visibles: '+franjaOrder.length+' de '+franjaOrderCompleto.length+')';
+  tfoot.innerHTML = `<tr style="border-top:2px solid var(--line);font-weight:600;"><td>${etiquetaTotal}</td><td class="num">${eur(totalVentas)}</td><td class="num">${eur(totalCogs)}</td><td class="num">${eur(totalLaboral)}</td><td class="num" style="color:${totalResultado>=0?'var(--positive)':'var(--negative)'}"><b>${eur(totalResultado)}</b></td></tr>`;
 
   await renderRentabilidadExtra(desde, hasta);
 }
@@ -3489,7 +3710,8 @@ async function renderRendimiento(){
   const hasta = document.getElementById('rendHasta').value;
   if(!desde || !hasta) return;
 
-  const { franjaOrder, resultado, semanasSinPlantilla } = await calcularRendimientoPeriodo(desde, hasta);
+  const { franjaOrder: franjaOrderCompletoRend, resultado, semanasSinPlantilla } = await calcularRendimientoPeriodo(desde, hasta);
+  const franjaOrder = aplicarFiltroFranjasGraficosRend(franjaOrderCompletoRend);
   let label = 'Periodo: '+desde+' a '+hasta;
   if(semanasSinPlantilla.length>0){
     label += ' — <span style="color:var(--negative)">'+semanasSinPlantilla.length+' semana(s) sin plantilla de baristas guardada (sus horas cuentan como 0): '+semanasSinPlantilla.join(', ')+'</span>';
@@ -3682,6 +3904,57 @@ function getReWidgets(){
   ];
 }
 function setReWidgets(list){ localStorage.setItem('miners_re_widgets', JSON.stringify(list)); }
+/* histórico de plantillas guardadas del propio Resumen Ejecutivo — guarda qué gráficos
+   y títulos tienes montados, y en qué orden, para poder recuperarlo más adelante */
+function getReTemplates(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_re_templates')); if(Array.isArray(v)) return v; }catch(e){}
+  return [];
+}
+function setReTemplates(list){ localStorage.setItem('miners_re_templates', JSON.stringify(list)); }
+function renderReTemplateSelect(){
+  const sel = document.getElementById('reCargarPlantillaSelect');
+  if(!sel) return;
+  const templates = getReTemplates();
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Cargar plantilla guardada...</option>' + templates.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  if(actual && templates.some(t=>t.id===actual)) sel.value = actual;
+  document.getElementById('reBorrarPlantillaBtn').style.display = sel.value ? 'inline-flex' : 'none';
+}
+document.getElementById('reGuardarPlantillaBtn').addEventListener('click', ()=>{
+  const nombre = prompt('Nombre para esta plantilla (ej. "Para inversores", "Resumen mensual"):');
+  if(!nombre || !nombre.trim()) return;
+  const templates = getReTemplates();
+  templates.push({ id:'t'+Date.now(), nombre:nombre.trim(), widgets:JSON.parse(JSON.stringify(getReWidgets())), savedAt:new Date().toISOString() });
+  setReTemplates(templates);
+  renderReTemplateSelect();
+  toast('Plantilla "'+nombre.trim()+'" guardada.');
+});
+document.getElementById('reCargarPlantillaSelect').addEventListener('change', (e)=>{
+  const id = e.target.value;
+  const borrarBtn = document.getElementById('reBorrarPlantillaBtn');
+  if(!id){ borrarBtn.style.display='none'; return; }
+  const t = getReTemplates().find(x=>x.id===id);
+  if(!t){ borrarBtn.style.display='none'; return; }
+  if(!confirm('¿Cargar la plantilla "'+t.nombre+'"? Sustituye los gráficos y títulos que tienes ahora mismo en pantalla (la plantilla guardada no se borra, puedes volver a ella cuando quieras).')){
+    e.target.value=''; borrarBtn.style.display='none'; return;
+  }
+  setReWidgets(JSON.parse(JSON.stringify(t.widgets)));
+  borrarBtn.style.display='inline-flex';
+  renderResumenEjecutivo();
+  toast('Plantilla "'+t.nombre+'" cargada.');
+});
+document.getElementById('reBorrarPlantillaBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('reCargarPlantillaSelect');
+  const id = sel.value;
+  if(!id) return;
+  const t = getReTemplates().find(x=>x.id===id);
+  if(!t) return;
+  if(!confirm('¿Eliminar la plantilla guardada "'+t.nombre+'"? No se puede deshacer (esto no afecta a los gráficos que tengas ahora mismo en pantalla, solo borra el guardado).')) return;
+  setReTemplates(getReTemplates().filter(x=>x.id!==id));
+  sel.value = '';
+  renderReTemplateSelect();
+  toast('Plantilla eliminada.');
+});
 function renderReAddWidgetSelect(){
   const sel = document.getElementById('reAddWidgetSelect');
   sel.innerHTML = '<option value="">Elegir...</option>' + Object.entries(RE_WIDGET_TYPES).map(([id,t])=>'<option value="'+id+'">'+t.label+'</option>').join('');
@@ -3915,6 +4188,7 @@ async function renderResumenEjecutivo(){
     document.getElementById('reHasta').value = hasta;
   }
   renderReAddWidgetSelect();
+  renderReTemplateSelect();
   const buckets = monthBucketsInRange(desde, hasta);
   const resultado = calcularResumenEjecutivo(buckets);
   const labels = buckets.map(b=>b.label);
