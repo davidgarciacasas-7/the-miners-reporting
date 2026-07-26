@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.46</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.50</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -566,17 +566,13 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <!-- RENTABILIDAD POR FRANJA -->
       <div class="tabpanel" id="tab-rentabilidad">
         <div class="card" style="margin-bottom:14px;">
-          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">Periodo a analizar (puede ser una semana, un mes, varios meses...)</label>
-          <div class="subfilter" style="margin-bottom:0;">
-            <div class="filter-group"><label>Desde</label><input type="date" id="rentDesde"></div>
-            <div class="filter-group"><label>Hasta</label><input type="date" id="rentHasta"></div>
-            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rentExcluirFuera"> Excluir "Fuera de horario"</label>
-          </div>
-          <p class="hint" id="rentSemanaLabel" style="margin-top:8px;"></p>
-        </div>
-
-        <div class="card" style="margin-bottom:14px;">
           <h3>Plantilla de personal</h3>
+          <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="font-weight:700;color:var(--copper);">📅 Estás editando la plantilla de personal de la semana:</label>
+            <input type="date" id="rentPlantillaDia" style="max-width:200px;">
+            <span class="hint" id="rentPlantillaSemanaLabel" style="font-weight:600;"></span>
+            <span class="hint">(independiente del Desde/Hasta de los gráficos, más abajo)</span>
+          </div>
           <p class="hint" style="margin-bottom:6px;"><b>Cocina</b> y <b>Baristas</b> se cuentan por separado, cada uno con su propio coste por hora — la app multiplica nº personas × €/hora × duración de la franja para cada uno, y la columna "Coste total" te enseña la suma de ambos para esa línea y ese patrón.</p>
           <p class="hint" style="margin-bottom:6px;">El coste por hora es siempre <u>por persona</u> (no la suma de todas) — el "Coste total" de cada franja es (nº cocina × €/h cocina + nº baristas × €/h barista) × duración de la franja en horas.</p>
           <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 personal en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
@@ -594,7 +590,6 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div class="filter-group"><label>Cada</label><select id="rentGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
             <button class="btn secondary" id="rentGenerarFranjasBtn">Generar franjas</button>
           </div>
-          <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rentPlantillaDia" style="max-width:200px;"></div>
           <div id="rentHistorialPlantillasWrap" style="margin-bottom:14px;">
             <p class="hint" style="margin-bottom:4px;">Semanas con plantilla guardada:</p>
             <div id="rentHistorialPlantillas" class="card" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
@@ -618,10 +613,22 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           </table>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
             <button class="btn secondary" id="rentGuardarBtn">Guardar solo esta semana</button>
-            <button class="btn" id="rentAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta)</button>
+            <button class="btn" id="rentAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta de los gráficos)</button>
             <button class="btn secondary" id="rentCopiarARendimientoBtn">Copiar a Rendimiento operacional (solo baristas)</button>
           </div>
           <p class="hint" id="rentGuardarStatus" style="margin-top:8px;"></p>
+        </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">Periodo a analizar en los gráficos de abajo (puede ser una semana, un mes, varios meses...)</label>
+          <div class="subfilter" style="margin-bottom:0;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="rentDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="rentHasta"></div>
+            <div class="filter-group"><label>Ver</label><select id="rentFiltroDiaTipo"><option value="todos" selected>Todos los días</option><option value="semana">Solo L-V</option><option value="sabado">Solo Sábado</option><option value="domingo">Solo Domingo</option></select></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rentExcluirFuera"> Excluir "Fuera de horario"</label>
+          </div>
+          <p class="hint" style="margin-top:8px;">L-V, Sábado y Domingo pueden tener plantillas y horarios distintos — usa "Ver" para analizar cada uno por separado en vez de mezclarlos.</p>
+          <p class="hint" id="rentSemanaLabel" style="margin-top:4px;"></p>
         </div>
 
         <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -645,55 +652,72 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartRentabilidadTipica"></canvas></div></div>
 
         <div class="section-title">Días rentables vs no rentables por franja (nº)</div>
-        <p class="hint" style="margin-bottom:8px;">De todos los días del periodo, cuántos tuvo esa franja un resultado positivo (rentable) frente a negativo (no rentable).</p>
+        <p class="hint" style="margin-bottom:8px;">De todos los días del periodo, cuántos tuvo esa franja un resultado positivo (rentable) frente a cero o negativo (no rentable).</p>
         <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartDiasRentables"></canvas></div></div>
 
         <div class="section-title">Días rentables vs no rentables por franja (%)</div>
+        <p class="hint" style="margin-bottom:8px;">Rentable + no rentable suman siempre 100% de los días del periodo.</p>
         <div class="card"><div class="chart-wrap"><canvas id="chartDiasRentablesPct"></canvas></div></div>
       </div>
 
       <!-- RENDIMIENTO OPERACIONAL -->
       <div class="tabpanel" id="tab-rendimiento">
         <div class="card" style="margin-bottom:14px;">
-          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">Periodo a analizar (puede ser una semana, un mes, varios meses...)</label>
-          <div class="subfilter" style="margin-bottom:0;">
-            <div class="filter-group"><label>Desde</label><input type="date" id="rendDesde"></div>
-            <div class="filter-group"><label>Hasta</label><input type="date" id="rendHasta"></div>
-            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rendExcluirFuera"> Excluir "Fuera de horario"</label>
-          </div>
-          <p class="hint" id="rendSemanaLabel" style="margin-top:8px;"></p>
-        </div>
-
-        <div class="card" style="margin-bottom:14px;">
           <h3>Baristas por franja horaria</h3>
+          <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="font-weight:700;color:var(--copper);">📅 Estás editando la plantilla de baristas de la semana:</label>
+            <input type="date" id="rendPlantillaDia" style="max-width:200px;">
+            <span class="hint" id="rendPlantillaSemanaLabel" style="font-weight:600;"></span>
+            <span class="hint">(independiente del Desde/Hasta de los gráficos, más abajo)</span>
+          </div>
           <p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón para L-V, otro para Sábado, otro para Domingo.</p>
           <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 baristas en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
           <div class="subfilter" style="margin-bottom:6px;">
-            <div class="filter-group"><label>Apertura L–V</label><input type="time" id="rendAperturaLVInput" value="08:00"></div>
-            <div class="filter-group"><label>Cierre L–V</label><input type="time" id="rendCierreLVInput" value="21:00"></div>
+            <div class="filter-group"><label>Apertura L–V</label><input type="time" step="900" id="rendAperturaLVInput" value="08:00"></div>
+            <div class="filter-group"><label>Cierre L–V</label><input type="time" step="900" id="rendCierreLVInput" value="21:00"></div>
           </div>
           <div class="subfilter" style="margin-bottom:6px;">
-            <div class="filter-group"><label>Apertura Sábado</label><input type="time" id="rendAperturaSabInput" value="09:00"></div>
-            <div class="filter-group"><label>Cierre Sábado</label><input type="time" id="rendCierreSabInput" value="21:00"></div>
+            <div class="filter-group"><label>Apertura Sábado</label><input type="time" step="900" id="rendAperturaSabInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Sábado</label><input type="time" step="900" id="rendCierreSabInput" value="21:00"></div>
           </div>
           <div class="subfilter" style="margin-bottom:10px;">
-            <div class="filter-group"><label>Apertura Domingo</label><input type="time" id="rendAperturaDomInput" value="09:00"></div>
-            <div class="filter-group"><label>Cierre Domingo</label><input type="time" id="rendCierreDomInput" value="18:00"></div>
+            <div class="filter-group"><label>Apertura Domingo</label><input type="time" step="900" id="rendAperturaDomInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Domingo</label><input type="time" step="900" id="rendCierreDomInput" value="18:00"></div>
             <div class="filter-group"><label>Cada</label><select id="rendGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
             <button class="btn secondary" id="rendGenerarFranjasBtn">Generar franjas</button>
           </div>
-          <div class="filter-group" style="margin-bottom:10px;"><label>Editando la semana que contiene</label><input type="date" id="rendPlantillaDia" style="max-width:200px;"></div>
-          <div style="overflow-x:auto;">
-            <table id="tablaBaristas">
-              <thead><tr><th>Franja</th><th>Nº baristas (L–V)</th><th>Nº baristas (Sábado)</th><th>Nº baristas (Domingo)</th></tr></thead>
-              <tbody></tbody>
-            </table>
+          <div id="rendHistorialPlantillasWrap" style="margin-bottom:14px;">
+            <p class="hint" style="margin-bottom:4px;">Semanas con plantilla guardada:</p>
+            <div id="rendHistorialPlantillas" class="card" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
           </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn" data-plantilla-tab-rend="semana" style="padding:6px 14px;font-size:12px;">Entre semana (L–V)</button>
+            <button class="btn secondary" data-plantilla-tab-rend="sabado" style="padding:6px 14px;font-size:12px;">Sábado</button>
+            <button class="btn secondary" data-plantilla-tab-rend="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
+            <button class="btn secondary" id="rendCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde L–V (sin guardar)</button>
+            <button class="btn secondary" id="rendCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar L–V → Sábado y Domingo (sin guardar)</button>
+          </div>
+          <table id="tablaBaristas">
+            <thead><tr><th>Franja</th><th>Nº baristas</th></tr></thead>
+            <tbody></tbody>
+          </table>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
             <button class="btn secondary" id="rendGuardarBtn">Guardar solo esta semana</button>
-            <button class="btn" id="rendAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta)</button>
+            <button class="btn" id="rendAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta de los gráficos)</button>
           </div>
           <p class="hint" id="rendGuardarStatus" style="margin-top:8px;"></p>
+        </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">Periodo a analizar en los gráficos de abajo (puede ser una semana, un mes, varios meses...)</label>
+          <div class="subfilter" style="margin-bottom:0;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="rendDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="rendHasta"></div>
+            <div class="filter-group"><label>Ver</label><select id="rendFiltroDiaTipo"><option value="todos" selected>Todos los días</option><option value="semana">Solo L-V</option><option value="sabado">Solo Sábado</option><option value="domingo">Solo Domingo</option></select></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rendExcluirFuera"> Excluir "Fuera de horario"</label>
+          </div>
+          <p class="hint" style="margin-top:8px;">L-V, Sábado y Domingo pueden tener plantillas y horarios distintos — usa "Ver" para analizar cada uno por separado en vez de mezclarlos.</p>
+          <p class="hint" id="rendSemanaLabel" style="margin-top:4px;"></p>
         </div>
 
         <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -1908,6 +1932,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
         desdeInp.value = inicioSemana; hastaInp.value = finSemana; plantillaInp.value = hoy;
         cargarPlantillaSemana(inicioSemana).then(renderRentabilidad);
       }
+      actualizarRentPlantillaSemanaLabel();
       renderHistorialPlantillas();
     }
     if(item.dataset.tab==='rendimiento'){
@@ -1919,6 +1944,8 @@ document.querySelectorAll('.nav-item').forEach(item=>{
         rDesdeInp.value = inicioSemana; rHastaInp.value = finSemana; rPlantillaInp.value = hoy;
         cargarBaristasSemana(inicioSemana).then(renderRendimiento);
       }
+      actualizarRendPlantillaSemanaLabel();
+      renderHistorialPlantillasRend();
     }
     if(item.dataset.tab==='resumenejecutivo') renderResumenEjecutivo();
     if(item.dataset.tab==='vacaciones'){
@@ -2967,6 +2994,10 @@ EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id=>{
     renderRendimiento();
   });
 });
+document.getElementById('rentFiltroDiaTipo').addEventListener('change', (e)=>{
+  setRentFiltroDiaTipo(e.target.value);
+  renderRentabilidad();
+});
 
 document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
   if(!window.jspdf){ toast('No se pudo cargar la librería de PDF. Comprueba tu conexión y recarga.', true); return; }
@@ -3253,6 +3284,7 @@ async function renderHistorialPlantillas(){
     btn.addEventListener('click', async ()=>{
       const ws = btn.getAttribute('data-cargar-semana');
       document.getElementById('rentPlantillaDia').value = ws;
+      actualizarRentPlantillaSemanaLabel();
       await cargarPlantillaSemana(ws);
       toast('Plantilla de la semana del '+ws+' cargada.');
     });
@@ -3303,18 +3335,21 @@ document.getElementById('rentCopiarARendimientoBtn').addEventListener('click', (
   const franjasRent = JSON.parse(JSON.stringify(getRentFranjas()));
   setRendFranjas(franjasRent);
   const nuevoBaristaWeek = [];
+  const nuevoDraft = {};
   franjasRent.forEach(f=>{
     ['semana','sabado','domingo'].forEach(tipo=>{
       const numBaristas = STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0;
       nuevoBaristaWeek.push({ franja:f.id, tipoDia:tipo, numBaristas });
+      nuevoDraft[f.id+'|'+tipo+'|numBaristas'] = numBaristas;
     });
   });
   STATE.baristaWeek = nuevoBaristaWeek;
+  STATE.rendPlantillaDraft = nuevoDraft;
   const diaActual = document.getElementById('rentPlantillaDia').value;
-  if(diaActual) document.getElementById('rendPlantillaDia').value = diaActual;
+  if(diaActual){ document.getElementById('rendPlantillaDia').value = diaActual; actualizarRendPlantillaSemanaLabel(); }
   renderTablaBaristas();
   renderRendimiento();
-  toast('Franjas y nº de baristas copiados a Rendimiento operacional — ve a esa pestaña, revisa, y pulsa "Guardar" para que se quede.');
+  toast('Franjas y nº de baristas copiados a Rendimiento operacional (sin cocineros) — ve a esa pestaña, revisa, y pulsa "Guardar" para que se quede.');
 });
 /* trae TODAS las plantillas guardadas cuyas semanas caen dentro de [desde,hasta] */
 async function cargarPlantillasEnRango(desde, hasta){
@@ -3324,7 +3359,17 @@ async function cargarPlantillasEnRango(desde, hasta){
     return rows.map(r=>({ weekStart:r.week_start, franja:r.franja, tipoDia:r.tipo_dia, numCocina:parseFloat(r.num_cocina)||0, costeCocina:parseFloat(r.coste_cocina)||0, numBaristas:parseFloat(r.num_baristas)||0, costeBarista:parseFloat(r.coste_barista)||0 }));
   }catch(e){ toast('No se pudieron cargar las plantillas del periodo: '+e.message, true); return []; }
 }
+function getRentFiltroDiaTipo(){ return localStorage.getItem('miners_rent_filtro_dia_tipo') || 'todos'; }
+function setRentFiltroDiaTipo(v){ localStorage.setItem('miners_rent_filtro_dia_tipo', v); }
+function diaTipoDeFecha(fechaStr){
+  const dow = new Date(fechaStr+'T00:00:00').getDay();
+  return dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+}
+function coincideFiltroDiaTipo(fechaStr, filtro){
+  return filtro==='todos' || diaTipoDeFecha(fechaStr)===filtro;
+}
 async function calcularRentabilidadPeriodo(desde, hasta){
+  const filtroDiaTipo = getRentFiltroDiaTipo();
   const franjasCustom = getRentFranjas();
   const incluirFuera = !getExcluirFueraHorario();
   const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
@@ -3341,6 +3386,7 @@ async function calcularRentabilidadPeriodo(desde, hasta){
 
   getAllSalesLinesRaw().forEach(l=>{
     if(l.fecha<desde || l.fecha>hasta) return;
+    if(!coincideFiltroDiaTipo(l.fecha, filtroDiaTipo)) return;
     const id = clasificar(l.hora);
     if(!resPorId[id]) return;
     resPorId[id].ventas += l.bruto;
@@ -3358,9 +3404,10 @@ async function calcularRentabilidadPeriodo(desde, hasta){
   while(d<=end){
     const fechaStr = d.toISOString().slice(0,10);
     const ws = isoMonday(fechaStr);
-    if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
     const dow = d.getDay(); // 0=domingo ... 6=sabado
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
+    if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
     idsOrder.forEach(id=>{
       if(id==='fuera') return; // no se planifica personal fuera de horario
       const p = patronMap[ws+'|'+id+'|'+tipoDia];
@@ -3377,6 +3424,7 @@ async function calcularRentabilidadPeriodo(desde, hasta){
    devuelve el resultado de CADA DÍA por separado — para calcular medias/medianas y
    contar días rentables vs no rentables. */
 async function calcularRentabilidadDiaria(desde, hasta){
+  const filtroDiaTipo = getRentFiltroDiaTipo();
   const franjasCustom = getRentFranjas();
   const incluirFuera = !getExcluirFueraHorario();
   const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
@@ -3392,6 +3440,7 @@ async function calcularRentabilidadDiaria(desde, hasta){
   const porDia = {}; idsOrder.forEach(id=>porDia[id]={});
   getAllSalesLinesRaw().forEach(l=>{
     if(l.fecha<desde || l.fecha>hasta) return;
+    if(!coincideFiltroDiaTipo(l.fecha, filtroDiaTipo)) return;
     const id = clasificar(l.hora);
     if(!porDia[id]) return;
     if(!porDia[id][l.fecha]) porDia[id][l.fecha] = {ventas:0, cogs:0};
@@ -3411,6 +3460,7 @@ async function calcularRentabilidadDiaria(desde, hasta){
     const ws = isoMonday(fechaStr);
     const dow = d.getDay();
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
     idsOrder.forEach(id=>{
       const vc = porDia[id][fechaStr] || {ventas:0, cogs:0};
       let laboral = 0;
@@ -3451,13 +3501,13 @@ async function renderRentabilidadExtra(desde, hasta){
   });
 
   const rentablesCount = franjaOrder.map(f=>resultadosPorFranja[f].filter(v=>v>0).length);
-  const noRentablesCount = franjaOrder.map(f=>resultadosPorFranja[f].filter(v=>v<0).length);
+  const noRentablesCount = franjaOrder.map(f=>resultadosPorFranja[f].filter(v=>v<=0).length);
   destroyChart('diasRentables');
   STATE.charts.diasRentables = safeNewChart('chartDiasRentables', {
     type: trendChartType(),
     data:{ labels:franjaOrder, datasets:[
       trendDataset('Rentables (>0)', rentablesCount, c.verdigris),
-      trendDataset('No rentables (<0)', noRentablesCount, '#C1613F')
+      trendDataset('No rentables (≤0)', noRentablesCount, '#C1613F')
     ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
   });
@@ -3520,9 +3570,18 @@ document.getElementById('rentMediaMedianaSelect').addEventListener('change', ()=
 });
 document.getElementById('rentDesde').addEventListener('change', renderRentabilidad);
 document.getElementById('rentHasta').addEventListener('change', renderRentabilidad);
+function actualizarRentPlantillaSemanaLabel(){
+  const fecha = document.getElementById('rentPlantillaDia').value;
+  const labelEl = document.getElementById('rentPlantillaSemanaLabel');
+  if(!fecha || !labelEl){ if(labelEl) labelEl.textContent=''; return; }
+  const ws = isoMonday(fecha);
+  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  labelEl.textContent = 'Semana del '+ws+' al '+we;
+}
 document.getElementById('rentPlantillaDia').addEventListener('change', async ()=>{
   const fecha = document.getElementById('rentPlantillaDia').value;
   if(!fecha) return;
+  actualizarRentPlantillaSemanaLabel();
   await cargarPlantillaSemana(isoMonday(fecha));
 });
 function filasDesdeDraftPlantilla(){
@@ -3544,6 +3603,8 @@ document.getElementById('rentGuardarBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('rentPlantillaDia').value;
   if(!fecha){ toast('Elige primero qué semana estás editando.', true); return; }
   const weekStart = isoMonday(fecha);
+  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  if(!confirm('Vas a guardar la plantilla para la semana del '+weekStart+' al '+weekEnd+'.\n\n¿Es esta la semana correcta? (revisa el campo "Editando la semana que contiene" si no estás seguro)')) return;
   const statusEl = document.getElementById('rentGuardarStatus');
   statusEl.textContent = 'Guardando...';
   const filas = filasDesdeDraftPlantilla();
@@ -3601,23 +3662,38 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
    RENDIMIENTO OPERACIONAL (bebidas y tickets por barista/hora)
    ========================================================= */
 STATE.baristaWeek = []; // plantilla cargada de la semana que se está EDITANDO (rendPlantillaDia)
+STATE.rendPlantillaTipoActivo = 'semana';
+STATE.rendPlantillaDraft = {};
+function inicializarDraftPlantillaRend(){
+  const draft = {};
+  getRendFranjas().forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      const d = STATE.baristaWeek.find(s=>s.franja===f.id && s.tipoDia===tipo) || {numBaristas:0};
+      draft[f.id+'|'+tipo+'|numBaristas'] = d.numBaristas;
+    });
+  });
+  STATE.rendPlantillaDraft = draft;
+}
 function renderTablaBaristas(){
   const tbody = document.querySelector('#tablaBaristas tbody');
   const franjas = getRendFranjas();
-  const buscar = (id,tipo) => STATE.baristaWeek.find(s=>s.franja===id && s.tipoDia===tipo) || {numBaristas:0};
-  const inputTiempo = (val, attr, id) => `<input type="time" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
-  const TIPOS_DIA = ['semana','sabado','domingo'];
+  const tipoActivo = STATE.rendPlantillaTipoActivo || 'semana';
+  const draft = STATE.rendPlantillaDraft || {};
+  const leerDraft = (fid) => draft[fid+'|'+tipoActivo+'|numBaristas'] ?? 0;
+  const inputTiempo = (val, attr, id) => `<input type="time" step="900" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
   tbody.innerHTML = franjas.map(f=>{
-    const celdas = TIPOS_DIA.map(tipo=>{
-      const d = buscar(f.id,tipo);
-      return `<td class="num"><input type="number" step="1" min="0" value="${d.numBaristas}" data-barista="${f.id}|${tipo}" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>`;
-    }).join('');
     return `<tr>
       <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'rend-franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'rend-franja-fin',f.id)} <button class="btn danger" data-rend-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
-      ${celdas}
+      <td class="num"><input type="number" step="1" min="0" value="${leerDraft(f.id)}" data-barista="${f.id}" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
     </tr>`;
-  }).join('') + `<tr><td colspan="4" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+  }).join('') + `<tr><td colspan="2" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
 
+  tbody.querySelectorAll('[data-barista]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const id = inp.getAttribute('data-barista');
+      STATE.rendPlantillaDraft[id+'|'+tipoActivo+'|numBaristas'] = parseFloat(inp.value)||0;
+    });
+  });
   tbody.querySelectorAll('[data-rend-franja-inicio]').forEach(inp=>{
     inp.addEventListener('change', ()=>{
       const id = inp.getAttribute('data-rend-franja-inicio');
@@ -3647,9 +3723,91 @@ function renderTablaBaristas(){
     const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
     const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
     const nuevoFin = Math.min(lastEnd+60, 23*60+59);
-    fr.push({ id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) });
+    const nuevaFranja = { id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) };
+    fr.push(nuevaFranja);
     setRendFranjas(fr);
+    ['semana','sabado','domingo'].forEach(tipo=>{ STATE.rendPlantillaDraft[nuevaFranja.id+'|'+tipo+'|numBaristas'] = 0; });
     renderTablaBaristas(); renderRendimiento();
+  });
+}
+document.querySelectorAll('[data-plantilla-tab-rend]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    STATE.rendPlantillaTipoActivo = btn.getAttribute('data-plantilla-tab-rend');
+    document.querySelectorAll('[data-plantilla-tab-rend]').forEach(b=>{
+      b.classList.toggle('secondary', b.getAttribute('data-plantilla-tab-rend')!==STATE.rendPlantillaTipoActivo);
+    });
+    document.getElementById('rendCopiarLVBtn').style.display = STATE.rendPlantillaTipoActivo==='semana' ? 'none' : 'inline-flex';
+    renderTablaBaristas();
+  });
+});
+document.getElementById('rendCopiarLVBtn').addEventListener('click', ()=>{
+  const tipoDestino = STATE.rendPlantillaTipoActivo;
+  if(tipoDestino==='semana') return;
+  const nombreDestino = tipoDestino==='sabado' ? 'Sábado' : 'Domingo';
+  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye lo que tengas ahora en esta pestaña (todavía sin guardar).')) return;
+  getRendFranjas().forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  renderTablaBaristas();
+  toast('Copiado desde L-V — recuerda guardar para que se quede.');
+});
+document.getElementById('rendCopiarAmbosBtn').addEventListener('click', ()=>{
+  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye lo que tengas ahora en ambas (todavía sin guardar).')) return;
+  getRendFranjas().forEach(f=>{
+    ['sabado','domingo'].forEach(tipoDestino=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  });
+  renderTablaBaristas();
+  toast('Copiado a Sábado y Domingo — recuerda guardar para que se quede.');
+});
+function actualizarRendPlantillaSemanaLabel(){
+  const fecha = document.getElementById('rendPlantillaDia').value;
+  const labelEl = document.getElementById('rendPlantillaSemanaLabel');
+  if(!fecha || !labelEl){ if(labelEl) labelEl.textContent=''; return; }
+  const ws = isoMonday(fecha);
+  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  labelEl.textContent = 'Semana del '+ws+' al '+we;
+}
+async function renderHistorialPlantillasRend(){
+  const el = document.getElementById('rendHistorialPlantillas');
+  if(!el) return;
+  el.innerHTML = '<p class="hint">Cargando...</p>';
+  let semanas = [];
+  try{
+    const rows = await sbList('barista_weeks', 'select=week_start&order=week_start.desc');
+    semanas = [...new Set(rows.map(r=>r.week_start))];
+  }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; return; }
+  if(semanas.length===0){ el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>'; return; }
+  el.innerHTML = semanas.map(ws=>{
+    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
+      <span class="hint">Semana del ${ws} al ${fin}</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn secondary" data-cargar-semana-rend="${ws}" style="padding:3px 10px;font-size:11px;">Cargar</button>
+        <button class="btn danger" data-eliminar-semana-rend="${ws}" style="padding:3px 10px;font-size:11px;">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-cargar-semana-rend]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ws = btn.getAttribute('data-cargar-semana-rend');
+      document.getElementById('rendPlantillaDia').value = ws;
+      actualizarRendPlantillaSemanaLabel();
+      await cargarBaristasSemana(ws);
+      toast('Plantilla de la semana del '+ws+' cargada.');
+    });
+  });
+  el.querySelectorAll('[data-eliminar-semana-rend]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ws = btn.getAttribute('data-eliminar-semana-rend');
+      if(!confirm('¿Eliminar toda la plantilla guardada para la semana del '+ws+'? No se puede deshacer.')) return;
+      btn.textContent = 'Borrando...'; btn.disabled = true;
+      try{
+        const rows = await sbList('barista_weeks', 'select=id&week_start=eq.'+ws);
+        for(const r of rows){ await sbDelete('barista_weeks', r.id); }
+        toast('Plantilla eliminada.');
+        renderHistorialPlantillasRend();
+        const diaActual = document.getElementById('rendPlantillaDia').value;
+        if(diaActual && isoMonday(diaActual)===ws){ await cargarBaristasSemana(ws); }
+      }catch(e){ toast('Error: '+e.message, true); btn.textContent='Eliminar'; btn.disabled=false; }
+    });
   });
 }
 document.getElementById('rendGenerarFranjasBtn').addEventListener('click', ()=>{
@@ -3664,6 +3822,11 @@ document.getElementById('rendGenerarFranjasBtn').addEventListener('click', ()=>{
   if(!(cierre>apertura)){ toast('Al menos uno de los tres cierres debe ser posterior a su apertura.', true); return; }
   const franjas = generarListaFranjas(apertura, cierre, gran);
   setRendFranjas(franjas);
+  franjas.forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      if(STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas']===undefined) STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0;
+    });
+  });
   renderTablaBaristas();
   renderRendimiento();
   const distintos = !(aLV===aSab && aSab===aDom && cLV===cSab && cSab===cDom);
@@ -3677,6 +3840,7 @@ async function cargarBaristasSemana(weekStart){
     STATE.baristaWeek = [];
     toast('No se pudo cargar la plantilla de baristas: '+e.message, true);
   }
+  inicializarDraftPlantillaRend();
   renderTablaBaristas();
 }
 /* trae TODAS las plantillas de baristas guardadas cuyas semanas caen dentro de [desde,hasta] */
@@ -3687,7 +3851,10 @@ async function cargarBaristasEnRango(desde, hasta){
     return rows.map(r=>({ weekStart:r.week_start, franja:r.franja, tipoDia:r.tipo_dia, numBaristas:parseFloat(r.num_baristas) }));
   }catch(e){ toast('No se pudieron cargar las plantillas del periodo: '+e.message, true); return []; }
 }
+function getRendFiltroDiaTipo(){ return localStorage.getItem('miners_rend_filtro_dia_tipo') || 'todos'; }
+function setRendFiltroDiaTipo(v){ localStorage.setItem('miners_rend_filtro_dia_tipo', v); }
 async function calcularRendimientoPeriodo(desde, hasta){
+  const filtroDiaTipo = getRendFiltroDiaTipo();
   const franjasCustom = getRendFranjas();
   const incluirFuera = !getExcluirFueraHorario();
   const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
@@ -3708,6 +3875,7 @@ async function calcularRendimientoPeriodo(desde, hasta){
       const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
       if(fecha<desde || fecha>hasta) return;
       if(!esPago) return;
+      if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
       const id = clasificar(hora);
       if(!resPorId[id]) return;
       const esBebida = bebidasCats.includes(pd.cats[catIdx]);
@@ -3733,9 +3901,10 @@ async function calcularRendimientoPeriodo(desde, hasta){
   while(d<=end){
     const fechaStr = d.toISOString().slice(0,10);
     const ws = isoMonday(fechaStr);
-    if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
     const dow = d.getDay(); // 0=domingo ... 6=sabado
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
+    if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
     idsOrder.forEach(id=>{
       if(id==='fuera') return;
       const p = patronMap[ws+'|'+id+'|'+tipoDia];
@@ -3792,33 +3961,48 @@ async function renderRendimiento(){
 }
 document.getElementById('rendDesde').addEventListener('change', renderRendimiento);
 document.getElementById('rendHasta').addEventListener('change', renderRendimiento);
+document.getElementById('rendFiltroDiaTipo').addEventListener('change', (e)=>{
+  setRendFiltroDiaTipo(e.target.value);
+  renderRendimiento();
+});
 document.getElementById('rendPlantillaDia').addEventListener('change', async ()=>{
   const fecha = document.getElementById('rendPlantillaDia').value;
   if(!fecha) return;
+  actualizarRendPlantillaSemanaLabel();
   await cargarBaristasSemana(isoMonday(fecha));
 });
+function filasDesdeDraftPlantillaRend(){
+  const filas = [];
+  getRendFranjas().forEach(f=>{
+    ['semana','sabado','domingo'].forEach(tipo=>{
+      filas.push({ franja: f.id, tipoDia: tipo, numBaristas: STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0 });
+    });
+  });
+  return filas;
+}
 document.getElementById('rendGuardarBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('rendPlantillaDia').value;
   if(!fecha){ toast('Elige primero qué semana estás editando.', true); return; }
   const weekStart = isoMonday(fecha);
+  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  if(!confirm('Vas a guardar la plantilla de baristas para la semana del '+weekStart+' al '+weekEnd+'.\n\n¿Es esta la semana correcta?')) return;
   const statusEl = document.getElementById('rendGuardarStatus');
   statusEl.textContent = 'Guardando...';
-  const inputs = document.querySelectorAll('[data-barista]');
+  const filas = filasDesdeDraftPlantillaRend();
   let ok = 0; const errores = [];
-  for(const inp of inputs){
-    const [franja, tipoDia] = inp.getAttribute('data-barista').split('|');
-    const numBaristas = parseFloat(inp.value)||0;
+  for(const row of filas){
     try{
-      await sbUpsert('barista_weeks', { week_start:weekStart, franja, tipo_dia:tipoDia, num_baristas:numBaristas }, 'week_start,franja,tipo_dia');
+      await sbUpsert('barista_weeks', { week_start:weekStart, franja:row.franja, tipo_dia:row.tipoDia, num_baristas:row.numBaristas }, 'week_start,franja,tipo_dia');
       ok++;
-    }catch(e){ errores.push(franja+'/'+tipoDia+': '+e.message); }
+    }catch(e){ errores.push(row.franja+'/'+row.tipoDia+': '+e.message); }
   }
   await cargarBaristasSemana(weekStart);
   renderRendimiento();
+  renderHistorialPlantillasRend();
   if(errores.length===0){
-    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente: '+ok+' de '+inputs.length+' filas, para la semana del '+weekStart+'.</span>';
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente: '+ok+' de '+filas.length+' filas, para la semana del '+weekStart+'.</span>';
   } else {
-    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+inputs.length+' filas. Fallaron '+errores.length+' — probablemente falte ejecutar una migración pendiente. Detalle: '+errores.slice(0,3).join(' · ')+(errores.length>3?' ...':'')+'</span>';
+    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+filas.length+' filas. Fallaron '+errores.length+' — probablemente falte ejecutar una migración pendiente. Detalle: '+errores.slice(0,3).join(' · ')+(errores.length>3?' ...':'')+'</span>';
   }
 });
 document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async ()=>{
@@ -3827,21 +4011,16 @@ document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async
   if(!desde || !hasta){ toast('Elige primero el periodo Desde/Hasta arriba.', true); return; }
   const wsDesde = isoMonday(desde), wsHasta = isoMonday(hasta);
   const nSemanas = Math.round((new Date(wsHasta)-new Date(wsDesde))/(7*86400000))+1;
-  if(!confirm('Esto aplica la plantilla que ves ahora mismo a las '+nSemanas+' semana(s) entre '+desde+' y '+hasta+', sobrescribiendo lo que ya hubiera guardado en cada una. ¿Continuar?')) return;
+  if(!confirm('Esto aplica la plantilla que ves ahora mismo (los 3 patrones: L-V, Sábado y Domingo) a las '+nSemanas+' semana(s) entre '+desde+' y '+hasta+', sobrescribiendo lo que ya hubiera guardado en cada una. ¿Continuar?')) return;
   const btn = document.getElementById('rendAplicarPeriodoBtn');
   const statusEl = document.getElementById('rendGuardarStatus');
   btn.disabled = true;
-  const inputs = document.querySelectorAll('[data-barista]');
-  const patron = [];
-  inputs.forEach(inp=>{
-    const [franja, tipoDia] = inp.getAttribute('data-barista').split('|');
-    patron.push({ franja, tipoDia, numBaristas: parseFloat(inp.value)||0 });
-  });
+  const filas = filasDesdeDraftPlantillaRend();
   let ws = wsDesde, hechas = 0, ok = 0, fallos = 0;
   const erroresMuestra = [];
   while(ws<=wsHasta){
     statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
-    for(const row of patron){
+    for(const row of filas){
       try{
         await sbUpsert('barista_weeks', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_baristas:row.numBaristas }, 'week_start,franja,tipo_dia');
         ok++;
@@ -3851,6 +4030,7 @@ document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async
     const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
   }
   renderRendimiento();
+  renderHistorialPlantillasRend();
   if(fallos===0){
     statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s), '+ok+' filas guardadas.</span>';
   } else {
@@ -7110,6 +7290,10 @@ function showApp(){
   if(dataLabelsSelEl) dataLabelsSelEl.value = getShowDataLabels() ? 'si' : 'no';
   CHART_TYPE_SELECT_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value = getChartTrendType(); });
   EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.checked = getExcluirFueraHorario(); });
+  const rentFiltroDiaTipoEl = document.getElementById('rentFiltroDiaTipo');
+  if(rentFiltroDiaTipoEl) rentFiltroDiaTipoEl.value = getRentFiltroDiaTipo();
+  const rendFiltroDiaTipoEl = document.getElementById('rendFiltroDiaTipo');
+  if(rendFiltroDiaTipoEl) rendFiltroDiaTipoEl.value = getRendFiltroDiaTipo();
   const hoy = new Date().toISOString().slice(0,10);
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
   const propinaFechaEl = document.getElementById('propinaFecha'); if(propinaFechaEl && !propinaFechaEl.value) propinaFechaEl.value = hoy;
