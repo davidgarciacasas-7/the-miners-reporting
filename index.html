@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.50</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.51</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1716,11 +1716,23 @@ function diaSemanaInfo(fecha){
   const dow = d.getDay();
   return { dow, esFinde: (dow===0||dow===6), nombre: DOW_NAMES[dow] };
 }
+/* fecha en YYYY-MM-DD usando el calendario LOCAL del navegador (nunca UTC).
+   IMPORTANTE: usar siempre esta función en vez de .toISOString().slice(0,10) —
+   toISOString() convierte a UTC, lo que en España (UTC+1/+2) puede mostrar el día
+   ANTERIOR al que realmente es en el calendario local. Bug real corregido: al elegir
+   una fecha como "4 de mayo", la app mostraba "semana del 3 al 8 de mayo" en vez de
+   "4 al 10 de mayo", por esta conversión a UTC de más. */
+function fechaLocalISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 function isoMonday(fecha){
   const d = new Date(fecha+'T00:00:00');
   const day = (d.getDay()+6)%7; // 0=lunes
   d.setDate(d.getDate()-day);
-  return d.toISOString().slice(0,10);
+  return fechaLocalISO(d);
 }
 function periodInfo(fecha, gran){
   if(gran==='semana'){ const k=isoMonday(fecha); return { key:k, label:'Sem. '+k }; }
@@ -1926,9 +1938,9 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.tab==='rentabilidad'){
       const desdeInp = document.getElementById('rentDesde'), hastaInp = document.getElementById('rentHasta'), plantillaInp = document.getElementById('rentPlantillaDia');
       if(!desdeInp.value){
-        const hoy = new Date().toISOString().slice(0,10);
+        const hoy = fechaLocalISO(new Date());
         const inicioSemana = isoMonday(hoy);
-        const finSemana = (()=>{ const d=new Date(inicioSemana+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+        const finSemana = (()=>{ const d=new Date(inicioSemana+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
         desdeInp.value = inicioSemana; hastaInp.value = finSemana; plantillaInp.value = hoy;
         cargarPlantillaSemana(inicioSemana).then(renderRentabilidad);
       }
@@ -1938,9 +1950,9 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.tab==='rendimiento'){
       const rDesdeInp = document.getElementById('rendDesde'), rHastaInp = document.getElementById('rendHasta'), rPlantillaInp = document.getElementById('rendPlantillaDia');
       if(!rDesdeInp.value){
-        const hoy = new Date().toISOString().slice(0,10);
+        const hoy = fechaLocalISO(new Date());
         const inicioSemana = isoMonday(hoy);
-        const finSemana = (()=>{ const d=new Date(inicioSemana+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+        const finSemana = (()=>{ const d=new Date(inicioSemana+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
         rDesdeInp.value = inicioSemana; rHastaInp.value = finSemana; rPlantillaInp.value = hoy;
         cargarBaristasSemana(inicioSemana).then(renderRendimiento);
       }
@@ -2598,7 +2610,7 @@ function otherCostValueForBucket(lineId, bucket, historyMap){
     guard++;
     const y=d.getFullYear(), m=d.getMonth();
     const monthStart = new Date(y,m,1), monthEnd = new Date(y,m+1,0);
-    const monthStartStr = monthStart.toISOString().slice(0,10), monthEndStr = monthEnd.toISOString().slice(0,10);
+    const monthStartStr = fechaLocalISO(monthStart), monthEndStr = fechaLocalISO(monthEnd);
     const amount = otherCostAtDate(historyMap, lineId, monthStartStr);
     sum += allocateToBucket(monthStartStr, monthEndStr, bucket.dateMin, bucket.dateMax, amount);
     d = new Date(y, m+1, 1);
@@ -2617,7 +2629,7 @@ function pnlPeriodBuckets(gran){
     while(d<=end){
       const y=d.getFullYear(), m=d.getMonth();
       const start=new Date(y,m,1), last=new Date(y,m+1,0);
-      buckets.push({ label:y+'-'+String(m+1).padStart(2,'0'), dateMin:start.toISOString().slice(0,10), dateMax:last.toISOString().slice(0,10) });
+      buckets.push({ label:y+'-'+String(m+1).padStart(2,'0'), dateMin:fechaLocalISO(start), dateMax:fechaLocalISO(last) });
       d.setMonth(d.getMonth()+1);
     }
   } else {
@@ -2625,7 +2637,7 @@ function pnlPeriodBuckets(gran){
     const end = new Date(maxD+'T00:00:00');
     while(d<=end){
       const start=new Date(d); const last=new Date(d); last.setDate(last.getDate()+6);
-      buckets.push({ label:'Sem. '+start.toISOString().slice(0,10), dateMin:start.toISOString().slice(0,10), dateMax:last.toISOString().slice(0,10) });
+      buckets.push({ label:'Sem. '+fechaLocalISO(start), dateMin:fechaLocalISO(start), dateMax:fechaLocalISO(last) });
       d.setDate(d.getDate()+7);
     }
   }
@@ -3066,7 +3078,7 @@ document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
   doc.setFontSize(8); doc.setTextColor(120,110,95);
   doc.text('Generado automáticamente desde el panel de The Miners Plaza de España.', margin, H-margin+2);
 
-  doc.save('the-miners-performance-equipo-'+new Date().toISOString().slice(0,10)+'.pdf');
+  doc.save('the-miners-performance-equipo-'+fechaLocalISO(new Date())+'.pdf');
 });
 
 /* =========================================================
@@ -3271,7 +3283,7 @@ async function renderHistorialPlantillas(){
   }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; return; }
   if(semanas.length===0){ el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>'; return; }
   el.innerHTML = semanas.map(ws=>{
-    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
       <span class="hint">Semana del ${ws} al ${fin}</span>
       <div style="display:flex;gap:6px;">
@@ -3402,7 +3414,7 @@ async function calcularRentabilidadPeriodo(desde, hasta){
   let d = new Date(desde+'T00:00:00');
   const end = new Date(hasta+'T00:00:00');
   while(d<=end){
-    const fechaStr = d.toISOString().slice(0,10);
+    const fechaStr = fechaLocalISO(d);
     const ws = isoMonday(fechaStr);
     const dow = d.getDay(); // 0=domingo ... 6=sabado
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
@@ -3456,7 +3468,7 @@ async function calcularRentabilidadDiaria(desde, hasta){
   let d = new Date(desde+'T00:00:00');
   const end = new Date(hasta+'T00:00:00');
   while(d<=end){
-    const fechaStr = d.toISOString().slice(0,10);
+    const fechaStr = fechaLocalISO(d);
     const ws = isoMonday(fechaStr);
     const dow = d.getDay();
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
@@ -3575,7 +3587,7 @@ function actualizarRentPlantillaSemanaLabel(){
   const labelEl = document.getElementById('rentPlantillaSemanaLabel');
   if(!fecha || !labelEl){ if(labelEl) labelEl.textContent=''; return; }
   const ws = isoMonday(fecha);
-  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
   labelEl.textContent = 'Semana del '+ws+' al '+we;
 }
 document.getElementById('rentPlantillaDia').addEventListener('change', async ()=>{
@@ -3603,7 +3615,7 @@ document.getElementById('rentGuardarBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('rentPlantillaDia').value;
   if(!fecha){ toast('Elige primero qué semana estás editando.', true); return; }
   const weekStart = isoMonday(fecha);
-  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
   if(!confirm('Vas a guardar la plantilla para la semana del '+weekStart+' al '+weekEnd+'.\n\n¿Es esta la semana correcta? (revisa el campo "Editando la semana que contiene" si no estás seguro)')) return;
   const statusEl = document.getElementById('rentGuardarStatus');
   statusEl.textContent = 'Guardando...';
@@ -3646,7 +3658,7 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
       }catch(e){ fallos++; if(erroresMuestra.length<3) erroresMuestra.push(ws+' '+row.franja+'/'+row.tipoDia+': '+e.message); }
     }
     hechas++;
-    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
+    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = fechaLocalISO(d);
   }
   renderRentabilidad();
   renderHistorialPlantillas();
@@ -3762,7 +3774,7 @@ function actualizarRendPlantillaSemanaLabel(){
   const labelEl = document.getElementById('rendPlantillaSemanaLabel');
   if(!fecha || !labelEl){ if(labelEl) labelEl.textContent=''; return; }
   const ws = isoMonday(fecha);
-  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
   labelEl.textContent = 'Semana del '+ws+' al '+we;
 }
 async function renderHistorialPlantillasRend(){
@@ -3776,7 +3788,7 @@ async function renderHistorialPlantillasRend(){
   }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; return; }
   if(semanas.length===0){ el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>'; return; }
   el.innerHTML = semanas.map(ws=>{
-    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
       <span class="hint">Semana del ${ws} al ${fin}</span>
       <div style="display:flex;gap:6px;">
@@ -3899,7 +3911,7 @@ async function calcularRendimientoPeriodo(desde, hasta){
   let d = new Date(desde+'T00:00:00');
   const end = new Date(hasta+'T00:00:00');
   while(d<=end){
-    const fechaStr = d.toISOString().slice(0,10);
+    const fechaStr = fechaLocalISO(d);
     const ws = isoMonday(fechaStr);
     const dow = d.getDay(); // 0=domingo ... 6=sabado
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
@@ -3984,7 +3996,7 @@ document.getElementById('rendGuardarBtn').addEventListener('click', async ()=>{
   const fecha = document.getElementById('rendPlantillaDia').value;
   if(!fecha){ toast('Elige primero qué semana estás editando.', true); return; }
   const weekStart = isoMonday(fecha);
-  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); })();
+  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
   if(!confirm('Vas a guardar la plantilla de baristas para la semana del '+weekStart+' al '+weekEnd+'.\n\n¿Es esta la semana correcta?')) return;
   const statusEl = document.getElementById('rendGuardarStatus');
   statusEl.textContent = 'Guardando...';
@@ -4027,7 +4039,7 @@ document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async
       }catch(e){ fallos++; if(erroresMuestra.length<3) erroresMuestra.push(ws+' '+row.franja+'/'+row.tipoDia+': '+e.message); }
     }
     hechas++;
-    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = d.toISOString().slice(0,10);
+    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = fechaLocalISO(d);
   }
   renderRendimiento();
   renderHistorialPlantillasRend();
@@ -4048,7 +4060,7 @@ function weekBucketsInRange(desde, hasta){
   const end = new Date(hasta+'T00:00:00');
   while(d<=end){
     const start = new Date(d); const last = new Date(d); last.setDate(last.getDate()+6);
-    buckets.push({ label:'Sem. '+start.toISOString().slice(0,10), dateMin:start.toISOString().slice(0,10), dateMax:last.toISOString().slice(0,10) });
+    buckets.push({ label:'Sem. '+fechaLocalISO(start), dateMin:fechaLocalISO(start), dateMax:fechaLocalISO(last) });
     d.setDate(d.getDate()+7);
   }
   return buckets;
@@ -4060,7 +4072,7 @@ function monthBucketsInRange(desde, hasta){
   while(d<=end){
     const y=d.getFullYear(), m=d.getMonth();
     const start=new Date(y,m,1), last=new Date(y,m+1,0);
-    buckets.push({ label:y+'-'+String(m+1).padStart(2,'0'), dateMin:start.toISOString().slice(0,10), dateMax:last.toISOString().slice(0,10) });
+    buckets.push({ label:y+'-'+String(m+1).padStart(2,'0'), dateMin:fechaLocalISO(start), dateMax:fechaLocalISO(last) });
     d.setMonth(d.getMonth()+1);
   }
   return buckets;
@@ -4602,7 +4614,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
   doc.setFontSize(8); doc.setTextColor(120,110,95);
   doc.text('Generado automáticamente desde el panel de The Miners Plaza de España.', margin, H-margin+2);
 
-  doc.save('the-miners-resumen-ejecutivo-'+new Date().toISOString().slice(0,10)+'.pdf');
+  doc.save('the-miners-resumen-ejecutivo-'+fechaLocalISO(new Date())+'.pdf');
 });
 
 function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCostHistory){
@@ -4649,9 +4661,9 @@ async function movePnlLine(lineId, dir){
   renderPnl();
 }
 
-function snapToMonthStart(dateStr){ const d=new Date(dateStr+'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0,10); }
-function snapToMonthEnd(dateStr){ const d=new Date(dateStr+'T00:00:00'); return new Date(d.getFullYear(), d.getMonth()+1, 0).toISOString().slice(0,10); }
-function snapToWeekEnd(dateStr){ const mon=isoMonday(dateStr); const d=new Date(mon+'T00:00:00'); d.setDate(d.getDate()+6); return d.toISOString().slice(0,10); }
+function snapToMonthStart(dateStr){ const d=new Date(dateStr+'T00:00:00'); return fechaLocalISO(new Date(d.getFullYear(), d.getMonth(), 1)); }
+function snapToMonthEnd(dateStr){ const d=new Date(dateStr+'T00:00:00'); return fechaLocalISO(new Date(d.getFullYear(), d.getMonth()+1, 0)); }
+function snapToWeekEnd(dateStr){ const mon=isoMonday(dateStr); const d=new Date(mon+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); }
 function pnlRango(){
   const gran = document.getElementById('pnlGranularidad').value;
   let desdeRaw = document.getElementById('pnlDesde').value;
@@ -4660,7 +4672,7 @@ function pnlRango(){
     let minD=null, maxD=null;
     getAllSalesLinesRaw().forEach(l=>{ if(!minD||l.fecha<minD) minD=l.fecha; if(!maxD||l.fecha>maxD) maxD=l.fecha; });
     STATE.pnlValues.forEach(v=>{ if(!minD||v.dateMin<minD) minD=v.dateMin; if(!maxD||v.dateMax>maxD) maxD=v.dateMax; });
-    if(!minD){ minD = new Date().toISOString().slice(0,10); maxD = minD; }
+    if(!minD){ minD = fechaLocalISO(new Date()); maxD = minD; }
     desdeRaw = desdeRaw || minD; hastaRaw = hastaRaw || maxD;
     document.getElementById('pnlDesde').value = desdeRaw;
     document.getElementById('pnlHasta').value = hastaRaw;
@@ -5074,8 +5086,8 @@ document.getElementById('pnlImportWideFile').addEventListener('change', async (e
         const amount = parseFloat(String(raw).replace(',','.').replace(/[^\d.-]/g,''));
         if(isNaN(amount)) continue;
         const [y,m] = col.mes.split('-').map(Number);
-        const dateMin = new Date(y,m-1,1).toISOString().slice(0,10);
-        const dateMax = new Date(y,m,0).toISOString().slice(0,10);
+        const dateMin = fechaLocalISO(new Date(y,m-1,1));
+        const dateMax = fechaLocalISO(new Date(y,m,0));
         const solapados = STATE.pnlValues.filter(v=>v.lineId===line.id && !(dateMax<v.dateMin || dateMin>v.dateMax));
         for(const v of solapados){ await sbDelete('pnl_values', v.id); STATE.pnlValues = STATE.pnlValues.filter(x=>x.id!==v.id); }
         const saved2 = await sbInsert('pnl_values', { line_id:line.id, date_min:dateMin, date_max:dateMax, amount });
@@ -5110,7 +5122,7 @@ document.getElementById('costeFinalFile').addEventListener('change', async (e)=>
   const file = e.target.files[0]; if(!file) return;
   const statusEl = document.getElementById('costeFinalStatus');
   statusEl.textContent = 'Leyendo archivo...';
-  const fechaVigencia = document.getElementById('costeFinalFechaInput').value || new Date().toISOString().slice(0,10);
+  const fechaVigencia = document.getElementById('costeFinalFechaInput').value || fechaLocalISO(new Date());
   try{
     let rows;
     if(/\.xlsx?$/i.test(file.name)){
@@ -5152,11 +5164,11 @@ document.getElementById('costeFinalFile').addEventListener('change', async (e)=>
   }
   document.getElementById('costeFinalFile').value='';
 });
-document.getElementById('costProdFecha').value = new Date().toISOString().slice(0,10);
+document.getElementById('costProdFecha').value = fechaLocalISO(new Date());
 document.getElementById('costProdAddBtn').addEventListener('click', async ()=>{
   const productName = document.getElementById('costProdNombre').value.trim();
   const unitCost = parseFloat(document.getElementById('costProdValor').value);
-  const effectiveFrom = document.getElementById('costProdFecha').value || new Date().toISOString().slice(0,10);
+  const effectiveFrom = document.getElementById('costProdFecha').value || fechaLocalISO(new Date());
   if(!productName || isNaN(unitCost)){ toast('Rellena producto y coste.', true); return; }
   try{
     const saved = await sbUpsert('product_costs', { product_name:productName, unit_cost:unitCost, effective_from:effectiveFrom, source:'manual' }, 'product_name,effective_from');
@@ -5228,11 +5240,11 @@ document.getElementById('otrosCostesFile').addEventListener('change', async (e)=
   }
   document.getElementById('otrosCostesFile').value='';
 });
-document.getElementById('otrosFecha').value = new Date().toISOString().slice(0,10);
+document.getElementById('otrosFecha').value = fechaLocalISO(new Date());
 document.getElementById('otrosAddBtn').addEventListener('click', async ()=>{
   const nombre = document.getElementById('otrosNombre').value.trim();
   const amount = parseFloat(document.getElementById('otrosValor').value);
-  const effectiveFrom = document.getElementById('otrosFecha').value || new Date().toISOString().slice(0,10);
+  const effectiveFrom = document.getElementById('otrosFecha').value || fechaLocalISO(new Date());
   if(!nombre || isNaN(amount)){ toast('Rellena nombre e importe.', true); return; }
   try{
     await saveOtroCosteEntry(nombre, amount, effectiveFrom, 'manual');
@@ -5327,7 +5339,7 @@ function calcularSaldoVacaciones(empleado){
   const referencias = entradas.filter(v=>v.tipo==='referencia').sort((a,b)=>b.fecha.localeCompare(a.fecha));
   if(referencias.length===0) return null;
   const ref = referencias[0];
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocalISO(new Date());
   const meses = mesesCompletosEntre(ref.fecha, hoy);
   const acumulado = meses*2.5;
   const usadas = entradas.filter(v=>v.tipo==='usada' && v.fecha>ref.fecha).reduce((s,v)=>s+v.dias,0);
@@ -5341,7 +5353,7 @@ async function ajusteRapidoVacaciones(empleado){
   const dias = parseFloat(input.replace(',','.'));
   if(isNaN(dias) || dias===0){ toast('Escribe un número válido, distinto de 0.', true); return; }
   try{
-    const fecha = new Date().toISOString().slice(0,10);
+    const fecha = fechaLocalISO(new Date());
     const saved = await sbInsert('vacaciones', { empleado, fecha, tipo:'ajuste', dias, nota:'Ajuste rápido' });
     STATE.vacaciones.unshift({ id:saved.id, empleado:saved.empleado, fecha:saved.fecha, tipo:saved.tipo, dias:parseFloat(saved.dias), nota:saved.nota });
     renderVacaciones();
@@ -5586,7 +5598,7 @@ function sugerirNumeroFactura(){
   const delAnio = STATE.facturas.filter(f=>f.numero && f.numero.startsWith(anio+'-'));
   const siguiente = delAnio.length+1;
   document.getElementById('facNumero').value = anio+'-'+String(siguiente).padStart(3,'0');
-  document.getElementById('facFecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('facFecha').value = fechaLocalISO(new Date());
 }
 function actualizarResumenFactura(){
   const base = parseFloat(document.getElementById('facImporteBase').value)||0;
@@ -7281,9 +7293,9 @@ function showApp(){
   const bebidaEl = document.getElementById('bebidaCategoriasInput');
   if(bebidaEl) bebidaEl.value = getBebidaCategorias().join('\n');
   const costeFechaEl = document.getElementById('costeFinalFechaInput');
-  if(costeFechaEl && !costeFechaEl.value) costeFechaEl.value = new Date().toISOString().slice(0,10);
+  if(costeFechaEl && !costeFechaEl.value) costeFechaEl.value = fechaLocalISO(new Date());
   const otrosCostesFechaEl = document.getElementById('otrosCostesFechaInput');
-  if(otrosCostesFechaEl && !otrosCostesFechaEl.value) otrosCostesFechaEl.value = new Date().toISOString().slice(0,10);
+  if(otrosCostesFechaEl && !otrosCostesFechaEl.value) otrosCostesFechaEl.value = fechaLocalISO(new Date());
   const trendSelEl = document.getElementById('trendChartTypeSelect');
   if(trendSelEl) trendSelEl.value = getChartTrendType();
   const dataLabelsSelEl = document.getElementById('dataLabelsSelect');
@@ -7294,7 +7306,7 @@ function showApp(){
   if(rentFiltroDiaTipoEl) rentFiltroDiaTipoEl.value = getRentFiltroDiaTipo();
   const rendFiltroDiaTipoEl = document.getElementById('rendFiltroDiaTipo');
   if(rendFiltroDiaTipoEl) rendFiltroDiaTipoEl.value = getRendFiltroDiaTipo();
-  const hoy = new Date().toISOString().slice(0,10);
+  const hoy = fechaLocalISO(new Date());
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
   const propinaFechaEl = document.getElementById('propinaFecha'); if(propinaFechaEl && !propinaFechaEl.value) propinaFechaEl.value = hoy;
   const hxFechaEl = document.getElementById('hxFecha'); if(hxFechaEl && !hxFechaEl.value) hxFechaEl.value = hoy;
