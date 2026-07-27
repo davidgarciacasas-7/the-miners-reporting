@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.52</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.54</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -735,6 +735,22 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card" style="margin-top:14px;"><h3>Tickets de bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartTicketsBebidaBarista"></canvas></div></div>
         <div class="card" style="margin-top:14px;">
           <table id="tablaRendimiento"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets (todos)</th><th>Tickets con bebida</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Tickets/barista/h</th><th>Tickets bebida/barista/h</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="section-title">¿Cuántos días se superó un umbral, en una franja concreta?</div>
+        <p class="hint" style="margin-bottom:8px;">Define aquí una franja horaria propia (no tiene que coincidir con las de la plantilla) y uno o varios umbrales — te dice, dentro del periodo Desde/Hasta de arriba, en cuántos días esa franja superó cada umbral. Útil para preguntas como "¿cuántos días entre las 10:00 y las 12:00 tuvimos más de 8 bebidas por barista y hora?".</p>
+        <div class="card">
+          <div class="subfilter">
+            <div class="filter-group"><label>Franja — desde</label><input type="time" step="900" id="rendUmbralHoraInicio"></div>
+            <div class="filter-group"><label>Franja — hasta</label><input type="time" step="900" id="rendUmbralHoraFin"></div>
+          </div>
+          <div class="subfilter">
+            <div class="filter-group"><label>Umbral bebidas/barista/h (mayor que)</label><input type="number" step="0.1" min="0" id="rendUmbralBebidas" placeholder="ej. 8"></div>
+            <div class="filter-group"><label>Umbral tickets/barista/h — todos (mayor que)</label><input type="number" step="0.1" min="0" id="rendUmbralTickets" placeholder="ej. 5"></div>
+            <div class="filter-group"><label>Umbral tickets bebida/barista/h (mayor que)</label><input type="number" step="0.1" min="0" id="rendUmbralTicketsBebida" placeholder="ej. 4"></div>
+          </div>
+          <button class="btn" id="rendCalcularUmbralBtn">Calcular</button>
+          <div id="rendUmbralResultado" style="margin-top:12px;"></div>
         </div>
       </div>
 
@@ -2121,7 +2137,7 @@ function aplicarFiltroFranjasGraficos(franjaOrder){
 function renderRentFiltroFranjasMenu(){
   const menu = document.getElementById('rentFiltroFranjasMenu');
   if(!menu) return;
-  const franjas = getRentFranjas().map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
+  const franjas = unionFranjas(getRentFranjasTipo('semana'), getRentFranjasTipo('sabado'), getRentFranjasTipo('domingo')).map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
   const ocultas = getRentFranjasOcultasGraficos();
   menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en los gráficos:</div>` +
     franjas.map(f=>{
@@ -2169,7 +2185,7 @@ function aplicarFiltroFranjasGraficosRend(franjaOrder){
 function renderRendFiltroFranjasMenu(){
   const menu = document.getElementById('rendFiltroFranjasMenu');
   if(!menu) return;
-  const franjas = getRendFranjas().map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
+  const franjas = unionFranjas(getRendFranjasTipo('semana'), getRendFranjasTipo('sabado'), getRendFranjasTipo('domingo')).map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
   const ocultas = getRendFranjasOcultasGraficos();
   menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en los gráficos:</div>` +
     franjas.map(f=>{
@@ -3106,7 +3122,6 @@ function getRentFranjas(){
   }catch(e){}
   return BUSINESS_FRANJAS.map((f,i)=>({ id:'f'+(i+1), start:f.start, end:f.end, label:f.label }));
 }
-function setRentFranjas(list){ localStorage.setItem('miners_rent_franjas', JSON.stringify(list)); }
 function getRendFranjas(){
   try{
     const v = JSON.parse(localStorage.getItem('miners_rend_franjas'));
@@ -3114,7 +3129,42 @@ function getRendFranjas(){
   }catch(e){}
   return BUSINESS_FRANJAS.map((f,i)=>({ id:'f'+(i+1), start:f.start, end:f.end, label:f.label }));
 }
-function setRendFranjas(list){ localStorage.setItem('miners_rend_franjas', JSON.stringify(list)); }
+/* franjas horarias INDEPENDIENTES por patrón de día (L-V / Sábado / Domingo) — quitar o
+   añadir una franja en uno de los tres no afecta a los otros dos. Si el usuario ya tenía
+   una lista única guardada de antes (miners_rent_franjas / miners_rend_franjas), se copia
+   una sola vez a los 3 patrones la primera vez que se piden, para no perder nada. */
+function getRentFranjasTipo(tipo){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_rent_franjas_'+tipo));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return getRentFranjas(); // migración: lo que hubiera en la lista única antigua, o el valor por defecto
+}
+function setRentFranjasTipo(tipo, list){ localStorage.setItem('miners_rent_franjas_'+tipo, JSON.stringify(list)); }
+function getRendFranjasTipo(tipo){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_rend_franjas_'+tipo));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return getRendFranjas();
+}
+function setRendFranjasTipo(tipo, list){ localStorage.setItem('miners_rend_franjas_'+tipo, JSON.stringify(list)); }
+/* combina las 3 listas de franjas en una sola de referencia (para la vista "Todos los días"),
+   uniendo por hora de inicio/fin exactas — una franja que solo exista en un patrón también
+   aparece, con 0 en los días donde ese patrón no aplica */
+function unionFranjas(...listas){
+  const vistos = new Map();
+  listas.flat().forEach(f=>{
+    const key = f.start+'-'+f.end;
+    if(!vistos.has(key)) vistos.set(key, { id:key, start:f.start, end:f.end, label:f.label });
+  });
+  return [...vistos.values()].sort((a,b)=>a.start-b.start);
+}
+function clasificarEnFranjas(horaStr, franjasList){
+  const min = horaAMinutos(horaStr);
+  const f = franjasList.find(x=>min>=x.start && min<x.end);
+  return f ? (f.start+'-'+f.end) : 'fuera';
+}
 
 function franjaDuracionHoras(franjaLabel){
   const f = BUSINESS_FRANJAS.find(x=>x.label===franjaLabel);
@@ -3124,8 +3174,8 @@ STATE.rentPlantillaTipoActivo = 'semana';
 STATE.rentPlantillaDraft = {};
 function inicializarDraftPlantilla(){
   const draft = {};
-  getRentFranjas().forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    getRentFranjasTipo(tipo).forEach(f=>{
       const d = STATE.staffingWeek.find(s=>s.franja===f.id && s.tipoDia===tipo) || {numCocina:0, costeCocina:0, numBaristas:0, costeBarista:0};
       draft[f.id+'|'+tipo+'|numCocina'] = d.numCocina;
       draft[f.id+'|'+tipo+'|costeCocina'] = d.costeCocina;
@@ -3137,25 +3187,45 @@ function inicializarDraftPlantilla(){
 }
 function renderTablaPlantilla(){
   const tbody = document.querySelector('#tablaPlantilla tbody');
-  const franjas = getRentFranjas();
   const tipoActivo = STATE.rentPlantillaTipoActivo || 'semana';
+  const franjas = getRentFranjasTipo(tipoActivo);
   const draft = STATE.rentPlantillaDraft || {};
   const leerDraft = (fid,campo) => draft[fid+'|'+tipoActivo+'|'+campo] ?? 0;
   const inputTiempo = (val, attr, id) => `<input type="time" step="900" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
-  const inputNum = (val, campo, id) => `<input type="number" step="${campo.startsWith('coste')?'0.5':'1'}" min="0" value="${val}" data-plantilla="${id}|${campo}" style="width:65px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 5px;text-align:right;">`;
+  const inputNum = (val, campo, id) => `<input type="number" step="${campo.startsWith('coste')?'0.5':'1'}" min="0" value="${val}" data-plantilla="${id}|${campo}" style="width:55px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 5px;text-align:right;">`;
+  const botonCopiarArriba = (id, campo, hayAnterior) => hayAnterior ? `<button class="btn secondary" data-copiar-fila-anterior="${id}|${campo}" title="Copiar el número de la franja anterior" style="padding:2px 5px;font-size:10px;margin-left:3px;">↑</button>` : '';
   const costeTotalFranja = (fid, horas) => (leerDraft(fid,'numCocina')*leerDraft(fid,'costeCocina') + leerDraft(fid,'numBaristas')*leerDraft(fid,'costeBarista')) * horas;
 
-  tbody.innerHTML = franjas.map(f=>{
+  tbody.innerHTML = (franjas.length ? franjas.map((f,idx)=>{
     const horas = (f.end-f.start)/60;
+    const hayAnterior = idx>0;
     return `<tr>
       <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'franja-fin',f.id)} <button class="btn danger" data-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
-      <td class="num">${inputNum(leerDraft(f.id,'numCocina'),'numCocina',f.id)}</td>
+      <td class="num">${inputNum(leerDraft(f.id,'numCocina'),'numCocina',f.id)}${botonCopiarArriba(f.id,'numCocina',hayAnterior)}</td>
       <td class="num">${inputNum(leerDraft(f.id,'costeCocina'),'costeCocina',f.id)}</td>
-      <td class="num">${inputNum(leerDraft(f.id,'numBaristas'),'numBaristas',f.id)}</td>
+      <td class="num">${inputNum(leerDraft(f.id,'numBaristas'),'numBaristas',f.id)}${botonCopiarArriba(f.id,'numBaristas',hayAnterior)}</td>
       <td class="num">${inputNum(leerDraft(f.id,'costeBarista'),'costeBarista',f.id)}</td>
       <td class="num"><b data-coste-total="${f.id}">${eur(Math.round(costeTotalFranja(f.id,horas)*100))}</b></td>
     </tr>`;
-  }).join('') + `<tr><td colspan="6" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="hint">Sin franjas en esta pestaña todavía.</td></tr>')
+    + `<tr><td colspan="6" style="padding-top:10px;"><button class="btn secondary" id="rentFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+
+  tbody.querySelectorAll('[data-copiar-fila-anterior]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [id, campo] = btn.getAttribute('data-copiar-fila-anterior').split('|');
+      const idx = franjas.findIndex(f=>f.id===id);
+      if(idx<=0) return;
+      const anterior = franjas[idx-1];
+      const valorAnterior = leerDraft(anterior.id, campo);
+      STATE.rentPlantillaDraft[id+'|'+tipoActivo+'|'+campo] = valorAnterior;
+      const input = tbody.querySelector('[data-plantilla="'+id+'|'+campo+'"]');
+      if(input) input.value = valorAnterior;
+      const f = franjas[idx];
+      const horas = (f.end-f.start)/60;
+      const span = tbody.querySelector('[data-coste-total="'+id+'"]');
+      if(span) span.textContent = eur(Math.round(costeTotalFranja(id,horas)*100));
+    });
+  });
 
   /* cada tecla escrita actualiza el borrador en memoria (los 3 tipos de día quedan a salvo
      aunque solo se vea uno en pantalla) y recalcula el "Coste total" en vivo */
@@ -3174,44 +3244,43 @@ function renderTablaPlantilla(){
   tbody.querySelectorAll('[data-franja-inicio]').forEach(inp=>{
     inp.addEventListener('change', ()=>{
       const id = inp.getAttribute('data-franja-inicio');
-      const fr = getRentFranjas();
+      const fr = getRentFranjasTipo(tipoActivo);
       const f = fr.find(x=>x.id===id);
-      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRentFranjas(fr); renderTablaPlantilla(); renderRentabilidad(); }
+      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRentFranjasTipo(tipoActivo, fr); renderTablaPlantilla(); renderRentabilidad(); }
     });
   });
   tbody.querySelectorAll('[data-franja-fin]').forEach(inp=>{
     inp.addEventListener('change', ()=>{
       const id = inp.getAttribute('data-franja-fin');
-      const fr = getRentFranjas();
+      const fr = getRentFranjasTipo(tipoActivo);
       const f = fr.find(x=>x.id===id);
-      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRentFranjas(fr); renderTablaPlantilla(); renderRentabilidad(); }
+      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRentFranjasTipo(tipoActivo, fr); renderTablaPlantilla(); renderRentabilidad(); }
     });
   });
   tbody.querySelectorAll('[data-franja-quitar]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      if(!confirm('¿Quitar esta línea de horario? El personal guardado para ella dejará de contarse.')) return;
-      setRentFranjas(getRentFranjas().filter(f=>f.id!==btn.getAttribute('data-franja-quitar')));
+      if(!confirm('¿Quitar esta línea de horario de "'+nombreTipoDia(tipoActivo)+'"? Solo afecta a esta pestaña. El personal guardado para ella dejará de contarse.')) return;
+      setRentFranjasTipo(tipoActivo, getRentFranjasTipo(tipoActivo).filter(f=>f.id!==btn.getAttribute('data-franja-quitar')));
       renderTablaPlantilla(); renderRentabilidad();
     });
   });
   const addBtn = document.getElementById('rentFranjaAddBtn');
   if(addBtn) addBtn.addEventListener('click', ()=>{
-    const fr = getRentFranjas();
+    const fr = getRentFranjasTipo(tipoActivo);
     const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
     const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
     const nuevoFin = Math.min(lastEnd+60, 23*60+59);
     const nuevaFranja = { id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) };
     fr.push(nuevaFranja);
-    setRentFranjas(fr);
-    ['semana','sabado','domingo'].forEach(tipo=>{
-      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|numCocina'] = 0;
-      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|costeCocina'] = 0;
-      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|numBaristas'] = 0;
-      STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipo+'|costeBarista'] = 0;
-    });
+    setRentFranjasTipo(tipoActivo, fr);
+    STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipoActivo+'|numCocina'] = 0;
+    STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipoActivo+'|costeCocina'] = 0;
+    STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipoActivo+'|numBaristas'] = 0;
+    STATE.rentPlantillaDraft[nuevaFranja.id+'|'+tipoActivo+'|costeBarista'] = 0;
     renderTablaPlantilla(); renderRentabilidad();
   });
 }
+function nombreTipoDia(tipo){ return tipo==='semana' ? 'Entre semana (L-V)' : (tipo==='sabado' ? 'Sábado' : 'Domingo'); }
 document.querySelectorAll('[data-plantilla-tab]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     STATE.rentPlantillaTipoActivo = btn.getAttribute('data-plantilla-tab');
@@ -3226,40 +3295,41 @@ document.querySelectorAll('[data-plantilla-tab]').forEach(btn=>{
 document.getElementById('rentCopiarLVBtn').addEventListener('click', ()=>{
   const tipoDestino = STATE.rentPlantillaTipoActivo;
   if(tipoDestino==='semana') return;
-  const nombreDestino = tipoDestino==='sabado' ? 'Sábado' : 'Domingo';
-  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye lo que tengas ahora en esta pestaña (todavía sin guardar).')) return;
-  getRentFranjas().forEach(f=>{
+  const nombreDestino = nombreTipoDia(tipoDestino);
+  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye las franjas y los valores que tengas ahora en esta pestaña (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getRentFranjasTipo('semana')));
+  setRentFranjasTipo(tipoDestino, franjasLV);
+  franjasLV.forEach(f=>{
     ['numCocina','costeCocina','numBaristas','costeBarista'].forEach(campo=>{
       STATE.rentPlantillaDraft[f.id+'|'+tipoDestino+'|'+campo] = STATE.rentPlantillaDraft[f.id+'|semana|'+campo] ?? 0;
     });
   });
   renderTablaPlantilla();
-  toast('Copiado desde L-V — recuerda guardar para que se quede.');
+  toast('Horario y valores copiados desde L-V — recuerda guardar para que se quede.');
 });
 document.getElementById('rentGenerarFranjasBtn').addEventListener('click', ()=>{
-  const franjasActuales = getRentFranjas();
-  if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
-  const aLV = horaAMinutos(document.getElementById('rentAperturaLVInput').value), cLV = horaAMinutos(document.getElementById('rentCierreLVInput').value);
-  const aSab = horaAMinutos(document.getElementById('rentAperturaSabInput').value), cSab = horaAMinutos(document.getElementById('rentCierreSabInput').value);
-  const aDom = horaAMinutos(document.getElementById('rentAperturaDomInput').value), cDom = horaAMinutos(document.getElementById('rentCierreDomInput').value);
-  const apertura = Math.min(aLV, aSab, aDom);
-  const cierre = Math.max(cLV, cSab, cDom);
+  if(!confirm('Esto sustituye las líneas de horario de los 3 patrones (L-V, Sábado, Domingo) por unas nuevas generadas automáticamente, cada una con su propio horario de apertura/cierre — pueden salir con distinto número de franjas. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
+  const pares = {
+    semana: [horaAMinutos(document.getElementById('rentAperturaLVInput').value), horaAMinutos(document.getElementById('rentCierreLVInput').value)],
+    sabado: [horaAMinutos(document.getElementById('rentAperturaSabInput').value), horaAMinutos(document.getElementById('rentCierreSabInput').value)],
+    domingo: [horaAMinutos(document.getElementById('rentAperturaDomInput').value), horaAMinutos(document.getElementById('rentCierreDomInput').value)],
+  };
   const gran = parseInt(document.getElementById('rentGranularidadFranja').value,10);
-  if(!(cierre>apertura)){ toast('Al menos uno de los tres cierres debe ser posterior a su apertura.', true); return; }
-  const franjas = generarListaFranjas(apertura, cierre, gran);
-  setRentFranjas(franjas);
-  franjas.forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
-      if(STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina']===undefined){
-        STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina']=0; STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeCocina']=0;
-        STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0; STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeBarista']=0;
-      }
+  let totalFranjas = 0;
+  for(const tipo of ['semana','sabado','domingo']){
+    const [apertura, cierre] = pares[tipo];
+    if(!(cierre>apertura)){ toast('El cierre de "'+nombreTipoDia(tipo)+'" debe ser posterior a su apertura.', true); return; }
+    const franjas = generarListaFranjas(apertura, cierre, gran);
+    setRentFranjasTipo(tipo, franjas);
+    franjas.forEach(f=>{
+      STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina']=0; STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeCocina']=0;
+      STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0; STATE.rentPlantillaDraft[f.id+'|'+tipo+'|costeBarista']=0;
     });
-  });
+    totalFranjas += franjas.length;
+  }
   renderTablaPlantilla();
   renderRentabilidad();
-  const distintos = !(aLV===aSab && aSab===aDom && cLV===cSab && cSab===cDom);
-  toast('Franjas generadas: '+franjas.length+' líneas.'+(distintos ? ' Recuerda poner 0 personal en las franjas donde cada día no abra.' : ''));
+  toast('Franjas generadas para los 3 patrones ('+totalFranjas+' líneas en total, independientes entre sí).');
 });
 async function cargarPlantillaSemana(weekStart){
   try{
@@ -3368,38 +3438,39 @@ async function renderHistorialPlantillas(){
   });
 }
 document.getElementById('rentCopiarAmbosBtn').addEventListener('click', ()=>{
-  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye lo que tengas ahora en ambas (todavía sin guardar).')) return;
-  getRentFranjas().forEach(f=>{
-    ['sabado','domingo'].forEach(tipoDestino=>{
+  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye las franjas y los valores que tengas ahora en ambas (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getRentFranjasTipo('semana')));
+  ['sabado','domingo'].forEach(tipoDestino=>{
+    setRentFranjasTipo(tipoDestino, JSON.parse(JSON.stringify(franjasLV)));
+    franjasLV.forEach(f=>{
       ['numCocina','costeCocina','numBaristas','costeBarista'].forEach(campo=>{
         STATE.rentPlantillaDraft[f.id+'|'+tipoDestino+'|'+campo] = STATE.rentPlantillaDraft[f.id+'|semana|'+campo] ?? 0;
       });
     });
   });
   renderTablaPlantilla();
-  toast('Copiado a Sábado y Domingo — recuerda guardar para que se quede.');
+  toast('Horario y valores copiados a Sábado y Domingo — recuerda guardar para que se quede.');
 });
 document.getElementById('rentAplicarCosteUnicoBtn').addEventListener('click', ()=>{
   const costeCocina = document.getElementById('rentCosteCocinaUnico').value;
   const costeBarista = document.getElementById('rentCosteBaristaUnico').value;
   if(costeCocina==='' && costeBarista===''){ toast('Escribe al menos un €/hora antes de aplicar.', true); return; }
   const tipoActivo = STATE.rentPlantillaTipoActivo || 'semana';
-  const nombreTipo = tipoActivo==='semana' ? 'Entre semana (L-V)' : (tipoActivo==='sabado' ? 'Sábado' : 'Domingo');
-  getRentFranjas().forEach(f=>{
+  getRentFranjasTipo(tipoActivo).forEach(f=>{
     if(costeCocina!=='') STATE.rentPlantillaDraft[f.id+'|'+tipoActivo+'|costeCocina'] = parseFloat(costeCocina)||0;
     if(costeBarista!=='') STATE.rentPlantillaDraft[f.id+'|'+tipoActivo+'|costeBarista'] = parseFloat(costeBarista)||0;
   });
   renderTablaPlantilla();
-  toast('€/hora aplicado a todas las franjas de "'+nombreTipo+'" — recuerda guardar para que se quede.');
+  toast('€/hora aplicado a todas las franjas de "'+nombreTipoDia(tipoActivo)+'" — recuerda guardar para que se quede.');
 });
 document.getElementById('rentCopiarARendimientoBtn').addEventListener('click', ()=>{
-  if(!confirm('Esto copia la configuración de franjas de Rentabilidad a Rendimiento operacional (sustituyendo las franjas que tenga Rendimiento ahora mismo), y copia solo el nº de baristas de cada franja — no la cocina, ni los costes (Rendimiento no los necesita). Se queda sin guardar hasta que le des a "Guardar" en Rendimiento. ¿Continuar?')) return;
-  const franjasRent = JSON.parse(JSON.stringify(getRentFranjas()));
-  setRendFranjas(franjasRent);
+  if(!confirm('Esto copia el horario de Rentabilidad a Rendimiento operacional para cada uno de los 3 patrones (L-V, Sábado, Domingo) por separado — sustituyendo las franjas que tenga Rendimiento en cada uno — y copia solo el nº de baristas de cada franja, no la cocina ni los costes (Rendimiento no los necesita). Se queda sin guardar hasta que le des a "Guardar" en Rendimiento. ¿Continuar?')) return;
   const nuevoBaristaWeek = [];
   const nuevoDraft = {};
-  franjasRent.forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    const franjasRent = JSON.parse(JSON.stringify(getRentFranjasTipo(tipo)));
+    setRendFranjasTipo(tipo, franjasRent);
+    franjasRent.forEach(f=>{
       const numBaristas = STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0;
       nuevoBaristaWeek.push({ franja:f.id, tipoDia:tipo, numBaristas });
       nuevoDraft[f.id+'|'+tipo+'|numBaristas'] = numBaristas;
@@ -3411,7 +3482,7 @@ document.getElementById('rentCopiarARendimientoBtn').addEventListener('click', (
   if(diaActual){ document.getElementById('rendPlantillaDia').value = diaActual; actualizarRendPlantillaSemanaLabel(); }
   renderTablaBaristas();
   renderRendimiento();
-  toast('Franjas y nº de baristas copiados a Rendimiento operacional (sin cocineros) — ve a esa pestaña, revisa, y pulsa "Guardar" para que se quede.');
+  toast('Horario y nº de baristas copiados a Rendimiento operacional (los 3 patrones, sin cocineros) — ve a esa pestaña, revisa, y pulsa "Guardar" para que se quede.');
 });
 /* trae TODAS las plantillas guardadas cuyas semanas caen dentro de [desde,hasta] */
 async function cargarPlantillasEnRango(desde, hasta){
@@ -3432,16 +3503,11 @@ function coincideFiltroDiaTipo(fechaStr, filtro){
 }
 async function calcularRentabilidadPeriodo(desde, hasta){
   const filtroDiaTipo = getRentFiltroDiaTipo();
-  const franjasCustom = getRentFranjas();
+  const franjasPorTipo = { semana: getRentFranjasTipo('semana'), sabado: getRentFranjasTipo('sabado'), domingo: getRentFranjasTipo('domingo') };
+  const franjasReferencia = filtroDiaTipo==='todos' ? unionFranjas(franjasPorTipo.semana, franjasPorTipo.sabado, franjasPorTipo.domingo) : franjasPorTipo[filtroDiaTipo];
   const incluirFuera = !getExcluirFueraHorario();
-  const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
-  const labelDe = {}; franjasCustom.forEach(f=>labelDe[f.id]=f.label); labelDe['fuera']='Fuera de horario';
-  const duracionDe = {}; franjasCustom.forEach(f=>duracionDe[f.id]=(f.end-f.start)/60);
-  const clasificar = (horaStr) => {
-    const min = horaAMinutos(horaStr);
-    const f = franjasCustom.find(x=>min>=x.start && min<x.end);
-    return f ? f.id : 'fuera';
-  };
+  const idsOrder = franjasReferencia.map(f=>f.start+'-'+f.end).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasReferencia.forEach(f=>labelDe[f.start+'-'+f.end]=f.label); labelDe['fuera']='Fuera de horario';
 
   const costHistory = buildCostHistoryMap();
   const resPorId = {}; idsOrder.forEach(id=>resPorId[id]={ventas:0,cogs:0,laboral:0});
@@ -3449,7 +3515,8 @@ async function calcularRentabilidadPeriodo(desde, hasta){
   getAllSalesLinesRaw().forEach(l=>{
     if(l.fecha<desde || l.fecha>hasta) return;
     if(!coincideFiltroDiaTipo(l.fecha, filtroDiaTipo)) return;
-    const id = clasificar(l.hora);
+    const tipoDelDia = diaTipoDeFecha(l.fecha);
+    const id = clasificarEnFranjas(l.hora, franjasPorTipo[tipoDelDia]);
     if(!resPorId[id]) return;
     resPorId[id].ventas += l.bruto;
     resPorId[id].cogs += l.cant * costAtDate(costHistory, l.articulo, l.fecha) * 100; // a céntimos, igual que ventas
@@ -3470,10 +3537,12 @@ async function calcularRentabilidadPeriodo(desde, hasta){
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
     if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
-    idsOrder.forEach(id=>{
-      if(id==='fuera') return; // no se planifica personal fuera de horario
-      const p = patronMap[ws+'|'+id+'|'+tipoDia];
-      if(p) resPorId[id].laboral += (p.numCocina*p.costeCocina + p.numBaristas*p.costeBarista) * (duracionDe[id]||0) * 100; // a céntimos
+    franjasPorTipo[tipoDia].forEach(f=>{
+      const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+      if(!p) return;
+      const idRef = f.start+'-'+f.end;
+      if(!resPorId[idRef]) return;
+      resPorId[idRef].laboral += (p.numCocina*p.costeCocina + p.numBaristas*p.costeBarista) * ((f.end-f.start)/60) * 100; // a céntimos
     });
     d.setDate(d.getDate()+1);
   }
@@ -3487,23 +3556,19 @@ async function calcularRentabilidadPeriodo(desde, hasta){
    contar días rentables vs no rentables. */
 async function calcularRentabilidadDiaria(desde, hasta){
   const filtroDiaTipo = getRentFiltroDiaTipo();
-  const franjasCustom = getRentFranjas();
+  const franjasPorTipo = { semana: getRentFranjasTipo('semana'), sabado: getRentFranjasTipo('sabado'), domingo: getRentFranjasTipo('domingo') };
+  const franjasReferencia = filtroDiaTipo==='todos' ? unionFranjas(franjasPorTipo.semana, franjasPorTipo.sabado, franjasPorTipo.domingo) : franjasPorTipo[filtroDiaTipo];
   const incluirFuera = !getExcluirFueraHorario();
-  const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
-  const labelDe = {}; franjasCustom.forEach(f=>labelDe[f.id]=f.label); labelDe['fuera']='Fuera de horario';
-  const duracionDe = {}; franjasCustom.forEach(f=>duracionDe[f.id]=(f.end-f.start)/60);
-  const clasificar = (horaStr) => {
-    const min = horaAMinutos(horaStr);
-    const f = franjasCustom.find(x=>min>=x.start && min<x.end);
-    return f ? f.id : 'fuera';
-  };
+  const idsOrder = franjasReferencia.map(f=>f.start+'-'+f.end).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasReferencia.forEach(f=>labelDe[f.start+'-'+f.end]=f.label); labelDe['fuera']='Fuera de horario';
 
   const costHistory = buildCostHistoryMap();
   const porDia = {}; idsOrder.forEach(id=>porDia[id]={});
   getAllSalesLinesRaw().forEach(l=>{
     if(l.fecha<desde || l.fecha>hasta) return;
     if(!coincideFiltroDiaTipo(l.fecha, filtroDiaTipo)) return;
-    const id = clasificar(l.hora);
+    const tipoDelDia = diaTipoDeFecha(l.fecha);
+    const id = clasificarEnFranjas(l.hora, franjasPorTipo[tipoDelDia]);
     if(!porDia[id]) return;
     if(!porDia[id][l.fecha]) porDia[id][l.fecha] = {ventas:0, cogs:0};
     porDia[id][l.fecha].ventas += l.bruto;
@@ -3523,15 +3588,21 @@ async function calcularRentabilidadDiaria(desde, hasta){
     const dow = d.getDay();
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
     if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
-    idsOrder.forEach(id=>{
-      const vc = porDia[id][fechaStr] || {ventas:0, cogs:0};
-      let laboral = 0;
-      if(id!=='fuera'){
-        const p = patronMap[ws+'|'+id+'|'+tipoDia];
-        if(p) laboral = (p.numCocina*p.costeCocina + p.numBaristas*p.costeBarista) * (duracionDe[id]||0) * 100;
-      }
-      resultadosPorId[id].push((vc.ventas - vc.cogs - laboral)/100);
+    /* solo se añade un resultado para las franjas que de verdad existen en el patrón de ESE
+       día — así una franja exclusiva de, por ejemplo, Sábado no se "diluye" con ceros
+       artificiales en los otros 6 días de la semana, que ni siquiera la contemplan */
+    franjasPorTipo[tipoDia].forEach(f=>{
+      const idRef = f.start+'-'+f.end;
+      if(!resultadosPorId[idRef]) return;
+      const vc = porDia[idRef][fechaStr] || {ventas:0, cogs:0};
+      const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+      const laboral = p ? (p.numCocina*p.costeCocina + p.numBaristas*p.costeBarista) * ((f.end-f.start)/60) : 0;
+      resultadosPorId[idRef].push((vc.ventas - vc.cogs)/100 - laboral);
     });
+    if(incluirFuera){
+      const vc = porDia['fuera'][fechaStr] || {ventas:0, cogs:0};
+      resultadosPorId['fuera'].push((vc.ventas - vc.cogs)/100);
+    }
     d.setDate(d.getDate()+1);
   }
   const franjaOrder = idsOrder.map(id=>labelDe[id]);
@@ -3648,8 +3719,8 @@ document.getElementById('rentPlantillaDia').addEventListener('change', async ()=
 });
 function filasDesdeDraftPlantilla(){
   const filas = [];
-  getRentFranjas().forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    getRentFranjasTipo(tipo).forEach(f=>{
       filas.push({
         franja: f.id, tipoDia: tipo,
         numCocina: STATE.rentPlantillaDraft[f.id+'|'+tipo+'|numCocina'] ?? 0,
@@ -3728,8 +3799,8 @@ STATE.rendPlantillaTipoActivo = 'semana';
 STATE.rendPlantillaDraft = {};
 function inicializarDraftPlantillaRend(){
   const draft = {};
-  getRendFranjas().forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    getRendFranjasTipo(tipo).forEach(f=>{
       const d = STATE.baristaWeek.find(s=>s.franja===f.id && s.tipoDia===tipo) || {numBaristas:0};
       draft[f.id+'|'+tipo+'|numBaristas'] = d.numBaristas;
     });
@@ -3738,17 +3809,31 @@ function inicializarDraftPlantillaRend(){
 }
 function renderTablaBaristas(){
   const tbody = document.querySelector('#tablaBaristas tbody');
-  const franjas = getRendFranjas();
   const tipoActivo = STATE.rendPlantillaTipoActivo || 'semana';
+  const franjas = getRendFranjasTipo(tipoActivo);
   const draft = STATE.rendPlantillaDraft || {};
   const leerDraft = (fid) => draft[fid+'|'+tipoActivo+'|numBaristas'] ?? 0;
   const inputTiempo = (val, attr, id) => `<input type="time" step="900" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
-  tbody.innerHTML = franjas.map(f=>{
+  tbody.innerHTML = (franjas.length ? franjas.map((f,idx)=>{
+    const boton = idx>0 ? `<button class="btn secondary" data-copiar-fila-anterior-rend="${f.id}" title="Copiar el número de la franja anterior" style="padding:2px 5px;font-size:10px;margin-left:3px;">↑</button>` : '';
     return `<tr>
       <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'rend-franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'rend-franja-fin',f.id)} <button class="btn danger" data-rend-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
-      <td class="num"><input type="number" step="1" min="0" value="${leerDraft(f.id)}" data-barista="${f.id}" style="width:70px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td class="num"><input type="number" step="1" min="0" value="${leerDraft(f.id)}" data-barista="${f.id}" style="width:60px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;">${boton}</td>
     </tr>`;
-  }).join('') + `<tr><td colspan="2" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+  }).join('') : '<tr><td colspan="2" class="hint">Sin franjas en esta pestaña todavía.</td></tr>')
+    + `<tr><td colspan="2" style="padding-top:10px;"><button class="btn secondary" id="rendFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+
+  tbody.querySelectorAll('[data-copiar-fila-anterior-rend]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-copiar-fila-anterior-rend');
+      const idx = franjas.findIndex(f=>f.id===id);
+      if(idx<=0) return;
+      const valorAnterior = leerDraft(franjas[idx-1].id);
+      STATE.rendPlantillaDraft[id+'|'+tipoActivo+'|numBaristas'] = valorAnterior;
+      const input = tbody.querySelector('[data-barista="'+id+'"]');
+      if(input) input.value = valorAnterior;
+    });
+  });
 
   tbody.querySelectorAll('[data-barista]').forEach(inp=>{
     inp.addEventListener('input', ()=>{
@@ -3759,36 +3844,36 @@ function renderTablaBaristas(){
   tbody.querySelectorAll('[data-rend-franja-inicio]').forEach(inp=>{
     inp.addEventListener('change', ()=>{
       const id = inp.getAttribute('data-rend-franja-inicio');
-      const fr = getRendFranjas();
+      const fr = getRendFranjasTipo(tipoActivo);
       const f = fr.find(x=>x.id===id);
-      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRendFranjas(fr); renderTablaBaristas(); renderRendimiento(); }
+      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRendFranjasTipo(tipoActivo, fr); renderTablaBaristas(); renderRendimiento(); }
     });
   });
   tbody.querySelectorAll('[data-rend-franja-fin]').forEach(inp=>{
     inp.addEventListener('change', ()=>{
       const id = inp.getAttribute('data-rend-franja-fin');
-      const fr = getRendFranjas();
+      const fr = getRendFranjasTipo(tipoActivo);
       const f = fr.find(x=>x.id===id);
-      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRendFranjas(fr); renderTablaBaristas(); renderRendimiento(); }
+      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setRendFranjasTipo(tipoActivo, fr); renderTablaBaristas(); renderRendimiento(); }
     });
   });
   tbody.querySelectorAll('[data-rend-franja-quitar]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      if(!confirm('¿Quitar esta línea de horario? El personal guardado para ella dejará de contarse.')) return;
-      setRendFranjas(getRendFranjas().filter(f=>f.id!==btn.getAttribute('data-rend-franja-quitar')));
+      if(!confirm('¿Quitar esta línea de horario de "'+nombreTipoDia(tipoActivo)+'"? Solo afecta a esta pestaña. El personal guardado para ella dejará de contarse.')) return;
+      setRendFranjasTipo(tipoActivo, getRendFranjasTipo(tipoActivo).filter(f=>f.id!==btn.getAttribute('data-rend-franja-quitar')));
       renderTablaBaristas(); renderRendimiento();
     });
   });
   const addBtn = document.getElementById('rendFranjaAddBtn');
   if(addBtn) addBtn.addEventListener('click', ()=>{
-    const fr = getRendFranjas();
+    const fr = getRendFranjasTipo(tipoActivo);
     const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
     const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
     const nuevoFin = Math.min(lastEnd+60, 23*60+59);
     const nuevaFranja = { id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) };
     fr.push(nuevaFranja);
-    setRendFranjas(fr);
-    ['semana','sabado','domingo'].forEach(tipo=>{ STATE.rendPlantillaDraft[nuevaFranja.id+'|'+tipo+'|numBaristas'] = 0; });
+    setRendFranjasTipo(tipoActivo, fr);
+    STATE.rendPlantillaDraft[nuevaFranja.id+'|'+tipoActivo+'|numBaristas'] = 0;
     renderTablaBaristas(); renderRendimiento();
   });
 }
@@ -3805,19 +3890,23 @@ document.querySelectorAll('[data-plantilla-tab-rend]').forEach(btn=>{
 document.getElementById('rendCopiarLVBtn').addEventListener('click', ()=>{
   const tipoDestino = STATE.rendPlantillaTipoActivo;
   if(tipoDestino==='semana') return;
-  const nombreDestino = tipoDestino==='sabado' ? 'Sábado' : 'Domingo';
-  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye lo que tengas ahora en esta pestaña (todavía sin guardar).')) return;
-  getRendFranjas().forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  const nombreDestino = nombreTipoDia(tipoDestino);
+  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye las franjas y los valores que tengas ahora en esta pestaña (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getRendFranjasTipo('semana')));
+  setRendFranjasTipo(tipoDestino, franjasLV);
+  franjasLV.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
   renderTablaBaristas();
-  toast('Copiado desde L-V — recuerda guardar para que se quede.');
+  toast('Horario y valores copiados desde L-V — recuerda guardar para que se quede.');
 });
 document.getElementById('rendCopiarAmbosBtn').addEventListener('click', ()=>{
-  if(!confirm('¿Copiar los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye lo que tengas ahora en ambas (todavía sin guardar).')) return;
-  getRendFranjas().forEach(f=>{
-    ['sabado','domingo'].forEach(tipoDestino=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye las franjas y los valores que tengas ahora en ambas (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getRendFranjasTipo('semana')));
+  ['sabado','domingo'].forEach(tipoDestino=>{
+    setRendFranjasTipo(tipoDestino, JSON.parse(JSON.stringify(franjasLV)));
+    franjasLV.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
   });
   renderTablaBaristas();
-  toast('Copiado a Sábado y Domingo — recuerda guardar para que se quede.');
+  toast('Horario y valores copiados a Sábado y Domingo — recuerda guardar para que se quede.');
 });
 function actualizarRendPlantillaSemanaLabel(){
   const fecha = document.getElementById('rendPlantillaDia').value;
@@ -3923,26 +4012,25 @@ async function renderHistorialPlantillasRend(){
   });
 }
 document.getElementById('rendGenerarFranjasBtn').addEventListener('click', ()=>{
-  const franjasActuales = getRendFranjas();
-  if(franjasActuales.length>0 && !confirm('Esto sustituye todas las líneas de horario actuales de la plantilla por unas nuevas generadas automáticamente. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
-  const aLV = horaAMinutos(document.getElementById('rendAperturaLVInput').value), cLV = horaAMinutos(document.getElementById('rendCierreLVInput').value);
-  const aSab = horaAMinutos(document.getElementById('rendAperturaSabInput').value), cSab = horaAMinutos(document.getElementById('rendCierreSabInput').value);
-  const aDom = horaAMinutos(document.getElementById('rendAperturaDomInput').value), cDom = horaAMinutos(document.getElementById('rendCierreDomInput').value);
-  const apertura = Math.min(aLV, aSab, aDom);
-  const cierre = Math.max(cLV, cSab, cDom);
+  if(!confirm('Esto sustituye las líneas de horario de los 3 patrones (L-V, Sábado, Domingo) por unas nuevas generadas automáticamente, cada una con su propio horario de apertura/cierre — pueden salir con distinto número de franjas. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
+  const pares = {
+    semana: [horaAMinutos(document.getElementById('rendAperturaLVInput').value), horaAMinutos(document.getElementById('rendCierreLVInput').value)],
+    sabado: [horaAMinutos(document.getElementById('rendAperturaSabInput').value), horaAMinutos(document.getElementById('rendCierreSabInput').value)],
+    domingo: [horaAMinutos(document.getElementById('rendAperturaDomInput').value), horaAMinutos(document.getElementById('rendCierreDomInput').value)],
+  };
   const gran = parseInt(document.getElementById('rendGranularidadFranja').value,10);
-  if(!(cierre>apertura)){ toast('Al menos uno de los tres cierres debe ser posterior a su apertura.', true); return; }
-  const franjas = generarListaFranjas(apertura, cierre, gran);
-  setRendFranjas(franjas);
-  franjas.forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
-      if(STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas']===undefined) STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0;
-    });
-  });
+  let totalFranjas = 0;
+  for(const tipo of ['semana','sabado','domingo']){
+    const [apertura, cierre] = pares[tipo];
+    if(!(cierre>apertura)){ toast('El cierre de "'+nombreTipoDia(tipo)+'" debe ser posterior a su apertura.', true); return; }
+    const franjas = generarListaFranjas(apertura, cierre, gran);
+    setRendFranjasTipo(tipo, franjas);
+    franjas.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0; });
+    totalFranjas += franjas.length;
+  }
   renderTablaBaristas();
   renderRendimiento();
-  const distintos = !(aLV===aSab && aSab===aDom && cLV===cSab && cSab===cDom);
-  toast('Franjas generadas: '+franjas.length+' líneas.'+(distintos ? ' Recuerda poner 0 baristas en las franjas donde cada día no abra.' : ''));
+  toast('Franjas generadas para los 3 patrones ('+totalFranjas+' líneas en total, independientes entre sí).');
 });
 async function cargarBaristasSemana(weekStart){
   try{
@@ -3967,16 +4055,11 @@ function getRendFiltroDiaTipo(){ return localStorage.getItem('miners_rend_filtro
 function setRendFiltroDiaTipo(v){ localStorage.setItem('miners_rend_filtro_dia_tipo', v); }
 async function calcularRendimientoPeriodo(desde, hasta){
   const filtroDiaTipo = getRendFiltroDiaTipo();
-  const franjasCustom = getRendFranjas();
+  const franjasPorTipo = { semana: getRendFranjasTipo('semana'), sabado: getRendFranjasTipo('sabado'), domingo: getRendFranjasTipo('domingo') };
+  const franjasReferencia = filtroDiaTipo==='todos' ? unionFranjas(franjasPorTipo.semana, franjasPorTipo.sabado, franjasPorTipo.domingo) : franjasPorTipo[filtroDiaTipo];
   const incluirFuera = !getExcluirFueraHorario();
-  const idsOrder = franjasCustom.map(f=>f.id).concat(incluirFuera ? ['fuera'] : []);
-  const labelDe = {}; franjasCustom.forEach(f=>labelDe[f.id]=f.label); labelDe['fuera']='Fuera de horario';
-  const duracionDe = {}; franjasCustom.forEach(f=>duracionDe[f.id]=(f.end-f.start)/60);
-  const clasificar = (horaStr) => {
-    const min = horaAMinutos(horaStr);
-    const f = franjasCustom.find(x=>min>=x.start && min<x.end);
-    return f ? f.id : 'fuera';
-  };
+  const idsOrder = franjasReferencia.map(f=>f.start+'-'+f.end).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasReferencia.forEach(f=>labelDe[f.start+'-'+f.end]=f.label); labelDe['fuera']='Fuera de horario';
   const bebidasCats = getBebidaCategorias();
   const resPorId = {}; idsOrder.forEach(id=>resPorId[id]={bebidas:0, tickets:0, ticketsBebida:0, baristaHoras:0});
 
@@ -3988,7 +4071,8 @@ async function calcularRendimientoPeriodo(desde, hasta){
       if(fecha<desde || fecha>hasta) return;
       if(!esPago) return;
       if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
-      const id = clasificar(hora);
+      const tipoDelDia = diaTipoDeFecha(fecha);
+      const id = clasificarEnFranjas(hora, franjasPorTipo[tipoDelDia]);
       if(!resPorId[id]) return;
       const esBebida = bebidasCats.includes(pd.cats[catIdx]);
       if(esBebida) resPorId[id].bebidas += cant;
@@ -4017,10 +4101,11 @@ async function calcularRendimientoPeriodo(desde, hasta){
     const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
     if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
-    idsOrder.forEach(id=>{
-      if(id==='fuera') return;
-      const p = patronMap[ws+'|'+id+'|'+tipoDia];
-      if(p) resPorId[id].baristaHoras += p.numBaristas * (duracionDe[id]||0);
+    franjasPorTipo[tipoDia].forEach(f=>{
+      const idRef = f.start+'-'+f.end;
+      if(!resPorId[idRef]) return;
+      const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+      if(p) resPorId[idRef].baristaHoras += p.numBaristas * ((f.end-f.start)/60);
     });
     d.setDate(d.getDate()+1);
   }
@@ -4029,6 +4114,114 @@ async function calcularRendimientoPeriodo(desde, hasta){
   const resultado = {}; idsOrder.forEach(id=>resultado[labelDe[id]] = resPorId[id]);
   return { franjaOrder, resultado, semanasSinPlantilla: [...semanasSinPlantilla].sort() };
 }
+/* calcula, día a día, bebidas/tickets/tickets-con-bebida por barista y hora dentro de una
+   franja horaria CUALQUIERA que el usuario elija (no tiene que coincidir con las franjas de
+   la plantilla) — las barista-horas se prorratean por solape con cada línea de la plantilla */
+async function calcularDiasFranjaPersonalizada(desde, hasta, horaInicioStr, horaFinStr){
+  const inicio = horaAMinutos(horaInicioStr), fin = horaAMinutos(horaFinStr);
+  if(!(fin>inicio)) return null;
+  const filtroDiaTipo = getRendFiltroDiaTipo();
+  const bebidasCats = getBebidaCategorias();
+  const franjasPorTipo = { semana: getRendFranjasTipo('semana'), sabado: getRendFranjasTipo('sabado'), domingo: getRendFranjasTipo('domingo') };
+
+  const porDia = {};
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const ticketsVistos = {}; // fecha_ticketIdx -> tieneBebida
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
+      if(fecha<desde || fecha>hasta) return;
+      if(!esPago) return;
+      if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
+      const min = horaAMinutos(hora);
+      if(!(min>=inicio && min<fin)) return;
+      if(!porDia[fecha]) porDia[fecha] = {bebidas:0};
+      const esBebida = bebidasCats.includes(pd.cats[catIdx]);
+      if(esBebida) porDia[fecha].bebidas += cant;
+      const key = fecha+'_'+ticketIdx;
+      if(esBebida) ticketsVistos[key] = true;
+      else if(!(key in ticketsVistos)) ticketsVistos[key] = false;
+    });
+    const contadoPorFecha = {};
+    Object.keys(ticketsVistos).forEach(key=>{
+      const fecha = key.slice(0, key.lastIndexOf('_'));
+      if(!contadoPorFecha[fecha]) contadoPorFecha[fecha] = {tickets:0, ticketsBebida:0};
+      contadoPorFecha[fecha].tickets++;
+      if(ticketsVistos[key]) contadoPorFecha[fecha].ticketsBebida++;
+    });
+    Object.keys(contadoPorFecha).forEach(fecha=>{
+      if(!porDia[fecha]) porDia[fecha] = {bebidas:0};
+      porDia[fecha].tickets = (porDia[fecha].tickets||0) + contadoPorFecha[fecha].tickets;
+      porDia[fecha].ticketsBebida = (porDia[fecha].ticketsBebida||0) + contadoPorFecha[fecha].ticketsBebida;
+    });
+  }
+
+  const plantillas = await cargarBaristasEnRango(desde, hasta);
+  const patronMap = {};
+  plantillas.forEach(p=>{ patronMap[p.weekStart+'|'+p.franja+'|'+p.tipoDia] = p; });
+
+  const resultadosDias = [];
+  let d = new Date(desde+'T00:00:00');
+  const end = new Date(hasta+'T00:00:00');
+  while(d<=end){
+    const fechaStr = fechaLocalISO(d);
+    const ws = isoMonday(fechaStr);
+    const dow = d.getDay();
+    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    if(filtroDiaTipo==='todos' || tipoDia===filtroDiaTipo){
+      let baristaHoras = 0;
+      franjasPorTipo[tipoDia].forEach(f=>{
+        const solapeInicio = Math.max(f.start, inicio), solapeFin = Math.min(f.end, fin);
+        if(solapeFin>solapeInicio){
+          const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+          if(p) baristaHoras += p.numBaristas * (solapeFin-solapeInicio)/60;
+        }
+      });
+      const datos = porDia[fechaStr] || {bebidas:0, tickets:0, ticketsBebida:0};
+      resultadosDias.push({
+        fecha: fechaStr,
+        baristaHoras,
+        bebidasPorHora: baristaHoras>0 ? (datos.bebidas||0)/baristaHoras : 0,
+        ticketsPorHora: baristaHoras>0 ? (datos.tickets||0)/baristaHoras : 0,
+        ticketsBebidaPorHora: baristaHoras>0 ? (datos.ticketsBebida||0)/baristaHoras : 0,
+      });
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return resultadosDias;
+}
+document.getElementById('rendCalcularUmbralBtn').addEventListener('click', async ()=>{
+  const desde = document.getElementById('rendDesde').value, hasta = document.getElementById('rendHasta').value;
+  if(!desde || !hasta){ toast('Elige primero el periodo Desde/Hasta de arriba.', true); return; }
+  const hi = document.getElementById('rendUmbralHoraInicio').value, hf = document.getElementById('rendUmbralHoraFin').value;
+  if(!hi || !hf){ toast('Elige la hora de inicio y de fin de la franja a analizar.', true); return; }
+  const resEl = document.getElementById('rendUmbralResultado');
+  resEl.innerHTML = '<p class="hint">Calculando...</p>';
+  const resultadosDias = await calcularDiasFranjaPersonalizada(desde, hasta, hi, hf);
+  if(!resultadosDias){ resEl.innerHTML = ''; toast('La hora de fin debe ser posterior a la de inicio.', true); return; }
+  const totalDias = resultadosDias.length;
+  const umbralBebidas = document.getElementById('rendUmbralBebidas').value;
+  const umbralTickets = document.getElementById('rendUmbralTickets').value;
+  const umbralTicketsBebida = document.getElementById('rendUmbralTicketsBebida').value;
+  const filas = [];
+  if(umbralBebidas!==''){
+    const n = resultadosDias.filter(d=>d.bebidasPorHora>parseFloat(umbralBebidas)).length;
+    filas.push(['Bebidas/barista/h > '+umbralBebidas, n]);
+  }
+  if(umbralTickets!==''){
+    const n = resultadosDias.filter(d=>d.ticketsPorHora>parseFloat(umbralTickets)).length;
+    filas.push(['Tickets/barista/h (todos) > '+umbralTickets, n]);
+  }
+  if(umbralTicketsBebida!==''){
+    const n = resultadosDias.filter(d=>d.ticketsBebidaPorHora>parseFloat(umbralTicketsBebida)).length;
+    filas.push(['Tickets bebida/barista/h > '+umbralTicketsBebida, n]);
+  }
+  if(filas.length===0){ resEl.innerHTML = '<p class="hint">Escribe al menos un umbral para calcular.</p>'; return; }
+  resEl.innerHTML = `<div class="card" style="border:1px solid var(--copper)55;">
+    <p class="hint" style="margin-bottom:8px;">Franja ${hi}–${hf}, periodo ${desde} a ${hasta} (${totalDias} día${totalDias!==1?'s':''} analizados):</p>
+    ${filas.map(([label,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);"><span>${label}</span><b style="color:var(--copper);">${n} de ${totalDias} día${totalDias!==1?'s':''}</b></div>`).join('')}
+  </div>`;
+});
 async function renderRendimiento(){
   const desde = document.getElementById('rendDesde').value;
   const hasta = document.getElementById('rendHasta').value;
@@ -4085,8 +4278,8 @@ document.getElementById('rendPlantillaDia').addEventListener('change', async ()=
 });
 function filasDesdeDraftPlantillaRend(){
   const filas = [];
-  getRendFranjas().forEach(f=>{
-    ['semana','sabado','domingo'].forEach(tipo=>{
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    getRendFranjasTipo(tipo).forEach(f=>{
       filas.push({ franja: f.id, tipoDia: tipo, numBaristas: STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0 });
     });
   });
