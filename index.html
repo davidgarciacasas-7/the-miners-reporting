@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.56</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.60</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -569,6 +569,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <div class="tabpanel" id="tab-produccion">
         <div class="card" style="margin-bottom:14px;">
           <p class="hint">Compara, semana a semana y producto a producto, lo que se pidió producir (encargado desde la app de mermas/Dream Team) frente a lo que se marcó como completado ahí — la diferencia es lo que quedó pendiente.</p>
+          <p class="hint">Se aconseja elegir un rango que empiece en <b>lunes</b> y termine en <b>domingo</b> (por ejemplo, aunque sea un lunes y el domingo de cinco semanas después) — así cada fila de la tabla corresponde a una semana completa, sin cortar ninguna por la mitad.</p>
           <div class="subfilter" style="margin-top:10px;">
             <div class="filter-group"><label>Desde</label><input type="date" id="produccionDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="produccionHasta"></div>
@@ -583,7 +584,8 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <!-- AJUSTE DE DEMANDA -->
       <div class="tabpanel" id="tab-ajustedemanda">
         <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;">
-          <p style="margin:0 0 8px 0;font-size:15px;"><b>Semana de referencia:</b> <span id="ajusteSemanaReferencia" style="color:var(--copper);"></span></p>
+          <div class="field" style="margin-bottom:8px;"><label>Semana de referencia</label><input type="date" id="ajusteSemanaReferenciaInput" style="max-width:200px;"></div>
+          <p style="margin:0 0 8px 0;font-size:15px;"><b>Semana de referencia elegida:</b> <span id="ajusteSemanaReferencia" style="color:var(--copper);"></span></p>
           <p class="hint" style="margin-bottom:0;">Los porcentajes que pongas aquí se aplican, <b>tal cual y sin acumular</b>, a todas las semanas siguientes a la de referencia — no es un incremento que vaya subiendo semana a semana (no es +5% la semana que viene, +10% la de después...); es el <b>mismo ajuste fijo</b> cada vez, comparado siempre contra la semana de referencia de arriba. Un valor positivo significa que esperas consumir más de lo normal en esa franja; uno negativo, menos.</p>
         </div>
         <div class="card">
@@ -954,19 +956,25 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div id="uploadStatus" style="margin-top:10px;"></div>
         </div>
         <div class="section-title">Periodos cargados</div>
-        <div class="card" id="periodsList"><p class="hint">No hay periodos cargados todavía.</p></div>
+        <div id="periodsResumen" class="hint" style="margin-bottom:6px;"></div>
+        <div style="margin-bottom:6px;"><button class="btn secondary" id="periodsToggleBtn" style="padding:4px 10px;font-size:11px;">Mostrar lista completa</button></div>
+        <div class="card hidden" id="periodsList"><p class="hint">No hay periodos cargados todavía.</p></div>
 
         <div class="section-title">Propinas</div>
         <div class="card">
-          <p class="hint" style="margin-bottom:10px;">Registro de referencia — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago). No afecta a ningún cálculo de esta app; para eso está la pestaña Caja, que trabaja con el extracto bancario real.</p>
+          <p class="hint" style="margin-bottom:10px;">Registro de referencia, mensual — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago). No afecta a ningún cálculo de esta app; para eso está la pestaña Caja, que trabaja con el extracto bancario real.</p>
           <div class="subfilter">
-            <input type="date" id="propinaFecha">
+            <select id="propinaMes">
+              <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option>
+              <option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option>
+              <option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <select id="propinaAnio"></select>
             <input type="number" step="0.01" min="0" id="propinaImporte" placeholder="Importe (€)" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
-            <input type="text" id="propinaNota" placeholder="Nota (opcional, ej. 'junio')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
             <button class="btn secondary" id="propinaAddBtn" style="padding:5px 10px;font-size:12px;">Guardar</button>
           </div>
           <div style="max-height:280px;overflow:auto;margin-top:12px;">
-            <table id="tablaPropinas"><thead><tr><th>Fecha</th><th>Importe</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
+            <table id="tablaPropinas"><thead><tr><th>Mes</th><th>Importe</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </div>
@@ -1564,7 +1572,22 @@ async function handleUpload(file){
   renderAll();
 }
 
+function renderPeriodsResumen(){
+  const el = document.getElementById('periodsResumen');
+  if(!el) return;
+  if(!STATE.index.periods || STATE.index.periods.length===0){ el.textContent = 'Sin periodos cargados todavía.'; return; }
+  const desde = STATE.index.periods.reduce((min,p)=>p.dateMin<min?p.dateMin:min, STATE.index.periods[0].dateMin);
+  const hasta = STATE.index.periods.reduce((max,p)=>p.dateMax>max?p.dateMax:max, STATE.index.periods[0].dateMax);
+  const n = STATE.index.periods.length;
+  el.innerHTML = '📅 Datos cargados desde <b>'+desde+'</b> hasta <b>'+hasta+'</b> ('+n+' archivo'+(n!==1?'s':'')+' subido'+(n!==1?'s':'')+').';
+}
+document.getElementById('periodsToggleBtn').addEventListener('click', ()=>{
+  const listEl = document.getElementById('periodsList');
+  const oculto = listEl.classList.toggle('hidden');
+  document.getElementById('periodsToggleBtn').textContent = oculto ? 'Mostrar lista completa' : 'Ocultar lista completa';
+});
 function renderPeriodsList(){
+  renderPeriodsResumen();
   const el = document.getElementById('periodsList');
   if(!STATE.index.periods || STATE.index.periods.length===0){
     el.innerHTML = '<p class="hint">No hay periodos cargados todavía.</p>';
@@ -1599,20 +1622,23 @@ function renderPeriodsList(){
    PROPINAS (registro de referencia — no afecta a ningún cálculo de esta app)
    ========================================================= */
 STATE.propinas = [];
+const NOMBRES_MES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 async function loadAndRenderPropinas(){
   try{
     const rows = await sbList('propinas', 'select=*&order=fecha.desc');
-    STATE.propinas = rows.map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), nota:r.nota }));
+    STATE.propinas = rows.map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe) }));
   }catch(e){ toast('No se pudo cargar propinas: '+e.message, true); STATE.propinas=[]; }
   renderPropinas();
 }
 function renderPropinas(){
   const tbody = document.querySelector('#tablaPropinas tbody');
   if(!tbody) return;
-  tbody.innerHTML = STATE.propinas.map(p=>`
-    <tr><td>${p.fecha}</td><td class="num">${eur(Math.round(p.importe*100))}</td><td class="hint">${p.nota||''}</td>
-    <td><button class="btn danger" data-del-propina="${p.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="4" class="hint">Sin propinas registradas todavía.</td></tr>';
+  tbody.innerHTML = STATE.propinas.map(p=>{
+    const [anio,mes] = p.fecha.split('-');
+    const etiquetaMes = NOMBRES_MES_LARGO[parseInt(mes,10)-1]+' '+anio;
+    return `<tr><td>${etiquetaMes}</td><td class="num">${eur(Math.round(p.importe*100))}</td>
+    <td><button class="btn danger" data-del-propina="${p.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+  }).join('') || '<tr><td colspan="3" class="hint">Sin propinas registradas todavía.</td></tr>';
   tbody.querySelectorAll('[data-del-propina]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar este registro de propinas?')) return;
@@ -1624,14 +1650,17 @@ function renderPropinas(){
   });
 }
 document.getElementById('propinaAddBtn').addEventListener('click', async ()=>{
-  const fecha = document.getElementById('propinaFecha').value;
+  const mes = document.getElementById('propinaMes').value;
+  const anio = document.getElementById('propinaAnio').value;
   const importe = parseFloat(document.getElementById('propinaImporte').value);
-  const nota = document.getElementById('propinaNota').value.trim();
-  if(!fecha || isNaN(importe)){ toast('Rellena fecha e importe.', true); return; }
+  if(!mes || !anio || isNaN(importe)){ toast('Elige mes, año, e indica el importe.', true); return; }
+  const fecha = anio+'-'+mes+'-01';
   try{
-    const saved = await sbInsert('propinas', { fecha, importe, nota: nota||null });
-    STATE.propinas.unshift({ id:saved.id, fecha:saved.fecha, importe:parseFloat(saved.importe), nota:saved.nota });
-    document.getElementById('propinaImporte').value=''; document.getElementById('propinaNota').value='';
+    const saved = await sbUpsert('propinas', { fecha, importe }, 'fecha');
+    STATE.propinas = STATE.propinas.filter(p=>p.fecha!==fecha);
+    STATE.propinas.unshift({ id:saved.id, fecha:saved.fecha, importe:parseFloat(saved.importe) });
+    STATE.propinas.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    document.getElementById('propinaImporte').value='';
     renderPropinas();
     toast('Guardado.');
   }catch(e){ toast('Error: '+e.message, true); }
@@ -2035,6 +2064,27 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 
 function destroyChart(id){ if(STATE.charts[id] && STATE.charts[id].destroy){ STATE.charts[id].destroy(); delete STATE.charts[id]; } }
 
+/* línea de tendencia (regresión lineal simple, mínimos cuadrados) — opcional, activable
+   gráfico a gráfico. Se guarda la preferencia por el id del <canvas>, así que se recuerda
+   aunque cambies de pestaña o recargues la página. */
+function getTendenciaHabilitada(canvasId){ return localStorage.getItem('miners_tendencia_'+canvasId)==='true'; }
+function setTendenciaHabilitada(canvasId, v){ localStorage.setItem('miners_tendencia_'+canvasId, v?'true':'false'); }
+function calcularLineaTendencia(valores){
+  const n = valores.length;
+  if(n<2) return valores.slice();
+  let sumX=0,sumY=0,sumXY=0,sumX2=0;
+  valores.forEach((y,x)=>{ sumX+=x; sumY+=y; sumXY+=x*y; sumX2+=x*x; });
+  const denom = n*sumX2 - sumX*sumX;
+  if(denom===0) return valores.map(()=>+(sumY/n).toFixed(2));
+  const pendiente = (n*sumXY - sumX*sumY) / denom;
+  const intercepto = (sumY - pendiente*sumX) / n;
+  return valores.map((_,x)=>+(pendiente*x + intercepto).toFixed(2));
+}
+function refrescarGraficoConTendencia(){
+  try{ refrescarTodosLosGraficos(); }catch(e){}
+  try{ if(typeof renderCaja==='function' && STATE.caja && STATE.caja.data) renderCaja(); }catch(e){}
+}
+
 /* crea un gráfico solo si Chart.js llegó a cargar; si no, avisa sin romper el resto de la app */
 function safeNewChart(canvasId, config){
   const canvas = document.getElementById(canvasId);
@@ -2044,6 +2094,40 @@ function safeNewChart(canvasId, config){
       canvas.insertAdjacentHTML('afterend', '<p class="hint warn">No se pudo cargar la librería de gráficos (revisa la conexión o una posible extensión que bloquee cdn.jsdelivr.net). Las tablas y la exportación siguen funcionando con normalidad.</p>');
     }
     return null;
+  }
+  // línea de tendencia: solo tiene sentido en barras/líneas con datos numéricos simples,
+  // no en tartas/donuts (proporciones, no una serie que evolucione)
+  const tipoAdmiteTendencia = config && config.type && config.type!=='doughnut' && config.type!=='pie';
+  if(tipoAdmiteTendencia && canvas && getTendenciaHabilitada(canvasId)){
+    const dsBase = config.data && config.data.datasets && config.data.datasets[0];
+    if(dsBase && Array.isArray(dsBase.data) && dsBase.data.length>=2 && dsBase.data.every(v=>typeof v==='number')){
+      config.data.datasets.push({
+        label: 'Tendencia', data: calcularLineaTendencia(dsBase.data), type:'line',
+        borderColor:'#9c8a6f', borderWidth:2, borderDash:[6,4], pointRadius:0, fill:false, order:0, tension:0
+      });
+    }
+  }
+  // botón de activar/desactivar tendencia, integrado en la esquina del contenedor del gráfico
+  // (se añade una sola vez por gráfico, aunque se vuelva a dibujar varias veces)
+  if(tipoAdmiteTendencia && canvas){
+    const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
+    if(wrap && !wrap.querySelector('[data-tendencia-toggle="'+canvasId+'"]')){
+      if(getComputedStyle(wrap).position==='static') wrap.style.position = 'relative';
+      const btn = document.createElement('button');
+      btn.className = 'btn secondary no-print';
+      btn.setAttribute('data-tendencia-toggle', canvasId);
+      btn.title = 'Mostrar u ocultar la línea de tendencia de este gráfico';
+      btn.style.cssText = 'position:absolute;top:2px;right:2px;padding:2px 7px;font-size:10px;z-index:5;opacity:.8;';
+      const activa = getTendenciaHabilitada(canvasId);
+      btn.textContent = activa ? '📈 Tendencia ✓' : '📈 Tendencia';
+      if(activa) btn.classList.remove('secondary');
+      btn.addEventListener('click', (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        setTendenciaHabilitada(canvasId, !getTendenciaHabilitada(canvasId));
+        refrescarGraficoConTendencia();
+      });
+      wrap.appendChild(btn);
+    }
   }
   try{ return new Chart(canvas, config); }
   catch(e){ console.error('Error creando gráfico '+canvasId, e); return null; }
@@ -7669,9 +7753,12 @@ document.getElementById('produccionRefreshBtn').addEventListener('click', render
 const AJUSTE_DEMANDA_FRANJAS = ['08:00-11:00','11:00-13:00','13:00-15:00','15:00-cierre'];
 async function renderAjusteDemanda(){
   const hoy = fechaLocalISO(new Date());
-  const semanaRef = isoMonday(hoy);
+  const inputRef = document.getElementById('ajusteSemanaReferenciaInput');
+  if(!inputRef.value) inputRef.value = hoy;
+  const semanaRef = isoMonday(inputRef.value);
   const finSemanaRef = (()=>{ const d=new Date(semanaRef+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
-  document.getElementById('ajusteSemanaReferencia').textContent = 'Semana del '+semanaRef+' al '+finSemanaRef+' (la semana actual)';
+  const esSemanaActual = semanaRef===isoMonday(hoy);
+  document.getElementById('ajusteSemanaReferencia').textContent = 'Semana del '+semanaRef+' al '+finSemanaRef+(esSemanaActual?' (coincide con la semana actual)':' (elegida a mano, distinta de la semana actual)');
 
   const tbody = document.querySelector('#tablaAjusteDemanda tbody');
   tbody.innerHTML = '<tr><td colspan="4" class="hint">Cargando...</td></tr>';
@@ -7695,6 +7782,7 @@ async function renderAjusteDemanda(){
     </tr>
   `).join('');
 }
+document.getElementById('ajusteSemanaReferenciaInput').addEventListener('change', renderAjusteDemanda);
 document.getElementById('ajusteGuardarBtn').addEventListener('click', async ()=>{
   const statusEl = document.getElementById('ajusteGuardarStatus');
   const btn = document.getElementById('ajusteGuardarBtn');
@@ -7747,7 +7835,15 @@ function showApp(){
   if(rendFiltroDiaTipoEl) rendFiltroDiaTipoEl.value = getRendFiltroDiaTipo();
   const hoy = fechaLocalISO(new Date());
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
-  const propinaFechaEl = document.getElementById('propinaFecha'); if(propinaFechaEl && !propinaFechaEl.value) propinaFechaEl.value = hoy;
+  const propinaAnioEl = document.getElementById('propinaAnio');
+  if(propinaAnioEl && !propinaAnioEl.dataset.cargado){
+    const anioActual = parseInt(hoy.slice(0,4),10);
+    const anios = []; for(let a=anioActual-2; a<=anioActual+1; a++) anios.push(a);
+    propinaAnioEl.innerHTML = anios.map(a=>'<option value="'+a+'" '+(a===anioActual?'selected':'')+'>'+a+'</option>').join('');
+    propinaAnioEl.dataset.cargado = '1';
+    const propinaMesEl = document.getElementById('propinaMes');
+    if(propinaMesEl) propinaMesEl.value = hoy.slice(5,7);
+  }
   const hxFechaEl = document.getElementById('hxFecha'); if(hxFechaEl && !hxFechaEl.value) hxFechaEl.value = hoy;
 }
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
