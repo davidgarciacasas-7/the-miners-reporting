@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.60</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.61</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2002,9 +2002,10 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
-    document.getElementById('pageTitle').textContent = titles[item.dataset.tab][0];
-    document.getElementById('pageSub').textContent = titles[item.dataset.tab][1];
+    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
+    const tituloActual = titles[item.dataset.tab] || [item.dataset.tab, ''];
+    document.getElementById('pageTitle').textContent = tituloActual[0];
+    document.getElementById('pageSub').textContent = tituloActual[1];
     const TABS_CON_FILTRO_GLOBAL = new Set(['ventas','tickets','productos','clientes']);
     document.getElementById('filterbar').style.display = TABS_CON_FILTRO_GLOBAL.has(item.dataset.tab) ? 'flex' : 'none';
     if(item.dataset.tab==='mermas') loadAndRenderMermas();
