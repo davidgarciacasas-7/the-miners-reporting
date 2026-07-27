@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.54</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.56</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -196,6 +196,8 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="nav-item" data-tab="costes"><span class="dot"></span>Costes</div>
     <div class="nav-item" data-tab="caja"><span class="dot"></span>Caja</div>
     <div class="nav-item" data-tab="mermas"><span class="dot"></span>Mermas</div>
+    <div class="nav-item" data-tab="produccion"><span class="dot"></span>Producción</div>
+    <div class="nav-item" data-tab="ajustedemanda"><span class="dot"></span>Ajuste de demanda</div>
     <div class="nav-item" data-tab="performance"><span class="dot"></span>Performance del equipo</div>
     <div class="nav-item" data-tab="rentabilidad"><span class="dot"></span>Rentabilidad por franja</div>
     <div class="nav-item" data-tab="rendimiento"><span class="dot"></span>Rendimiento operacional</div>
@@ -561,6 +563,37 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <p class="hint" style="margin-bottom:14px;">Categorías consideradas "bebida" (editable en Configuración): <span id="bebidaCategoriasResumen"></span>. Arrastra una tarjeta por su título (✥) para reordenarla.</p>
         <div id="perfWidgetsContainer" class="grid split"></div>
+      </div>
+
+      <!-- PRODUCCIÓN (pedido vs completado, desde la app de mermas) -->
+      <div class="tabpanel" id="tab-produccion">
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint">Compara, semana a semana y producto a producto, lo que se pidió producir (encargado desde la app de mermas/Dream Team) frente a lo que se marcó como completado ahí — la diferencia es lo que quedó pendiente.</p>
+          <div class="subfilter" style="margin-top:10px;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="produccionDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="produccionHasta"></div>
+            <button class="clear-btn" id="produccionRefreshBtn">Actualizar</button>
+          </div>
+        </div>
+        <div class="card">
+          <table id="tablaProduccion"><thead><tr><th>Semana</th><th>Producto</th><th>Pedido</th><th>Producido (completado)</th><th>Diferencia (pendiente)</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+
+      <!-- AJUSTE DE DEMANDA -->
+      <div class="tabpanel" id="tab-ajustedemanda">
+        <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;">
+          <p style="margin:0 0 8px 0;font-size:15px;"><b>Semana de referencia:</b> <span id="ajusteSemanaReferencia" style="color:var(--copper);"></span></p>
+          <p class="hint" style="margin-bottom:0;">Los porcentajes que pongas aquí se aplican, <b>tal cual y sin acumular</b>, a todas las semanas siguientes a la de referencia — no es un incremento que vaya subiendo semana a semana (no es +5% la semana que viene, +10% la de después...); es el <b>mismo ajuste fijo</b> cada vez, comparado siempre contra la semana de referencia de arriba. Un valor positivo significa que esperas consumir más de lo normal en esa franja; uno negativo, menos.</p>
+        </div>
+        <div class="card">
+          <table id="tablaAjusteDemanda">
+            <thead><tr><th>Franja</th><th>L-V (%)</th><th>Sábado (%)</th><th>Domingo (%)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button class="btn" id="ajusteGuardarBtn" style="margin-top:14px;">Guardar ajustes</button>
+          <p class="hint" id="ajusteGuardarStatus" style="margin-top:8px;"></p>
+        </div>
       </div>
 
       <!-- RENTABILIDAD POR FRANJA -->
@@ -1987,6 +2020,16 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       else { renderFacEmisorForm(); renderFacBancos(); renderFacClientes(); renderFacturasHistorico(); if(!document.getElementById('facNumero').value) sugerirNumeroFactura(); }
     }
     if(item.dataset.tab==='caja') initCajaSiHaceFalta();
+    if(item.dataset.tab==='produccion'){
+      const pDesdeInp = document.getElementById('produccionDesde'), pHastaInp = document.getElementById('produccionHasta');
+      if(!pDesdeInp.value){
+        const hoy = fechaLocalISO(new Date());
+        const hace8Semanas = (()=>{ const d=new Date(hoy+'T00:00:00'); d.setDate(d.getDate()-56); return fechaLocalISO(d); })();
+        pDesdeInp.value = hace8Semanas; pHastaInp.value = hoy;
+      }
+      renderProduccion();
+    }
+    if(item.dataset.tab==='ajustedemanda') renderAjusteDemanda();
   });
 });
 
@@ -7569,6 +7612,109 @@ document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(segSheet), 'Clientes');
 
   XLSX.writeFile(wb, 'the-miners-reporting-'+(STATE.filters.desde||'inicio')+'_'+(STATE.filters.hasta||'fin')+'.xlsx');
+});
+
+/* =========================================================
+   PRODUCCIÓN (leído de caja_storage... no, de produccion_semanal — misma
+   tabla que usa la app de mermas/Dream Team, mismo proyecto de Supabase)
+   ========================================================= */
+async function renderProduccion(){
+  const tbody = document.querySelector('#tablaProduccion tbody');
+  if(!tbody) return;
+  const desde = document.getElementById('produccionDesde').value;
+  const hasta = document.getElementById('produccionHasta').value;
+  tbody.innerHTML = '<tr><td colspan="5" class="hint">Cargando...</td></tr>';
+  try{
+    let query = 'select=week_start,producto,cantidad,completado&order=week_start.desc,producto.asc';
+    if(desde) query += '&week_start=gte.'+desde;
+    if(hasta) query += '&week_start=lte.'+hasta;
+    const rows = await sbList('produccion_semanal', query);
+    if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="5" class="hint">Sin datos de producción en este periodo (o todavía no se ha usado esa sección en la app de mermas).</td></tr>'; return; }
+
+    // agrupar por semana+producto: pedido = suma de todo lo encargado; producido = suma de lo marcado completado
+    const grupos = {};
+    rows.forEach(r=>{
+      const key = r.week_start+'|'+r.producto;
+      if(!grupos[key]) grupos[key] = { week_start:r.week_start, producto:r.producto, pedido:0, producido:0 };
+      const cant = parseFloat(r.cantidad)||0;
+      grupos[key].pedido += cant;
+      if(r.completado) grupos[key].producido += cant;
+    });
+    const filas = Object.values(grupos).sort((a,b)=> b.week_start.localeCompare(a.week_start) || a.producto.localeCompare(b.producto,'es'));
+
+    tbody.innerHTML = filas.map(f=>{
+      const fin = (()=>{ const d=new Date(f.week_start+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+      const diferencia = +(f.pedido - f.producido).toFixed(2);
+      const colorDif = diferencia>0 ? 'var(--negative)' : 'var(--positive)';
+      return `<tr>
+        <td>${f.week_start} al ${fin}</td>
+        <td>${f.producto}</td>
+        <td class="num">${f.pedido}</td>
+        <td class="num">${f.producido}</td>
+        <td class="num" style="color:${colorDif};font-weight:600;">${diferencia}</td>
+      </tr>`;
+    }).join('');
+  }catch(e){
+    tbody.innerHTML = '<tr><td colspan="5" class="hint">Error cargando: '+e.message+'</td></tr>';
+  }
+}
+document.getElementById('produccionDesde').addEventListener('change', renderProduccion);
+document.getElementById('produccionHasta').addEventListener('change', renderProduccion);
+document.getElementById('produccionRefreshBtn').addEventListener('click', renderProduccion);
+
+/* =========================================================
+   AJUSTE DE DEMANDA — % manual por franja y tipo de día, fijo respecto a la
+   semana de referencia (la actual), aplicado igual a todas las semanas siguientes
+   ========================================================= */
+const AJUSTE_DEMANDA_FRANJAS = ['08:00-11:00','11:00-13:00','13:00-15:00','15:00-cierre'];
+async function renderAjusteDemanda(){
+  const hoy = fechaLocalISO(new Date());
+  const semanaRef = isoMonday(hoy);
+  const finSemanaRef = (()=>{ const d=new Date(semanaRef+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+  document.getElementById('ajusteSemanaReferencia').textContent = 'Semana del '+semanaRef+' al '+finSemanaRef+' (la semana actual)';
+
+  const tbody = document.querySelector('#tablaAjusteDemanda tbody');
+  tbody.innerHTML = '<tr><td colspan="4" class="hint">Cargando...</td></tr>';
+  let ajustesGuardados = [];
+  try{
+    ajustesGuardados = await sbList('demanda_ajustes', 'select=*');
+  }catch(e){
+    tbody.innerHTML = '<tr><td colspan="4" class="hint">Error cargando: '+e.message+'</td></tr>';
+    return;
+  }
+  const valorGuardado = (franja, tipo) => {
+    const r = ajustesGuardados.find(x=>x.franja===franja && x.tipo_dia===tipo);
+    return r ? parseFloat(r.porcentaje) : 0;
+  };
+  tbody.innerHTML = AJUSTE_DEMANDA_FRANJAS.map(f=>`
+    <tr>
+      <td>${f}</td>
+      <td class="num"><input type="number" step="1" data-ajuste="${f}|semana" value="${valorGuardado(f,'semana')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td class="num"><input type="number" step="1" data-ajuste="${f}|sabado" value="${valorGuardado(f,'sabado')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td class="num"><input type="number" step="1" data-ajuste="${f}|domingo" value="${valorGuardado(f,'domingo')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+    </tr>
+  `).join('');
+}
+document.getElementById('ajusteGuardarBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('ajusteGuardarStatus');
+  const btn = document.getElementById('ajusteGuardarBtn');
+  const inputs = document.querySelectorAll('[data-ajuste]');
+  btn.disabled = true; statusEl.textContent = 'Guardando...';
+  let ok = 0; const errores = [];
+  for(const inp of inputs){
+    const [franja, tipoDia] = inp.getAttribute('data-ajuste').split('|');
+    const porcentaje = parseFloat(inp.value)||0;
+    try{
+      await sbUpsert('demanda_ajustes', { franja, tipo_dia:tipoDia, porcentaje }, 'franja,tipo_dia');
+      ok++;
+    }catch(e){ errores.push(franja+'/'+tipoDia+': '+e.message); }
+  }
+  if(errores.length===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente ('+ok+' de '+inputs.length+').</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+inputs.length+'. Fallos: '+errores.slice(0,3).join(' · ')+'</span>';
+  }
+  btn.disabled = false;
 });
 
 /* =========================================================
