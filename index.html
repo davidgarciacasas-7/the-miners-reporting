@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.71</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.72</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -198,6 +198,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="nav-item" data-tab="mermas"><span class="dot"></span>Mermas</div>
     <div class="nav-item" data-tab="produccion"><span class="dot"></span>Producción</div>
     <div class="nav-item" data-tab="ajustedemanda"><span class="dot"></span>Ajuste de demanda</div>
+    <div class="nav-item" data-tab="simulacion"><span class="dot"></span>Simulación</div>
     <div class="nav-item" data-tab="performance"><span class="dot"></span>Performance del equipo</div>
     <div class="nav-item" data-tab="rentabilidad"><span class="dot"></span>Rentabilidad por franja</div>
     <div class="nav-item" data-tab="rendimiento"><span class="dot"></span>Rendimiento operacional</div>
@@ -688,6 +689,33 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <button class="btn" id="ajusteGuardarBtn" style="margin-top:14px;">Guardar ajustes</button>
           <p class="hint" id="ajusteGuardarStatus" style="margin-top:8px;"></p>
         </div>
+      </div>
+
+      <!-- SIMULACIÓN -->
+      <div class="tabpanel" id="tab-simulacion">
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Simulador simple: pon unos ingresos brutos medios al mes, añade las líneas de coste que quieras (cada una como % de esos ingresos, o como un valor fijo en euros al mes), y verás el beneficio resultante al momento. Puedes guardar varias simulaciones distintas para comparar escenarios.</p>
+          <div class="field" style="max-width:260px;"><label>Ingresos brutos medios al mes (€)</label><input type="number" step="50" min="0" id="simIngresos" value="0"></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <table id="tablaSimulacion">
+            <thead><tr><th>Línea de coste</th><th>Tipo</th><th>Valor</th><th>Coste mensual</th><th></th></tr></thead>
+            <tbody id="simLineasBody"></tbody>
+          </table>
+          <button class="btn secondary" id="simAnadirLineaBtn" style="margin-top:12px;">+ Añadir línea de coste</button>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="grid kpi" id="simResultadoKpi"></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="subfilter">
+            <input type="text" id="simNombreInput" placeholder="Nombre para guardar esta simulación (ej. 'Escenario conservador')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 10px;font-size:13px;">
+            <button class="btn" id="simGuardarBtn">Guardar simulación</button>
+          </div>
+          <p class="hint" id="simGuardarStatus" style="margin-top:8px;"></p>
+        </div>
+        <div class="section-title">Simulaciones guardadas</div>
+        <div class="card"><div id="simGuardadasList"><p class="hint">Cargando...</p></div></div>
       </div>
 
       <!-- RENTABILIDAD POR FRANJA -->
@@ -2097,7 +2125,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
+    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación','Ingresos, costes y beneficio resultante, a modo de escenario'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
     const tituloActual = titles[item.dataset.tab] || [item.dataset.tab, ''];
     document.getElementById('pageTitle').textContent = tituloActual[0];
     document.getElementById('pageSub').textContent = tituloActual[1];
@@ -2162,6 +2190,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       renderHorneadoRegistros();
     }
     if(item.dataset.tab==='ajustedemanda') renderAjusteDemanda();
+    if(item.dataset.tab==='simulacion') initSimulacion();
   });
 });
 
@@ -8649,6 +8678,133 @@ document.getElementById('ajusteGuardarBtn').addEventListener('click', async ()=>
   }
   btn.disabled = false;
 });
+
+/* =========================================================
+   SIMULACIÓN — ingresos + líneas de coste (% o € fijo) -> beneficio
+   ========================================================= */
+STATE.simLineas = null; // se inicializa la primera vez que se entra en la pestaña
+let simIdCounter = 0;
+function simLineasPorDefecto(){
+  return [
+    { id:'s'+(simIdCounter++), nombre:'Personal', tipo:'pct', valor:30 },
+    { id:'s'+(simIdCounter++), nombre:'COGS (coste de producto)', tipo:'pct', valor:28 },
+    { id:'s'+(simIdCounter++), nombre:'Royalties', tipo:'pct', valor:5 },
+  ];
+}
+async function initSimulacion(){
+  if(!STATE.simLineas) STATE.simLineas = simLineasPorDefecto();
+  renderSimLineas();
+  await renderSimGuardadas();
+}
+function renderSimLineas(){
+  const tbody = document.getElementById('simLineasBody');
+  const ingresos = parseFloat(document.getElementById('simIngresos').value)||0;
+  tbody.innerHTML = STATE.simLineas.map(l=>{
+    const costeMensual = l.tipo==='pct' ? ingresos*(l.valor/100) : l.valor;
+    return `<tr>
+      <td><input type="text" data-sim-nombre="${l.id}" value="${l.nombre.replace(/"/g,'&quot;')}" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;"></td>
+      <td><select data-sim-tipo="${l.id}"><option value="pct" ${l.tipo==='pct'?'selected':''}>% de ingresos</option><option value="fijo" ${l.tipo==='fijo'?'selected':''}>€ fijo/mes</option></select></td>
+      <td class="num"><input type="number" step="0.5" data-sim-valor="${l.id}" value="${l.valor}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td class="num">${eur(Math.round(costeMensual*100))}</td>
+      <td><button class="btn danger" data-sim-quitar="${l.id}" style="padding:3px 8px;font-size:11px;">✕</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="hint">Sin líneas de coste todavía.</td></tr>';
+
+  tbody.querySelectorAll('[data-sim-nombre]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const l = STATE.simLineas.find(x=>x.id===inp.getAttribute('data-sim-nombre'));
+      if(l){ l.nombre = inp.value; }
+    });
+  });
+  tbody.querySelectorAll('[data-sim-tipo]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      const l = STATE.simLineas.find(x=>x.id===sel.getAttribute('data-sim-tipo'));
+      if(l){ l.tipo = sel.value; renderSimLineas(); calcularSimulacionResultado(); }
+    });
+  });
+  tbody.querySelectorAll('[data-sim-valor]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const l = STATE.simLineas.find(x=>x.id===inp.getAttribute('data-sim-valor'));
+      if(l){ l.valor = parseFloat(inp.value)||0; renderSimLineas(); calcularSimulacionResultado(); }
+    });
+  });
+  tbody.querySelectorAll('[data-sim-quitar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      STATE.simLineas = STATE.simLineas.filter(x=>x.id!==btn.getAttribute('data-sim-quitar'));
+      renderSimLineas(); calcularSimulacionResultado();
+    });
+  });
+  calcularSimulacionResultado();
+}
+function calcularSimulacionResultado(){
+  const ingresos = parseFloat(document.getElementById('simIngresos').value)||0;
+  let totalCostes = 0;
+  STATE.simLineas.forEach(l=>{ totalCostes += l.tipo==='pct' ? ingresos*(l.valor/100) : l.valor; });
+  const beneficio = ingresos - totalCostes;
+  const margen = ingresos>0 ? (beneficio/ingresos*100) : 0;
+  document.getElementById('simResultadoKpi').innerHTML = `
+    <div class="stub"><div class="label">Ingresos</div><div class="value">${eur(Math.round(ingresos*100))}</div></div>
+    <div class="stub"><div class="label">Total costes</div><div class="value">${eur(Math.round(totalCostes*100))}</div></div>
+    <div class="stub"><div class="label">Beneficio mensual</div><div class="value" style="color:${beneficio>=0?'var(--positive)':'var(--negative)'}">${eur(Math.round(beneficio*100))}</div></div>
+    <div class="stub"><div class="label">Margen</div><div class="value" style="color:${beneficio>=0?'var(--positive)':'var(--negative)'}">${margen.toFixed(1)}%</div></div>
+  `;
+}
+document.getElementById('simIngresos').addEventListener('input', ()=>{ renderSimLineas(); });
+document.getElementById('simAnadirLineaBtn').addEventListener('click', ()=>{
+  STATE.simLineas.push({ id:'s'+(simIdCounter++), nombre:'Nueva línea', tipo:'pct', valor:0 });
+  renderSimLineas();
+});
+document.getElementById('simGuardarBtn').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('simNombreInput').value.trim();
+  const statusEl = document.getElementById('simGuardarStatus');
+  if(!nombre){ statusEl.innerHTML = '<span style="color:var(--negative)">Ponle un nombre a la simulación antes de guardar.</span>'; return; }
+  const ingresos = parseFloat(document.getElementById('simIngresos').value)||0;
+  try{
+    await sbInsert('simulaciones', { nombre, ingresos_mensuales: ingresos, lineas: STATE.simLineas.map(l=>({nombre:l.nombre, tipo:l.tipo, valor:l.valor})) });
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardada ✓</span>';
+    document.getElementById('simNombreInput').value = '';
+    await renderSimGuardadas();
+  }catch(e){ statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>'; }
+});
+async function renderSimGuardadas(){
+  const el = document.getElementById('simGuardadasList');
+  el.innerHTML = '<p class="hint">Cargando...</p>';
+  try{
+    const rows = await sbList('simulaciones', 'select=*&order=created_at.desc');
+    if(rows.length===0){ el.innerHTML = '<p class="hint">Sin simulaciones guardadas todavía.</p>'; return; }
+    el.innerHTML = rows.map(r=>{
+      const totalCostes = (r.lineas||[]).reduce((s,l)=> s + (l.tipo==='pct' ? parseFloat(r.ingresos_mensuales)*(l.valor/100) : l.valor), 0);
+      const beneficio = parseFloat(r.ingresos_mensuales) - totalCostes;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);">
+        <div>
+          <b>${r.nombre}</b>
+          <div class="hint">Ingresos ${eur(Math.round(parseFloat(r.ingresos_mensuales)*100))} · ${(r.lineas||[]).length} línea(s) de coste · Beneficio <span style="color:${beneficio>=0?'var(--positive)':'var(--negative)'}">${eur(Math.round(beneficio*100))}</span></div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn secondary" data-sim-cargar="${r.id}" style="padding:4px 10px;font-size:11px;">Cargar</button>
+          <button class="btn danger" data-sim-borrar="${r.id}" style="padding:4px 10px;font-size:11px;">Borrar</button>
+        </div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-sim-cargar]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const r = rows.find(x=>x.id===btn.getAttribute('data-sim-cargar'));
+        if(!r) return;
+        document.getElementById('simIngresos').value = r.ingresos_mensuales;
+        STATE.simLineas = (r.lineas||[]).map(l=>({ id:'s'+(simIdCounter++), nombre:l.nombre, tipo:l.tipo, valor:l.valor }));
+        renderSimLineas();
+        toast('Simulación "'+r.nombre+'" cargada.');
+      });
+    });
+    el.querySelectorAll('[data-sim-borrar]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if(!confirm('¿Borrar esta simulación guardada?')) return;
+        await sbDelete('simulaciones', btn.getAttribute('data-sim-borrar'));
+        await renderSimGuardadas();
+      });
+    });
+  }catch(e){ el.innerHTML = '<p class="hint">Error cargando: '+e.message+'</p>'; }
+}
 
 /* =========================================================
    LOGIN / LOGOUT
