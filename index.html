@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.61</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.62</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -567,6 +567,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
       <!-- PRODUCCIÓN (pedido vs completado, desde la app de mermas) -->
       <div class="tabpanel" id="tab-produccion">
+        <div class="section-title">Producción en cocina</div>
         <div class="card" style="margin-bottom:14px;">
           <p class="hint">Compara, semana a semana y producto a producto, lo que se pidió producir (encargado desde la app de mermas/Dream Team) frente a lo que se marcó como completado ahí — la diferencia es lo que quedó pendiente.</p>
           <p class="hint">Se aconseja elegir un rango que empiece en <b>lunes</b> y termine en <b>domingo</b> (por ejemplo, aunque sea un lunes y el domingo de cinco semanas después) — así cada fila de la tabla corresponde a una semana completa, sin cortar ninguna por la mitad.</p>
@@ -576,8 +577,21 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <button class="clear-btn" id="produccionRefreshBtn">Actualizar</button>
           </div>
         </div>
-        <div class="card">
+        <div class="card" style="margin-bottom:26px;">
           <table id="tablaProduccion"><thead><tr><th>Semana</th><th>Producto</th><th>Pedido</th><th>Producido (completado)</th><th>Diferencia (pendiente)</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="section-title">Horneado</div>
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint">Cada vez que un empleado confirma en la app de mermas cuánto ha horneado de verdad (tras ver la previsión de la sección Horneado), queda registrado aquí — fecha, hora, producto y cantidad exactas.</p>
+          <div class="subfilter" style="margin-top:10px;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="horneadoRegDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="horneadoRegHasta"></div>
+            <button class="clear-btn" id="horneadoRegRefreshBtn">Actualizar</button>
+          </div>
+        </div>
+        <div class="card">
+          <table id="tablaHorneadoRegistros"><thead><tr><th>Fecha</th><th>Hora</th><th>Producto</th><th>Cantidad horneada</th></tr></thead><tbody></tbody></table>
         </div>
       </div>
 
@@ -2058,6 +2072,13 @@ document.querySelectorAll('.nav-item').forEach(item=>{
         pDesdeInp.value = hace8Semanas; pHastaInp.value = hoy;
       }
       renderProduccion();
+      const hDesdeInp = document.getElementById('horneadoRegDesde'), hHastaInp = document.getElementById('horneadoRegHasta');
+      if(!hDesdeInp.value){
+        const hoy = fechaLocalISO(new Date());
+        const hace8Semanas = (()=>{ const d=new Date(hoy+'T00:00:00'); d.setDate(d.getDate()-56); return fechaLocalISO(d); })();
+        hDesdeInp.value = hace8Semanas; hHastaInp.value = hoy;
+      }
+      renderHorneadoRegistros();
     }
     if(item.dataset.tab==='ajustedemanda') renderAjusteDemanda();
   });
@@ -7746,6 +7767,27 @@ async function renderProduccion(){
 document.getElementById('produccionDesde').addEventListener('change', renderProduccion);
 document.getElementById('produccionHasta').addEventListener('change', renderProduccion);
 document.getElementById('produccionRefreshBtn').addEventListener('click', renderProduccion);
+
+async function renderHorneadoRegistros(){
+  const tbody = document.querySelector('#tablaHorneadoRegistros tbody');
+  if(!tbody) return;
+  const desde = document.getElementById('horneadoRegDesde').value;
+  const hasta = document.getElementById('horneadoRegHasta').value;
+  tbody.innerHTML = '<tr><td colspan="4" class="hint">Cargando...</td></tr>';
+  try{
+    let query = 'select=fecha,hora,producto,cantidad&order=fecha.desc,hora.desc';
+    if(desde) query += '&fecha=gte.'+desde;
+    if(hasta) query += '&fecha=lte.'+hasta;
+    const rows = await sbList('horneado_registros', query);
+    if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="4" class="hint">Sin horneados registrados en este periodo (o todavía no se ha confirmado ninguno desde la app de mermas).</td></tr>'; return; }
+    tbody.innerHTML = rows.map(r=>`<tr><td>${r.fecha}</td><td>${r.hora.slice(0,5)}</td><td>${r.producto}</td><td class="num">${parseFloat(r.cantidad)}</td></tr>`).join('');
+  }catch(e){
+    tbody.innerHTML = '<tr><td colspan="4" class="hint">Error cargando: '+e.message+'</td></tr>';
+  }
+}
+document.getElementById('horneadoRegDesde').addEventListener('change', renderHorneadoRegistros);
+document.getElementById('horneadoRegHasta').addEventListener('change', renderHorneadoRegistros);
+document.getElementById('horneadoRegRefreshBtn').addEventListener('click', renderHorneadoRegistros);
 
 /* =========================================================
    AJUSTE DE DEMANDA — % manual por franja y tipo de día, fijo respecto a la
