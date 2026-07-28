@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.72</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.73</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8705,7 +8705,7 @@ function renderSimLineas(){
       <td><input type="text" data-sim-nombre="${l.id}" value="${l.nombre.replace(/"/g,'&quot;')}" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;"></td>
       <td><select data-sim-tipo="${l.id}"><option value="pct" ${l.tipo==='pct'?'selected':''}>% de ingresos</option><option value="fijo" ${l.tipo==='fijo'?'selected':''}>€ fijo/mes</option></select></td>
       <td class="num"><input type="number" step="0.5" data-sim-valor="${l.id}" value="${l.valor}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num">${eur(Math.round(costeMensual*100))}</td>
+      <td class="num" data-sim-coste-mensual="${l.id}">${eur(Math.round(costeMensual*100))}</td>
       <td><button class="btn danger" data-sim-quitar="${l.id}" style="padding:3px 8px;font-size:11px;">✕</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" class="hint">Sin líneas de coste todavía.</td></tr>';
@@ -8719,20 +8719,35 @@ function renderSimLineas(){
   tbody.querySelectorAll('[data-sim-tipo]').forEach(sel=>{
     sel.addEventListener('change', ()=>{
       const l = STATE.simLineas.find(x=>x.id===sel.getAttribute('data-sim-tipo'));
-      if(l){ l.tipo = sel.value; renderSimLineas(); calcularSimulacionResultado(); }
+      if(l){ l.tipo = sel.value; renderSimLineas(); }
     });
   });
   tbody.querySelectorAll('[data-sim-valor]').forEach(inp=>{
+    // OJO: nunca reconstruir toda la tabla aquí (mientras se escribe tecla a tecla) — eso
+    // recrea el propio <input> en el que se está escribiendo y le quita el foco/cursor,
+    // dando la sensación de que "no deja escribir números". Solo se actualiza el texto
+    // de la celda de coste y el resumen, sin tocar los campos de entrada.
     inp.addEventListener('input', ()=>{
       const l = STATE.simLineas.find(x=>x.id===inp.getAttribute('data-sim-valor'));
-      if(l){ l.valor = parseFloat(inp.value)||0; renderSimLineas(); calcularSimulacionResultado(); }
+      if(l){ l.valor = parseFloat(inp.value)||0; actualizarSimCostesMensuales(); }
     });
   });
   tbody.querySelectorAll('[data-sim-quitar]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       STATE.simLineas = STATE.simLineas.filter(x=>x.id!==btn.getAttribute('data-sim-quitar'));
-      renderSimLineas(); calcularSimulacionResultado();
+      renderSimLineas();
     });
+  });
+  calcularSimulacionResultado();
+}
+/* actualiza solo el texto de "coste mensual" de cada línea y el resumen — sin tocar los
+   <input> en los que el usuario puede estar escribiendo en ese momento */
+function actualizarSimCostesMensuales(){
+  const ingresos = parseFloat(document.getElementById('simIngresos').value)||0;
+  STATE.simLineas.forEach(l=>{
+    const costeMensual = l.tipo==='pct' ? ingresos*(l.valor/100) : l.valor;
+    const celda = document.querySelector('[data-sim-coste-mensual="'+l.id+'"]');
+    if(celda) celda.textContent = eur(Math.round(costeMensual*100));
   });
   calcularSimulacionResultado();
 }
@@ -8749,7 +8764,7 @@ function calcularSimulacionResultado(){
     <div class="stub"><div class="label">Margen</div><div class="value" style="color:${beneficio>=0?'var(--positive)':'var(--negative)'}">${margen.toFixed(1)}%</div></div>
   `;
 }
-document.getElementById('simIngresos').addEventListener('input', ()=>{ renderSimLineas(); });
+document.getElementById('simIngresos').addEventListener('input', ()=>{ actualizarSimCostesMensuales(); });
 document.getElementById('simAnadirLineaBtn').addEventListener('click', ()=>{
   STATE.simLineas.push({ id:'s'+(simIdCounter++), nombre:'Nueva línea', tipo:'pct', valor:0 });
   renderSimLineas();
