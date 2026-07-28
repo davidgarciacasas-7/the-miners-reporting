@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.63</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.71</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -285,6 +285,42 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="card"><h3>Ventas brutas por franja horaria</h3><div class="chart-wrap"><canvas id="chartFranjaVentas"></canvas></div></div>
           <div class="card"><h3>Ventas por día de la semana</h3><div class="chart-wrap"><canvas id="chartDiaSemanaVentas"></canvas></div></div>
         </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Tendencia de ventas por día de la semana</span>
+          <select id="ventasTendenciaGranularidad"><option value="mes" selected>Mensual</option><option value="semana">Semanal</option></select>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Cómo evolucionan las ventas de cada día de la semana a lo largo del tiempo.</p>
+        <div class="card" style="margin-bottom:6px;position:relative;">
+          <button class="btn secondary no-print" id="ventasTendenciaDiaFiltroBtn" style="padding:4px 10px;font-size:11px;margin-bottom:8px;">Elegir días a mostrar</button>
+          <div id="ventasTendenciaDiaFiltroMenu" style="display:none;position:absolute;top:40px;left:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:200px;max-height:260px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+          <div class="chart-wrap"><canvas id="chartVentasTendenciaDia"></canvas></div>
+        </div>
+
+        <div class="section-title">Tendencia de ventas por franja horaria</div>
+        <p class="hint" style="margin-bottom:8px;">Cómo evolucionan las ventas de cada franja horaria a lo largo del tiempo (misma granularidad de arriba).</p>
+        <div class="card" style="margin-bottom:6px;position:relative;">
+          <button class="btn secondary no-print" id="ventasTendenciaFranjaFiltroBtn" style="padding:4px 10px;font-size:11px;margin-bottom:8px;">Elegir franjas a mostrar</button>
+          <div id="ventasTendenciaFranjaFiltroMenu" style="display:none;position:absolute;top:40px;left:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:200px;max-height:260px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+          <div class="chart-wrap"><canvas id="chartVentasTendenciaFranja"></canvas></div>
+        </div>
+
+        <div class="section-title">Tendencia combinada: días + franjas a tu elección</div>
+        <p class="hint" style="margin-bottom:8px;">Elige qué días de la semana y qué franjas horarias quieres combinar (puede ser toda la semana y todas las franjas) — el gráfico suma esa combinación exacta y muestra su evolución en el tiempo.</p>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div style="position:relative;">
+              <button class="btn secondary" id="ventasComboDiasBtn" style="padding:5px 12px;font-size:12px;">Días incluidos</button>
+              <div id="ventasComboDiasMenu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:200px;max-height:260px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+            </div>
+            <div style="position:relative;">
+              <button class="btn secondary" id="ventasComboFranjasBtn" style="padding:5px 12px;font-size:12px;">Franjas incluidas</button>
+              <div id="ventasComboFranjasMenu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:200px;max-height:260px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+            </div>
+          </div>
+          <p class="hint" id="ventasComboResumen" style="margin-bottom:10px;"></p>
+          <div class="chart-wrap"><canvas id="chartVentasCombo"></canvas></div>
+        </div>
       </div>
 
       <!-- TICKETS -->
@@ -298,10 +334,28 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           </div>
         </div>
         <div class="card"><div class="chart-wrap tall"><canvas id="chartPeriodoTickets"></canvas></div></div>
+
+        <div class="section-title">Ticket medio por periodo</div>
+        <p class="hint" style="margin-bottom:8px;">Evolución del ticket medio total (sin dividir por franja) — usa la misma granularidad de arriba.</p>
+        <div class="card"><div class="chart-wrap tall"><canvas id="chartPeriodoTicketMedio"></canvas></div></div>
+
         <div class="grid two" style="margin-top:14px;">
           <div class="card"><h3>Nº de tickets por franja horaria</h3><div class="chart-wrap"><canvas id="chartFranjaTickets"></canvas></div></div>
           <div class="card"><h3>Ticket medio por franja horaria</h3><div class="chart-wrap"><canvas id="chartFranjaTicket"></canvas></div></div>
         </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Evolución por franja horaria</span>
+          <div style="display:flex;gap:8px;align-items:center;position:relative;">
+            <select id="ticketsEvolGranularidad"><option value="semana" selected>Semanal</option><option value="mes">Mensual</option></select>
+            <button class="btn secondary" id="ticketsEvolFiltroFranjasBtn" style="padding:5px 12px;font-size:12px;">Filtrar franjas</button>
+            <div id="ticketsEvolFiltroFranjasMenu" style="display:none;position:absolute;top:100%;right:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Cómo evoluciona cada franja horaria a lo largo del tiempo — usa "Filtrar franjas" para elegir cuáles ver, si salen demasiadas a la vez.</p>
+        <div class="card" style="margin-bottom:14px;"><h3>Nº de tickets — evolución</h3><div class="chart-wrap"><canvas id="chartTicketsEvolFranjaN"></canvas></div></div>
+        <div class="card"><h3>Ticket medio — evolución</h3><div class="chart-wrap"><canvas id="chartTicketsEvolFranjaMedio"></canvas></div></div>
+
         <div class="section-title">Detalle por franja</div>
         <div class="card"><table id="tablaFranjas"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>Ventas netas</th><th>Nº tickets</th><th>Ticket medio</th></tr></thead><tbody></tbody></table></div>
       </div>
@@ -329,6 +383,23 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <button class="btn secondary" id="categoriaGruposGuardarBtn" style="margin-top:10px;">Guardar reagrupación</button>
           <p class="hint" id="categoriaGruposStatus" style="margin-top:8px;"></p>
         </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Tendencia de ventas por categoría</span>
+          <select id="productosGranularidad"><option value="mes" selected>Mensual</option><option value="semana">Semanal</option></select>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Evolución de ventas brutas de cada categoría, dentro del periodo Desde/Hasta de arriba. Usa las categorías ya reagrupadas si has definido alguna arriba.</p>
+        <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartCategoriasTendencia"></canvas></div></div>
+
+        <div class="section-title">Tendencia de ventas por producto</div>
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Elige uno o varios productos (del periodo Desde/Hasta de arriba) para ver su evolución de ventas — sin elegir ninguno, no se dibuja nada, para no saturar el gráfico con cientos de productos a la vez.</p>
+          <div class="subfilter">
+            <select id="productoTendenciaAddSelect"><option value="">+ Añadir producto...</option></select>
+          </div>
+          <div id="productosTendenciaChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+        </div>
+        <div class="card"><div class="chart-wrap"><canvas id="chartProductosTendencia"></canvas></div></div>
       </div>
 
       <!-- CLIENTES -->
@@ -385,6 +456,13 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <p class="hint" style="margin-top:10px;">El periodo Desde/Hasta se ajusta siempre a meses completos (en vista Mensual) o semanas completas (en vista Semanal) — elige cualquier día dentro del primer y el último mes/semana que quieras ver.</p>
         <p class="hint">Formato de importación CSV (una fila por importe/periodo): columnas <code>Nombre,Tipo,Fecha_inicio,Fecha_fin,Importe</code> — Tipo debe ser <code>ingreso</code> o <code>coste</code>, fechas en formato AAAA-MM-DD.</p>
         <p class="hint">Formato "Importar mi propio PNL" (tu hoja habitual, una columna por mes): cabecera <code>Nombre,Tipo,2026-01,2026-02,2026-03...</code> (los meses en formato AAAA-MM) y una fila por cada línea de tu PNL, con el importe de cada mes en su columna. Se crean las líneas que falten automáticamente.</p>
+
+        <div class="section-title">Evolución de una línea del PNL</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="field"><label>Qué línea mostrar</label><select id="pnlGraficoLineaSelect"></select></div>
+          <p class="hint">Usa el mismo periodo y granularidad (mensual/semanal) que la tabla de arriba. Por defecto sale "Resultado" — algunos lo llaman EBITDA — pero puedes elegir cualquier línea del PNL, incluidas las de Total ingresos y Total costes.</p>
+        </div>
+        <div class="card"><div class="chart-wrap"><canvas id="chartPnlLinea"></canvas></div></div>
       </div>
 
       <!-- COSTES / COGS -->
@@ -1595,10 +1673,13 @@ function renderPeriodsResumen(){
   const n = STATE.index.periods.length;
   el.innerHTML = '📅 Datos cargados desde <b>'+desde+'</b> hasta <b>'+hasta+'</b> ('+n+' archivo'+(n!==1?'s':'')+' subido'+(n!==1?'s':'')+').';
 }
+let periodsListaVisible = false;
 document.getElementById('periodsToggleBtn').addEventListener('click', ()=>{
+  periodsListaVisible = !periodsListaVisible;
   const listEl = document.getElementById('periodsList');
-  const oculto = listEl.classList.toggle('hidden');
-  document.getElementById('periodsToggleBtn').textContent = oculto ? 'Mostrar lista completa' : 'Ocultar lista completa';
+  if(periodsListaVisible){ listEl.classList.remove('hidden'); }
+  else { listEl.classList.add('hidden'); }
+  document.getElementById('periodsToggleBtn').textContent = periodsListaVisible ? 'Ocultar lista completa' : 'Mostrar lista completa';
 });
 function renderPeriodsList(){
   renderPeriodsResumen();
@@ -2195,6 +2276,14 @@ function getPnlHiddenRows(){
   return new Set();
 }
 function setPnlHiddenRows(set){ localStorage.setItem('miners_pnl_hidden_rows', JSON.stringify([...set])); }
+/* nombres editables de las 3 filas de totales (Total ingresos / Total costes / Resultado)
+   — no son líneas reales de la base de datos, así que el nombre se guarda aparte */
+function getPnlEtiquetasTotales(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_pnl_etiquetas_totales')); if(v && typeof v==='object') return v; }catch(e){}
+  return {};
+}
+function setPnlEtiquetasTotales(obj){ localStorage.setItem('miners_pnl_etiquetas_totales', JSON.stringify(obj)); }
+function pnlEtiquetaTotal(clave, porDefecto){ return getPnlEtiquetasTotales()[clave] || porDefecto; }
 function renderPnlHiddenRowsInfo(){
   const el = document.getElementById('pnlHiddenRowsInfo');
   if(!el) return;
@@ -2368,6 +2457,87 @@ document.getElementById('rendFiltroFranjasBtn').addEventListener('click', ()=>{
   if(abrir) renderRendFiltroFranjasMenu();
   menu.style.display = abrir ? 'block' : 'none';
 });
+/* filtro de franjas para los gráficos de evolución de la pestaña Tickets */
+function getTicketsEvolFranjasOcultas(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_tickets_evol_franjas_ocultas')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setTicketsEvolFranjasOcultas(set){ localStorage.setItem('miners_tickets_evol_franjas_ocultas', JSON.stringify([...set])); }
+function renderTicketsEvolFiltroFranjasMenu(){
+  const menu = document.getElementById('ticketsEvolFiltroFranjasMenu');
+  if(!menu) return;
+  const franjas = franjaOrderFor(STATE.filters.franjaTipo);
+  const ocultas = getTicketsEvolFranjasOcultas();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en los gráficos:</div>` +
+    franjas.map(f=>{
+      const visible = !ocultas.has(f);
+      return `<div data-toggle-tickets-evol-franja="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${f}</span>
+      </div>`;
+    }).join('') +
+    `<div data-tickets-evol-marcar-todas="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todas</div>`;
+  menu.querySelectorAll('[data-toggle-tickets-evol-franja]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-tickets-evol-franja');
+      const o = getTicketsEvolFranjasOcultas();
+      if(o.has(f)) o.delete(f); else o.add(f);
+      setTicketsEvolFranjasOcultas(o);
+      renderTicketsEvolFiltroFranjasMenu();
+      const {lines,tickets}=currentDataset(); renderTickets(lines,tickets);
+    });
+  });
+  const marcarTodas = menu.querySelector('[data-tickets-evol-marcar-todas]');
+  if(marcarTodas) marcarTodas.addEventListener('click', ()=>{
+    setTicketsEvolFranjasOcultas(new Set());
+    renderTicketsEvolFiltroFranjasMenu();
+    const {lines,tickets}=currentDataset(); renderTickets(lines,tickets);
+  });
+}
+document.getElementById('ticketsEvolFiltroFranjasBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('ticketsEvolFiltroFranjasMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderTicketsEvolFiltroFranjasMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
+document.getElementById('ticketsEvolGranularidad').addEventListener('change', ()=>{ const {lines,tickets}=currentDataset(); renderTickets(lines,tickets); });
+/* filtro de franjas para los widgets "Evolución por franja" de Performance del equipo —
+   un único ajuste compartido por todos los widgets de este tipo (L-V y S-D, nº y %),
+   igual que en Rentabilidad/Rendimiento */
+function getPerfEvolFranjasOcultas(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_perf_evol_franjas_ocultas')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setPerfEvolFranjasOcultas(set){ localStorage.setItem('miners_perf_evol_franjas_ocultas', JSON.stringify([...set])); }
+function renderPerfEvolFiltroFranjasMenu(instanceId){
+  const menu = document.getElementById('perfEvolFiltroMenu_'+instanceId);
+  if(!menu) return;
+  const franjas = franjaOrderNegocioFiltrado();
+  const ocultas = getPerfEvolFranjasOcultas();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en el gráfico:</div>` +
+    franjas.map(f=>{
+      const visible = !ocultas.has(f);
+      return `<div data-toggle-perf-evol-franja="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${f}</span>
+      </div>`;
+    }).join('') +
+    `<div data-perf-evol-marcar-todas="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todas</div>`;
+  menu.querySelectorAll('[data-toggle-perf-evol-franja]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-perf-evol-franja');
+      const o = getPerfEvolFranjasOcultas();
+      if(o.has(f)) o.delete(f); else o.add(f);
+      setPerfEvolFranjasOcultas(o);
+      renderPerformanceEquipo();
+    });
+  });
+  const marcarTodas = menu.querySelector('[data-perf-evol-marcar-todas]');
+  if(marcarTodas) marcarTodas.addEventListener('click', ()=>{
+    setPerfEvolFranjasOcultas(new Set());
+    renderPerformanceEquipo();
+  });
+}
 function setShowDataLabels(v){
   localStorage.setItem('miners_show_datalabels', v?'true':'false');
   if(window.Chart && Chart.defaults.plugins && Chart.defaults.plugins.datalabels) Chart.defaults.plugins.datalabels.display = v;
@@ -2481,7 +2651,260 @@ function renderVentas(lines, tickets){
     ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:metricAxisCallback(true)}, grid:{color:c.grid} } } }
   });
+
+  renderVentasTendenciaDia(lines);
+  renderVentasTendenciaFranja(lines);
+  renderVentasCombo(lines);
 }
+document.getElementById('ventasTendenciaGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderVentasTendenciaDia(lines); renderVentasTendenciaFranja(lines); renderVentasCombo(lines); });
+
+const DOW_ORDEN_COMPLETO = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+/* --- Tendencia por día de la semana (filtrable) --- */
+function getVentasTendenciaDiasOcultos(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_ventas_tendencia_dias_ocultos')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setVentasTendenciaDiasOcultos(set){ localStorage.setItem('miners_ventas_tendencia_dias_ocultos', JSON.stringify([...set])); }
+function renderVentasTendenciaDia(lines){
+  const canvas = document.getElementById('chartVentasTendenciaDia');
+  if(!canvas) return;
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  if(!desde || !hasta){ destroyChart('ventasTendenciaDia'); return; }
+  const gran = document.getElementById('ventasTendenciaGranularidad').value;
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const ocultos = getVentasTendenciaDiasOcultos();
+  const dias = DOW_ORDEN_COMPLETO.filter(d=>!ocultos.has(d));
+  const porDiaBucket = {}; dias.forEach(d=>{ porDiaBucket[d]={}; buckets.forEach(b=>porDiaBucket[d][b.label]=0); });
+  lines.forEach(l=>{
+    if(!porDiaBucket[l.diaSemana]) return;
+    const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+    if(b) porDiaBucket[l.diaSemana][b.label] += l.bruto;
+  });
+  const c = chartColors();
+  const datasets = dias.map((d,i)=>{
+    const color = FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length];
+    return trendDataset(d, buckets.map(b=>+(porDiaBucket[d][b.label]/100).toFixed(2)), color);
+  });
+  destroyChart('ventasTendenciaDia');
+  STATE.charts.ventasTendenciaDia = safeNewChart('chartVentasTendenciaDia', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+function renderVentasTendenciaDiaFiltroMenu(){
+  const menu = document.getElementById('ventasTendenciaDiaFiltroMenu');
+  const ocultos = getVentasTendenciaDiasOcultos();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en el gráfico:</div>` +
+    DOW_ORDEN_COMPLETO.map(d=>{
+      const visible = !ocultos.has(d);
+      return `<div data-toggle-ventas-tendencia-dia="${d}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${d}</span>
+      </div>`;
+    }).join('') +
+    `<div data-ventas-tendencia-dia-todos="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todos</div>`;
+  menu.querySelectorAll('[data-toggle-ventas-tendencia-dia]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const d = div.getAttribute('data-toggle-ventas-tendencia-dia');
+      const o = getVentasTendenciaDiasOcultos();
+      if(o.has(d)) o.delete(d); else o.add(d);
+      setVentasTendenciaDiasOcultos(o);
+      renderVentasTendenciaDiaFiltroMenu();
+      const {lines}=currentDataset(); renderVentasTendenciaDia(lines);
+    });
+  });
+  const todos = menu.querySelector('[data-ventas-tendencia-dia-todos]');
+  if(todos) todos.addEventListener('click', ()=>{
+    setVentasTendenciaDiasOcultos(new Set());
+    renderVentasTendenciaDiaFiltroMenu();
+    const {lines}=currentDataset(); renderVentasTendenciaDia(lines);
+  });
+}
+document.getElementById('ventasTendenciaDiaFiltroBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('ventasTendenciaDiaFiltroMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderVentasTendenciaDiaFiltroMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
+
+/* --- Tendencia por franja horaria (filtrable) --- */
+function getVentasTendenciaFranjasOcultas(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_ventas_tendencia_franjas_ocultas')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setVentasTendenciaFranjasOcultas(set){ localStorage.setItem('miners_ventas_tendencia_franjas_ocultas', JSON.stringify([...set])); }
+function renderVentasTendenciaFranja(lines){
+  const canvas = document.getElementById('chartVentasTendenciaFranja');
+  if(!canvas) return;
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  if(!desde || !hasta){ destroyChart('ventasTendenciaFranja'); return; }
+  const gran = document.getElementById('ventasTendenciaGranularidad').value;
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const franjaOrderCompleto = franjaOrderFor(STATE.filters.franjaTipo);
+  const ocultas = getVentasTendenciaFranjasOcultas();
+  const franjas = franjaOrderCompleto.filter(f=>!ocultas.has(f));
+  const porFranjaBucket = {}; franjas.forEach(f=>{ porFranjaBucket[f]={}; buckets.forEach(b=>porFranjaBucket[f][b.label]=0); });
+  lines.forEach(l=>{
+    if(!porFranjaBucket[l.franja]) return;
+    const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+    if(b) porFranjaBucket[l.franja][b.label] += l.bruto;
+  });
+  const c = chartColors();
+  const datasets = franjas.map((f,i)=>{
+    const color = FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length];
+    return trendDataset(f, buckets.map(b=>+(porFranjaBucket[f][b.label]/100).toFixed(2)), color);
+  });
+  destroyChart('ventasTendenciaFranja');
+  STATE.charts.ventasTendenciaFranja = safeNewChart('chartVentasTendenciaFranja', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+function renderVentasTendenciaFranjaFiltroMenu(){
+  const menu = document.getElementById('ventasTendenciaFranjaFiltroMenu');
+  const franjaOrderCompleto = franjaOrderFor(STATE.filters.franjaTipo);
+  const ocultas = getVentasTendenciaFranjasOcultas();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en el gráfico:</div>` +
+    franjaOrderCompleto.map(f=>{
+      const visible = !ocultas.has(f);
+      return `<div data-toggle-ventas-tendencia-franja="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${f}</span>
+      </div>`;
+    }).join('') +
+    `<div data-ventas-tendencia-franja-todas="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todas</div>`;
+  menu.querySelectorAll('[data-toggle-ventas-tendencia-franja]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-ventas-tendencia-franja');
+      const o = getVentasTendenciaFranjasOcultas();
+      if(o.has(f)) o.delete(f); else o.add(f);
+      setVentasTendenciaFranjasOcultas(o);
+      renderVentasTendenciaFranjaFiltroMenu();
+      const {lines}=currentDataset(); renderVentasTendenciaFranja(lines);
+    });
+  });
+  const todas = menu.querySelector('[data-ventas-tendencia-franja-todas]');
+  if(todas) todas.addEventListener('click', ()=>{
+    setVentasTendenciaFranjasOcultas(new Set());
+    renderVentasTendenciaFranjaFiltroMenu();
+    const {lines}=currentDataset(); renderVentasTendenciaFranja(lines);
+  });
+}
+document.getElementById('ventasTendenciaFranjaFiltroBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('ventasTendenciaFranjaFiltroMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderVentasTendenciaFranjaFiltroMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
+
+/* --- Tendencia combinada: días elegidos + franjas elegidas -> UNA sola línea --- */
+function getVentasComboDias(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_ventas_combo_dias')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set(DOW_ORDEN_COMPLETO); // por defecto, todos los días
+}
+function setVentasComboDias(set){ localStorage.setItem('miners_ventas_combo_dias', JSON.stringify([...set])); }
+function getVentasComboFranjas(franjaOrderCompleto){
+  try{ const v = JSON.parse(localStorage.getItem('miners_ventas_combo_franjas')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set(franjaOrderCompleto); // por defecto, todas las franjas
+}
+function setVentasComboFranjas(set){ localStorage.setItem('miners_ventas_combo_franjas', JSON.stringify([...set])); }
+function renderVentasCombo(lines){
+  const canvas = document.getElementById('chartVentasCombo');
+  if(!canvas) return;
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const franjaOrderCompleto = franjaOrderFor(STATE.filters.franjaTipo);
+  const diasElegidos = getVentasComboDias();
+  const franjasElegidas = getVentasComboFranjas(franjaOrderCompleto);
+  document.getElementById('ventasComboResumen').textContent =
+    (diasElegidos.size===DOW_ORDEN_COMPLETO.length ? 'Todos los días' : diasElegidos.size+' día(s) elegido(s)') + ' · ' +
+    (franjasElegidas.size===franjaOrderCompleto.length ? 'todas las franjas' : franjasElegidas.size+' franja(s) elegida(s)');
+  if(!desde || !hasta || diasElegidos.size===0 || franjasElegidas.size===0){ destroyChart('ventasCombo'); return; }
+  const gran = document.getElementById('ventasTendenciaGranularidad').value;
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
+  lines.forEach(l=>{
+    if(!diasElegidos.has(l.diaSemana) || !franjasElegidas.has(l.franja)) return;
+    const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+    if(b) porBucket[b.label] += l.bruto;
+  });
+  const c = chartColors();
+  destroyChart('ventasCombo');
+  STATE.charts.ventasCombo = safeNewChart('chartVentasCombo', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets:[ trendDataset('Ventas (combinación elegida)', buckets.map(b=>+(porBucket[b.label]/100).toFixed(2)), c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+function renderVentasComboDiasMenu(){
+  const menu = document.getElementById('ventasComboDiasMenu');
+  const elegidos = getVentasComboDias();
+  menu.innerHTML = DOW_ORDEN_COMPLETO.map(d=>{
+    const on = elegidos.has(d);
+    return `<div data-toggle-combo-dia="${d}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+      <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${on?'var(--positive)':'var(--line)'};background:${on?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${on?'✓':''}</span>
+      <span style="color:${on?'var(--text)':'var(--text-muted)'};">${d}</span>
+    </div>`;
+  }).join('') + `<div data-combo-dias-todos="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Elegir todos</div>`;
+  menu.querySelectorAll('[data-toggle-combo-dia]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const d = div.getAttribute('data-toggle-combo-dia');
+      const s = getVentasComboDias();
+      if(s.has(d)) s.delete(d); else s.add(d);
+      setVentasComboDias(s);
+      renderVentasComboDiasMenu();
+      const {lines}=currentDataset(); renderVentasCombo(lines);
+    });
+  });
+  const todos = menu.querySelector('[data-combo-dias-todos]');
+  if(todos) todos.addEventListener('click', ()=>{
+    setVentasComboDias(new Set(DOW_ORDEN_COMPLETO));
+    renderVentasComboDiasMenu();
+    const {lines}=currentDataset(); renderVentasCombo(lines);
+  });
+}
+document.getElementById('ventasComboDiasBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('ventasComboDiasMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderVentasComboDiasMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
+function renderVentasComboFranjasMenu(){
+  const menu = document.getElementById('ventasComboFranjasMenu');
+  const franjaOrderCompleto = franjaOrderFor(STATE.filters.franjaTipo);
+  const elegidas = getVentasComboFranjas(franjaOrderCompleto);
+  menu.innerHTML = franjaOrderCompleto.map(f=>{
+    const on = elegidas.has(f);
+    return `<div data-toggle-combo-franja="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+      <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${on?'var(--positive)':'var(--line)'};background:${on?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${on?'✓':''}</span>
+      <span style="color:${on?'var(--text)':'var(--text-muted)'};">${f}</span>
+    </div>`;
+  }).join('') + `<div data-combo-franjas-todas="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Elegir todas</div>`;
+  menu.querySelectorAll('[data-toggle-combo-franja]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-combo-franja');
+      const franjaOrderCompleto2 = franjaOrderFor(STATE.filters.franjaTipo);
+      const s = getVentasComboFranjas(franjaOrderCompleto2);
+      if(s.has(f)) s.delete(f); else s.add(f);
+      setVentasComboFranjas(s);
+      renderVentasComboFranjasMenu();
+      const {lines}=currentDataset(); renderVentasCombo(lines);
+    });
+  });
+  const todas = menu.querySelector('[data-combo-franjas-todas]');
+  if(todas) todas.addEventListener('click', ()=>{
+    setVentasComboFranjas(new Set(franjaOrderCompleto));
+    renderVentasComboFranjasMenu();
+    const {lines}=currentDataset(); renderVentasCombo(lines);
+  });
+}
+document.getElementById('ventasComboFranjasBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('ventasComboFranjasMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderVentasComboFranjasMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
 
 function renderTickets(lines, tickets){
   const bruto = tickets.reduce((s,t)=>s+t.bruto,0);
@@ -2499,7 +2922,8 @@ function renderTickets(lines, tickets){
   // tickets por periodo (usa el selector de agrupación propio de esta pestaña)
   const gran = document.getElementById('ticketsGranularidad').value;
   const byPeriodoRaw = {};
-  tickets.forEach(t=>{ const k = periodInfo(t.fecha, gran).key; byPeriodoRaw[k] = (byPeriodoRaw[k]||0) + 1; });
+  const brutoPorPeriodoRaw = {};
+  tickets.forEach(t=>{ const k = periodInfo(t.fecha, gran).key; byPeriodoRaw[k] = (byPeriodoRaw[k]||0) + 1; brutoPorPeriodoRaw[k] = (brutoPorPeriodoRaw[k]||0) + t.bruto; });
   const periodos = Object.keys(byPeriodoRaw).sort();
   const byPeriodo = toMetric(byPeriodoRaw, nTickets, false);
   destroyChart('periodoTickets');
@@ -2507,6 +2931,14 @@ function renderTickets(lines, tickets){
     type: trendChartType(),
     data:{ labels:periodos, datasets:[ trendDataset('Nº tickets', periodos.map(p=>byPeriodo[p]), c.verdigris) ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:metricAxisCallback(false)}, grid:{color:c.grid} } } }
+  });
+
+  // ticket medio por periodo — evolución total, sin dividir por franja, misma granularidad de arriba
+  destroyChart('periodoTicketMedio');
+  STATE.charts.periodoTicketMedio = safeNewChart('chartPeriodoTicketMedio', {
+    type: trendChartType(),
+    data:{ labels:periodos, datasets:[ trendDataset('Ticket medio', periodos.map(p=>{ const n=byPeriodoRaw[p]; return n? +((brutoPorPeriodoRaw[p]/n)/100).toFixed(2) : 0; }), c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} } } }
   });
 
   // por franja: nº tickets y ticket medio
@@ -2529,6 +2961,33 @@ function renderTickets(lines, tickets){
     type: trendChartType(),
     data:{ labels:franjaOrder, datasets:[ trendDataset('Ticket medio', franjaOrder.map(f=>{ const n=byFranja[f].n; return n? +((byFranja[f].bruto/n)/100).toFixed(2) : 0; }), c.copper) ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} } } }
+  });
+
+  // evolución por franja horaria (nº tickets y ticket medio), a lo largo del tiempo,
+  // con las franjas que el usuario haya elegido ver en el filtro
+  const granEvol = document.getElementById('ticketsEvolGranularidad').value;
+  const ocultasEvol = getTicketsEvolFranjasOcultas();
+  const franjaOrderEvol = franjaOrder.filter(f=>!ocultasEvol.has(f));
+  const porBucketFranja = {}; // { periodoKey: { franja: {n,bruto} } }
+  tickets.forEach(t=>{
+    if(!franjaOrderEvol.includes(t.franja)) return;
+    const k = periodInfo(t.fecha, granEvol).key;
+    if(!porBucketFranja[k]) porBucketFranja[k] = {};
+    if(!porBucketFranja[k][t.franja]) porBucketFranja[k][t.franja] = {n:0,bruto:0};
+    porBucketFranja[k][t.franja].n++;
+    porBucketFranja[k][t.franja].bruto += t.bruto;
+  });
+  const periodosEvol = Object.keys(porBucketFranja).sort();
+  destroyChart('ticketsEvolFranjaN'); destroyChart('ticketsEvolFranjaMedio');
+  STATE.charts.ticketsEvolFranjaN = safeNewChart('chartTicketsEvolFranjaN', {
+    type: trendChartType(),
+    data:{ labels:periodosEvol, datasets: franjaOrderEvol.map((f,i)=>trendDataset(f, periodosEvol.map(p=>(porBucketFranja[p][f]||{n:0}).n), FRANJA_COLOR_PALETTE[i%FRANJA_COLOR_PALETTE.length])) },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  });
+  STATE.charts.ticketsEvolFranjaMedio = safeNewChart('chartTicketsEvolFranjaMedio', {
+    type: trendChartType(),
+    data:{ labels:periodosEvol, datasets: franjaOrderEvol.map((f,i)=>trendDataset(f, periodosEvol.map(p=>{ const d=porBucketFranja[p][f]; return d&&d.n? +((d.bruto/d.n)/100).toFixed(2) : 0; }), FRANJA_COLOR_PALETTE[i%FRANJA_COLOR_PALETTE.length])) },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} } } }
   });
 
   const tbody = document.querySelector('#tablaFranjas tbody');
@@ -2618,7 +3077,95 @@ function renderProductos(lines){
     const ventasDisplay = metrica==='porcentual' ? (a.ventas/totalVentasAll*100).toFixed(1)+'%' : eur(a.ventas);
     return `<tr><td class="bar-cell"><div class="bar" style="width:${barPct}%"></div><span>${a.name}</span></td><td>${a.cat}</td><td class="num">${udsDisplay}</td><td class="num">${ventasDisplay}</td></tr>`;
   }).join('');
+
+  renderCategoriasTendencia(lines);
+  renderProductosTendenciaChart(lines);
 }
+/* tendencia de ventas por categoría — siempre en líneas, dentro del Desde/Hasta general */
+function renderCategoriasTendencia(lines){
+  const canvas = document.getElementById('chartCategoriasTendencia');
+  if(!canvas) return;
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  if(!desde || !hasta){ destroyChart('categoriasTendencia'); return; }
+  const gran = document.getElementById('productosGranularidad').value;
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const categorias = [...new Set(lines.map(l=>displayCategoryFor(l.categoria)))].sort();
+  const porCatBucket = {}; categorias.forEach(cat=>{ porCatBucket[cat]={}; buckets.forEach(b=>porCatBucket[cat][b.label]=0); });
+  lines.forEach(l=>{
+    const cat = displayCategoryFor(l.categoria);
+    const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+    if(b) porCatBucket[cat][b.label] += l.bruto;
+  });
+  const c = chartColors();
+  const datasets = categorias.map((cat,i)=>{
+    const color = FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length];
+    return trendDataset(cat, buckets.map(b=>+(porCatBucket[cat][b.label]/100).toFixed(2)), color);
+  });
+  destroyChart('categoriasTendencia');
+  STATE.charts.categoriasTendencia = safeNewChart('chartCategoriasTendencia', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+document.getElementById('productosGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderCategoriasTendencia(lines); renderProductosTendenciaChart(lines); });
+
+/* tendencia de ventas por producto — solo dibuja los productos que el usuario elija
+   explícitamente, para no saturar el gráfico con cientos de líneas */
+function getProductosTendenciaSeleccion(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_productos_tendencia_seleccion')); if(Array.isArray(v)) return v; }catch(e){}
+  return [];
+}
+function setProductosTendenciaSeleccion(list){ localStorage.setItem('miners_productos_tendencia_seleccion', JSON.stringify(list)); }
+function renderProductosTendenciaChart(lines){
+  const canvas = document.getElementById('chartProductosTendencia');
+  if(!canvas) return;
+  const productosDisponibles = [...new Set(lines.map(l=>l.articulo))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'es'));
+  const addSel = document.getElementById('productoTendenciaAddSelect');
+  addSel.innerHTML = '<option value="">+ Añadir producto...</option>' + productosDisponibles.map(p=>'<option value="'+p.replace(/"/g,'&quot;')+'">'+p+'</option>').join('');
+
+  const seleccion = getProductosTendenciaSeleccion().filter(p=>productosDisponibles.includes(p));
+  document.getElementById('productosTendenciaChips').innerHTML = seleccion.length ? seleccion.map(p=>`
+    <span style="display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:4px 6px 4px 12px;font-size:12px;">
+      ${p} <button class="btn danger" data-quitar-producto-tendencia="${p.replace(/"/g,'&quot;')}" style="padding:2px 7px;font-size:10px;border-radius:50%;">✕</button>
+    </span>`).join('') : '<span class="hint">Ningún producto elegido todavía.</span>';
+  document.querySelectorAll('[data-quitar-producto-tendencia]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      setProductosTendenciaSeleccion(getProductosTendenciaSeleccion().filter(p=>p!==btn.getAttribute('data-quitar-producto-tendencia')));
+      const {lines:lines2}=currentDataset(); renderProductosTendenciaChart(lines2);
+    });
+  });
+
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  if(!desde || !hasta || seleccion.length===0){ destroyChart('productosTendencia'); return; }
+  const gran = document.getElementById('productosGranularidad').value;
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const porProdBucket = {}; seleccion.forEach(p=>{ porProdBucket[p]={}; buckets.forEach(b=>porProdBucket[p][b.label]=0); });
+  lines.forEach(l=>{
+    if(!porProdBucket[l.articulo]) return;
+    const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+    if(b) porProdBucket[l.articulo][b.label] += l.bruto;
+  });
+  const c = chartColors();
+  const datasets = seleccion.map((p,i)=>{
+    const color = FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length];
+    return trendDataset(p, buckets.map(b=>+(porProdBucket[p][b.label]/100).toFixed(2)), color);
+  });
+  destroyChart('productosTendencia');
+  STATE.charts.productosTendencia = safeNewChart('chartProductosTendencia', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+document.getElementById('productoTendenciaAddSelect').addEventListener('change', (e)=>{
+  const producto = e.target.value;
+  if(!producto) return;
+  const seleccion = getProductosTendenciaSeleccion();
+  if(!seleccion.includes(producto)){ seleccion.push(producto); setProductosTendenciaSeleccion(seleccion); }
+  e.target.value = '';
+  const {lines}=currentDataset(); renderProductosTendenciaChart(lines);
+});
 
 function renderClientes(lines, tickets){
   const segLabels = { nuevo:'Nuevo', repetido:'Repetido sin fidelidad', fidelidad:'Con tarjeta de fidelidad', noident:'No identificable' };
@@ -2665,8 +3212,12 @@ function renderClientesTendencia(){
   let minD=null, maxD=null;
   allLines.forEach(l=>{ if(!minD||l.fecha<minD) minD=l.fecha; if(!maxD||l.fecha>maxD) maxD=l.fecha; });
   if(!minD) return;
+  // respeta el filtro Desde/Hasta que el usuario tenga puesto arriba — si no ha puesto
+  // ninguno, usa todo el histórico disponible como antes
+  const desde = STATE.filters.desde || minD;
+  const hasta = STATE.filters.hasta || maxD;
   const gran = document.getElementById('clGranularidad').value;
-  const buckets = gran==='mes' ? monthBucketsInRange(minD,maxD) : weekBucketsInRange(minD,maxD);
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
   const resultado = calcularResumenEjecutivo(buckets);
   const labels = buckets.map(b=>b.label);
   const c = chartColors();
@@ -3054,7 +3605,9 @@ function pintarWidgetPerf(typeId, canvasId, chartKey, ctx){
     const esFinde = typeId.includes('SD');
     const esPct = typeId.endsWith('Pct');
     const { desde, hasta, gran } = ctx;
-    const { franjaOrder, buckets, resultado } = calcularEvolucionNoBebida(desde, hasta, gran, esFinde);
+    const { franjaOrder: franjaOrderCompleto, buckets, resultado } = calcularEvolucionNoBebida(desde, hasta, gran, esFinde);
+    const ocultas = getPerfEvolFranjasOcultas();
+    const franjaOrder = franjaOrderCompleto.filter(f=>!ocultas.has(f));
     const labels = buckets.map(b=>b.label);
     const datasets = franjaOrder.map((f,i)=>{
       const color = FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length];
@@ -3107,12 +3660,19 @@ function renderPerformanceEquipo(){
     const type = PERF_WIDGET_TYPES[w.typeId];
     if(!type) return '';
     const extraTop = w.typeId==='fidelidadNueva' ? `<div class="grid kpi" id="kpiFidelidad_${w.instanceId}" style="margin-bottom:10px;"></div>` : '';
+    const esEvol = w.typeId.startsWith('evolNoBebida');
+    const filtroFranjasHtml = esEvol ? `
+      <div class="no-print" style="position:relative;margin-bottom:8px;">
+        <button class="btn secondary" data-perf-evol-filtro-btn="${w.instanceId}" style="padding:4px 10px;font-size:11px;">Filtrar franjas en el gráfico</button>
+        <div id="perfEvolFiltroMenu_${w.instanceId}" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+      </div>` : '';
     return `<div class="card" draggable="true" data-perf-instance="${w.instanceId}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
         <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
         <button class="btn danger no-print" data-perf-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
       </div>
       ${extraTop}
+      ${filtroFranjasHtml}
       <div class="chart-wrap"><canvas id="chartPerfW_${w.instanceId}"></canvas></div>
     </div>`;
   }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
@@ -3142,6 +3702,16 @@ function renderPerformanceEquipo(){
     btn.addEventListener('click', ()=>{
       setPerfWidgets(getPerfWidgets().filter(w=>w.instanceId!==btn.getAttribute('data-perf-quitar')));
       renderPerformanceEquipo();
+    });
+  });
+  container.querySelectorAll('[data-perf-evol-filtro-btn]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const instanceId = btn.getAttribute('data-perf-evol-filtro-btn');
+      const menu = document.getElementById('perfEvolFiltroMenu_'+instanceId);
+      const abrir = menu.style.display==='none';
+      if(abrir) renderPerfEvolFiltroFranjasMenu(instanceId);
+      menu.style.display = abrir ? 'block' : 'none';
     });
   });
   attachPerfDragHandlers();
@@ -4580,6 +5150,8 @@ const RE_WIDGET_TYPES = {
   cajaGastos:    { label:'Caja — Gastos totales por mes', tipo:'snapshot-async' },
   cajaIngresos:  { label:'Caja — Ingresos Square + Efectivo por mes', tipo:'snapshot-async' },
   cajaBalance:   { label:'Caja — Balance mensual', tipo:'snapshot-async' },
+  pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
+  pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
 };
 function getReWidgets(){
   try{
@@ -4928,6 +5500,30 @@ async function renderResumenEjecutivo(){
         <div contenteditable="true" draggable="false" data-re-texto="${w.instanceId}" style="font-family:'Fraunces',serif;font-size:20px;color:var(--text);outline:none;min-height:1.4em;">${w.contenido||''}</div>
       </div>`;
     }
+    if(w.typeId==='pnl'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}" style="grid-column:1 / -1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>PNL</h3>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <div class="subfilter no-print" style="margin-bottom:10px;">
+          <div class="filter-group"><label>Desde</label><input type="date" data-re-pnl-desde="${w.instanceId}" value="${w.pnlDesde||''}"></div>
+          <div class="filter-group"><label>Hasta</label><input type="date" data-re-pnl-hasta="${w.instanceId}" value="${w.pnlHasta||''}"></div>
+        </div>
+        <p class="hint no-print" style="margin-bottom:10px;">Este periodo es independiente del Desde/Hasta de arriba — solo afecta a esta tabla de PNL.</p>
+        <div style="overflow-x:auto;" id="rePnlTabla_${w.instanceId}"></div>
+      </div>`;
+    }
+    if(w.typeId==='pnlLinea'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>PNL — evolución de línea</h3>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <div class="field no-print" style="margin-bottom:8px;"><select data-re-pnl-linea="${w.instanceId}"></select></div>
+        <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
+      </div>`;
+    }
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!type) return '';
     return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
@@ -4941,8 +5537,35 @@ async function renderResumenEjecutivo(){
 
   for(const w of widgets){
     if(w.typeId==='texto') continue;
+    if(w.typeId==='pnl'){ await renderPnlWidgetInstance(w); continue; }
+    if(w.typeId==='pnlLinea'){ await renderPnlLineaWidgetInstance(w, buckets); continue; }
     await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta);
   }
+
+  container.querySelectorAll('[data-re-pnl-desde]').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const id = inp.getAttribute('data-re-pnl-desde');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.pnlDesde = inp.value; setReWidgets(widgets2); await renderPnlWidgetInstance(w2); }
+    });
+  });
+  container.querySelectorAll('[data-re-pnl-hasta]').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const id = inp.getAttribute('data-re-pnl-hasta');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.pnlHasta = inp.value; setReWidgets(widgets2); await renderPnlWidgetInstance(w2); }
+    });
+  });
+  container.querySelectorAll('[data-re-pnl-linea]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const id = sel.getAttribute('data-re-pnl-linea');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.pnlLineaId = sel.value; setReWidgets(widgets2); await renderPnlLineaWidgetInstance(w2, buckets); }
+    });
+  });
 
   container.querySelectorAll('[data-re-texto]').forEach(div=>{
     div.addEventListener('input', ()=>{
@@ -4989,7 +5612,7 @@ document.getElementById('reCopyClaudeBtn').addEventListener('click', ()=>{
     toast('No se pudo copiar automáticamente. Prueba desde un navegador normal (no incógnito restringido).', true);
   });
 });
-document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
+document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   if(!window.jspdf){ toast('No se pudo cargar la librería de PDF.', true); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
@@ -5037,6 +5660,59 @@ document.getElementById('reExportPdfBtn').addEventListener('click', ()=>{
       if(y + altoTexto > yLimite) nuevaPagina();
       doc.text(lineas, margin, y+5);
       y += altoTexto;
+      continue;
+    }
+    if(w.typeId==='pnl'){
+      if(colPendiente){ y += chartH + 16; colPendiente = null; }
+      const desdeW = w.pnlDesde, hastaW = w.pnlHasta;
+      if(!desdeW || !hastaW) continue;
+      const bucketsW = monthBucketsInRange(desdeW, hastaW);
+      if(bucketsW.length===0) continue;
+      await ensureDefaultPnlLines();
+      const allSalesLinesW = getAllSalesLinesRaw();
+      const costHistoryW = buildCostHistoryMap();
+      const otherCostHistoryW = buildOtherCostHistoryMap();
+      const linesW = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+      const hiddenRowsW = getPnlHiddenRows();
+      let totIng = bucketsW.map(()=>0), totCos = bucketsW.map(()=>0);
+      const filasW = [];
+      linesW.forEach(line=>{
+        const values = bucketsW.map(b=>pnlLineValueForBucket(line, b, allSalesLinesW, costHistoryW, otherCostHistoryW));
+        values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totIng[bi]+=v; else totCos[bi]+=v; });
+        if(hiddenRowsW.has(line.id)) return;
+        filasW.push({ nombre: line.name, indent: line.indent||0, values });
+      });
+
+      const numCols = bucketsW.length;
+      const colNombreAncho = 46;
+      const colAncho = Math.min(24, (W-margin*2-colNombreAncho)/Math.max(numCols,1));
+      const filaAlto = 5;
+      const alturaTotal = 13 + (filasW.length+2)*filaAlto + 8;
+      if(y + alturaTotal > yLimite) nuevaPagina();
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(242,234,217);
+      doc.text('PNL — '+desdeW+' a '+hastaW, margin, y+5);
+      y += 9;
+
+      doc.setFontSize(7); doc.setTextColor(167,154,133); doc.setFont('helvetica','normal');
+      doc.text('Línea', margin, y+3.5);
+      bucketsW.forEach((b,i)=>{ doc.text(b.label, margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
+      y += filaAlto;
+      doc.setDrawColor(58,47,36); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
+      y += 3;
+
+      doc.setFontSize(7); doc.setTextColor(220,210,195);
+      filasW.forEach(f=>{
+        doc.text(f.nombre, margin+f.indent*3, y+3.5, { maxWidth: colNombreAncho-2 });
+        f.values.forEach((v,i)=>{ doc.text(eur(Math.round(v*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
+        y += filaAlto;
+      });
+      doc.setDrawColor(58,47,36); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
+      y += 3;
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(242,234,217);
+      doc.text('Resultado', margin, y+3.5);
+      bucketsW.forEach((b,i)=>{ doc.text(eur(Math.round((totIng[i]-totCos[i])*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
+      y += filaAlto + 10;
       continue;
     }
     const type = RE_WIDGET_TYPES[w.typeId];
@@ -5090,6 +5766,82 @@ async function ensureDefaultPnlLines(){
     STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:true }); changed=true;
   }
   if(changed) STATE.pnlLines.sort((a,b)=>a.orden-b.orden);
+}
+/* tabla de PNL para un widget de Resumen Ejecutivo — usa el MISMO cálculo que la pestaña
+   PNL (mensual siempre, para que quepa bien en una página), pero con el periodo propio de
+   ESTE widget, totalmente independiente del Desde/Hasta general del Resumen Ejecutivo */
+async function renderPnlWidgetInstance(w){
+  const tableEl = document.getElementById('rePnlTabla_'+w.instanceId);
+  if(!tableEl) return;
+  const desde = w.pnlDesde, hasta = w.pnlHasta;
+  if(!desde || !hasta){ tableEl.innerHTML = '<p class="hint">Elige un Desde y un Hasta para este PNL (arriba, en este mismo bloque).</p>'; return; }
+  await ensureDefaultPnlLines();
+  const buckets = monthBucketsInRange(desde, hasta);
+  if(buckets.length===0){ tableEl.innerHTML = '<p class="hint">Sin meses en ese rango.</p>'; return; }
+  const allSalesLines = getAllSalesLinesRaw();
+  const costHistory = buildCostHistoryMap();
+  const otherCostHistory = buildOtherCostHistoryMap();
+  const lines = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+  const hiddenRows = getPnlHiddenRows(); // mismas filas ocultas que en la pestaña PNL, para coherencia
+
+  let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
+  const filas = lines.map(line=>{
+    const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
+    values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
+    if(hiddenRows.has(line.id)) return '';
+    const indent = line.indent||0;
+    const cells = values.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('');
+    return `<tr><td style="padding-left:${indent*20}px;">${line.name}</td>${cells}</tr>`;
+  }).filter(Boolean).join('');
+  const totalCells = buckets.map((b,bi)=>'<td class="num"><b>'+eur(Math.round((totalIngresos[bi]-totalCostes[bi])*100))+'</b></td>').join('');
+
+  tableEl.innerHTML = `<table>
+    <thead><tr><th>Línea</th>${buckets.map(b=>'<th class="num">'+b.label+'</th>').join('')}</tr></thead>
+    <tbody>${filas}<tr style="border-top:2px solid var(--line);"><td><b>Resultado</b></td>${totalCells}</tr></tbody>
+  </table>`;
+}
+/* widget de Resumen Ejecutivo: evolución de UNA línea del PNL elegida por el usuario
+   (Resultado/EBITDA por defecto), usando el mismo periodo (buckets mensuales) que el
+   resto de gráficos de Resumen Ejecutivo — a diferencia del widget "pnl" (tabla completa),
+   este SÍ comparte el Desde/Hasta general */
+async function renderPnlLineaWidgetInstance(w, buckets){
+  const sel = document.querySelector('[data-re-pnl-linea="'+w.instanceId+'"]');
+  if(!sel) return;
+  await ensureDefaultPnlLines();
+  const lines = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+  const etiquetaTI = pnlEtiquetaTotal('totalIngresos','Total ingresos'), etiquetaTC = pnlEtiquetaTotal('totalCostes','Total costes'), etiquetaR = pnlEtiquetaTotal('resultado','Resultado');
+  if(!sel.dataset.cargado){
+    sel.innerHTML =
+      '<option value="__resultado__">'+etiquetaR+' (EBITDA)</option>' +
+      '<option value="__totalIngresos__">'+etiquetaTI+'</option>' +
+      '<option value="__totalCostes__">'+etiquetaTC+'</option>' +
+      lines.map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
+    sel.value = w.pnlLineaId || '__resultado__';
+    sel.dataset.cargado = '1';
+  }
+  const seleccion = sel.value;
+  const allSalesLines = getAllSalesLinesRaw();
+  const costHistory = buildCostHistoryMap();
+  const otherCostHistory = buildOtherCostHistoryMap();
+  let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
+  lines.forEach(line=>{
+    const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
+    values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
+  });
+  let datos;
+  if(seleccion==='__resultado__') datos = buckets.map((b,i)=>totalIngresos[i]-totalCostes[i]);
+  else if(seleccion==='__totalIngresos__') datos = totalIngresos;
+  else if(seleccion==='__totalCostes__') datos = totalCostes;
+  else {
+    const linea = lines.find(l=>l.id===seleccion);
+    datos = linea ? buckets.map(b=>pnlLineValueForBucket(linea, b, allSalesLines, costHistory, otherCostHistory)) : buckets.map(()=>0);
+  }
+  const c = chartColors();
+  STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
+    type: trendChartType(),
+    data:{ labels: buckets.map(b=>b.label), datasets:[ trendDataset(sel.options[sel.selectedIndex]?.text||'', datos.map(v=>+v.toFixed(2)), c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
 }
 async function movePnlLine(lineId, dir){
   const sorted = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
@@ -5213,11 +5965,33 @@ async function renderPnl(){
   });
 
   const resultado = totalIngresos.map((v,i)=>v-totalCostes[i]);
+  const etiquetaTI = pnlEtiquetaTotal('totalIngresos','Total ingresos'), etiquetaTC = pnlEtiquetaTotal('totalCostes','Total costes'), etiquetaR = pnlEtiquetaTotal('resultado','Resultado');
+  const celdaEditableTotal = (clave, etiqueta) => `<span style="display:inline-flex;align-items:center;gap:6px;"><b data-nombre-total="${clave}">${etiqueta}</b> <button class="btn secondary no-print" data-editar-nombre-total="${clave}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
   document.querySelector('#tablaPnl tfoot').innerHTML = `
-    <tr style="border-top:2px solid var(--line);"><td><b>Total ingresos</b></td>${totalIngresos.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('')}<td></td></tr>
-    <tr><td><b>Total costes</b></td>${totalCostes.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('')}<td></td></tr>
-    <tr style="border-top:1px solid var(--line);"><td><b>Resultado</b></td>${resultado.map(v=>'<td class="num" style="color:'+(v>=0?'var(--positive)':'var(--negative)')+'"><b>'+eur(Math.round(v*100))+'</b></td>').join('')}<td></td></tr>
+    <tr style="border-top:2px solid var(--line);"><td>${celdaEditableTotal('totalIngresos',etiquetaTI)}</td>${totalIngresos.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('')}<td></td></tr>
+    <tr><td>${celdaEditableTotal('totalCostes',etiquetaTC)}</td>${totalCostes.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('')}<td></td></tr>
+    <tr style="border-top:1px solid var(--line);"><td>${celdaEditableTotal('resultado',etiquetaR)}</td>${resultado.map(v=>'<td class="num" style="color:'+(v>=0?'var(--positive)':'var(--negative)')+'"><b>'+eur(Math.round(v*100))+'</b></td>').join('')}<td></td></tr>
   `;
+  document.querySelectorAll('[data-editar-nombre-total]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const clave = btn.getAttribute('data-editar-nombre-total');
+      const span = document.querySelector('[data-nombre-total="'+clave+'"]');
+      if(!span) return;
+      const nombreActual = span.textContent;
+      const input = document.createElement('input');
+      input.type = 'text'; input.value = nombreActual;
+      input.style.cssText = 'background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:4px;padding:3px 6px;font-size:13px;width:140px;';
+      span.replaceWith(input); btn.style.display = 'none';
+      input.focus(); input.select();
+      const guardar = () => {
+        const nuevo = input.value.trim();
+        if(nuevo){ const et = getPnlEtiquetasTotales(); et[clave] = nuevo; setPnlEtiquetasTotales(et); }
+        renderPnl();
+      };
+      input.addEventListener('blur', guardar);
+      input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') input.blur(); });
+    });
+  });
 
   document.querySelectorAll('[data-pnl-cell]').forEach(inp=>{
     inp.addEventListener('change', async ()=>{
@@ -5273,6 +6047,34 @@ async function renderPnl(){
       });
     });
   });
+
+  // Gráfico de evolución de una línea del PNL elegida — reutiliza los totales ya calculados arriba
+  const selLinea = document.getElementById('pnlGraficoLineaSelect');
+  if(selLinea){
+    const valorPrevio = selLinea.value;
+    selLinea.innerHTML =
+      '<option value="__resultado__">'+etiquetaR+' (EBITDA)</option>' +
+      '<option value="__totalIngresos__">'+etiquetaTI+'</option>' +
+      '<option value="__totalCostes__">'+etiquetaTC+'</option>' +
+      lines.map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
+    if(valorPrevio && [...selLinea.options].some(o=>o.value===valorPrevio)) selLinea.value = valorPrevio;
+    const seleccion = selLinea.value;
+    let datosGrafico;
+    if(seleccion==='__resultado__') datosGrafico = resultado;
+    else if(seleccion==='__totalIngresos__') datosGrafico = totalIngresos;
+    else if(seleccion==='__totalCostes__') datosGrafico = totalCostes;
+    else {
+      const lineaElegida = lines.find(l=>l.id===seleccion);
+      datosGrafico = lineaElegida ? buckets.map(b=>pnlLineValueForBucket(lineaElegida, b, allSalesLines, costHistory, otherCostHistory)) : buckets.map(()=>0);
+    }
+    const cChart = chartColors();
+    STATE.charts['pnlLinea'] = safeNewChart('chartPnlLinea', {
+      type: trendChartType(),
+      data:{ labels: buckets.map(b=>b.label), datasets:[ trendDataset(selLinea.options[selLinea.selectedIndex]?.text||'', buckets.map((b,i)=>+datosGrafico[i].toFixed(2)), cChart.copper) ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:cChart.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:cChart.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:cChart.grid} } } }
+    });
+    if(!selLinea.dataset.wired){ selLinea.addEventListener('change', renderPnl); selLinea.dataset.wired = '1'; }
+  }
 }
 
 function renderCogsTendencia(){
