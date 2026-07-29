@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.77</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.78</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9255,8 +9255,39 @@ function renderMermas(){
 
   const seleccionadas = getMermasSeleccionadas();
   document.querySelector('#tablaMermas tbody').innerHTML = filtradas.map(m=>`
-    <tr><td><input type="checkbox" class="mermas-check" data-id-merma="${m.id}" ${seleccionadas.has(m.id)?'checked':''}></td><td>${m.fecha}</td><td>${(m.hora||'').slice(0,5)}</td><td>${m.empleado||'—'}</td><td>${m.producto}</td><td class="num">${m.cantidad} ${m.unidad}</td><td><span class="pill noident">${m.categoria}</span></td><td class="hint">${m.textoOriginal||''}</td><td><button class="btn danger" data-del-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+    <tr data-fila-merma="${m.id}"><td><input type="checkbox" class="mermas-check" data-id-merma="${m.id}" ${seleccionadas.has(m.id)?'checked':''}></td><td>${m.fecha}</td><td>${(m.hora||'').slice(0,5)}</td><td>${m.empleado||'—'}</td><td>${m.producto}</td><td class="num">${m.cantidad} ${m.unidad}</td><td><span class="pill noident">${m.categoria}</span> <span class="hint">(${m.tipo==='producto_final'?'producto':'ingrediente'})</span></td><td class="hint">${m.textoOriginal||''}</td><td style="white-space:nowrap;"><button class="btn secondary" data-editar-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn danger" data-del-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
   `).join('') || '<tr><td colspan="9" class="hint">Sin registros para este filtro.</td></tr>';
+  document.querySelectorAll('[data-editar-merma]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-editar-merma');
+      const m = STATE.mermas.find(x=>x.id===id);
+      const fila = document.querySelector('[data-fila-merma="'+id+'"]');
+      if(!m || !fila) return;
+      const categoriasDisponibles = ['Bebidas','Verduras','Otros ingredientes de comida'];
+      fila.innerHTML = `<td colspan="9">
+        <div class="subfilter" style="margin:6px 0;">
+          <input type="text" data-edit-producto="${id}" value="${m.producto.replace(/"/g,'&quot;')}" style="flex:1;background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
+          <select data-edit-tipo="${id}"><option value="ingrediente" ${m.tipo==='ingrediente'?'selected':''}>Ingrediente</option><option value="producto_final" ${m.tipo==='producto_final'?'selected':''}>Producto de Square</option></select>
+          <select data-edit-categoria="${id}">${categoriasDisponibles.map(c=>'<option value="'+c+'" '+(m.categoria===c?'selected':'')+'>'+c+'</option>').join('')}</select>
+          <button class="btn" data-guardar-edit-merma="${id}" style="padding:6px 12px;font-size:12px;">Guardar</button>
+          <button class="btn secondary" data-cancelar-edit-merma="${id}" style="padding:6px 12px;font-size:12px;">Cancelar</button>
+        </div>
+      </td>`;
+      fila.querySelector('[data-guardar-edit-merma]').addEventListener('click', async ()=>{
+        const producto = fila.querySelector('[data-edit-producto]').value.trim();
+        const tipo = fila.querySelector('[data-edit-tipo]').value;
+        const categoria = fila.querySelector('[data-edit-categoria]').value;
+        if(!producto){ toast('El producto no puede quedar vacío.', true); return; }
+        try{
+          await sbUpdate('mermas', id, { producto, tipo, categoria });
+          m.producto = producto; m.tipo = tipo; m.categoria = categoria;
+          toast('Actualizado ✓');
+          renderMermas();
+        }catch(e){ toast('Error: '+e.message, true); }
+      });
+      fila.querySelector('[data-cancelar-edit-merma]').addEventListener('click', renderMermas);
+    });
+  });
   document.querySelectorAll('[data-del-merma]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar este registro de merma?')) return;
