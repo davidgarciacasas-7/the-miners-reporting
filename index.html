@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.76</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.77</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8913,6 +8913,36 @@ async function initCajaSiHaceFalta(){
    MERMAS (registro de los empleados)
    ========================================================= */
 STATE.mermas = [];
+/* Auto-aprendizaje: si un texto (ej. "tomates") ya se confirmó antes como un tipo/producto
+   concreto, y vuelve a aparecer sin revisar, se aplica automáticamente lo mismo que la
+   última vez — sin pedir confirmación otra vez. Se basa en coincidencia exacta (sin
+   mayúsculas ni espacios de más) contra cualquier entrada YA revisada anteriormente. */
+async function autoAplicarCategoriasAprendidas(){
+  const aprendido = {};
+  STATE.mermas.forEach(m=>{
+    if(!m.tipo) return; // solo de los que ya están revisados
+    const key = (m.producto||'').toLowerCase().trim();
+    if(key && !aprendido[key]) aprendido[key] = { tipo:m.tipo, producto:m.producto, categoria:m.categoria };
+  });
+  const squareLower = new Set([...getSquareProductNames()].map(p=>p.toLowerCase().trim()));
+  const pendientes = STATE.mermas.filter(m=>{
+    if(m.tipo) return false;
+    const key = (m.producto||'').toLowerCase().trim();
+    if(!key || squareLower.has(key)) return false; // eso se resuelve solo, por otro camino
+    return !!aprendido[key];
+  });
+  if(pendientes.length===0) return 0;
+  let ok = 0;
+  for(const m of pendientes){
+    const info = aprendido[(m.producto||'').toLowerCase().trim()];
+    try{
+      await sbUpdate('mermas', m.id, { producto:info.producto, tipo:info.tipo });
+      m.producto = info.producto; m.tipo = info.tipo;
+      ok++;
+    }catch(e){ /* si falla una, se sigue con las demás; se quedará pendiente de revisar a mano */ }
+  }
+  return ok;
+}
 async function loadAndRenderMermas(){
   try{
     const rows = await sbList('mermas', 'select=*&order=fecha.desc,hora.desc&limit=2000');
@@ -8926,6 +8956,8 @@ async function loadAndRenderMermas(){
   const curEmp = empSel.value;
   empSel.innerHTML = '<option value="">Todos</option>'+empActuales.map(e=>`<option value="${e}">${e}</option>`).join('');
   empSel.value = curEmp;
+  const nAuto = await autoAplicarCategoriasAprendidas();
+  if(nAuto>0) toast(nAuto+' registro(s) categorizados automáticamente (ya se habían confirmado antes con el mismo texto).');
   renderCasosACorregir();
   renderMermas();
 }
@@ -8942,9 +8974,10 @@ function getCasosACorregir(){
     const pLower = (m.producto||'').toLowerCase().trim();
     if(squareLower.has(pLower)) return; // coincide con un producto real de Square
     const key = m.producto;
-    if(!grupos[key]) grupos[key] = { producto:key, count:0, ids:[] };
+    if(!grupos[key]) grupos[key] = { producto:key, count:0, ids:[], registros:[] };
     grupos[key].count++;
     grupos[key].ids.push(m.id);
+    grupos[key].registros.push({ fecha:m.fecha, hora:m.hora, empleado:m.empleado||'(sin empleado)' });
   });
   return Object.values(grupos).sort((a,b)=>b.count-a.count);
 }
@@ -9001,11 +9034,16 @@ function renderCasosACorregir(){
   listEl.innerHTML = casos.map((c,i)=>{
     const sugerencias = sugerenciasSimilares(c.producto, candidatosSugerencia);
     const chips = sugerencias.map(s=>`<button type="button" class="btn secondary" data-caso-sugerencia="${i}" data-valor="${s.replace(/"/g,'&quot;')}" style="padding:3px 8px;font-size:11px;margin-right:4px;">¿"${s}"?</button>`).join('');
+    const registrosOrdenados = [...c.registros].sort((a,b)=> (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+    const LIMITE_MOSTRAR = 5;
+    const registrosTexto = registrosOrdenados.slice(0,LIMITE_MOSTRAR).map(r=>`${r.empleado} — ${r.fecha} ${(r.hora||'').slice(0,5)}`).join(' · ');
+    const masTexto = registrosOrdenados.length>LIMITE_MOSTRAR ? ' · y '+(registrosOrdenados.length-LIMITE_MOSTRAR)+' más' : '';
     return `
     <div style="border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
         <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" class="caso-check" data-idx-caso="${i}" ${casosSeleccionadosSet.has(i)?'checked':''}><b>"${c.producto}"</b></label><span class="hint">${c.count} registro${c.count>1?'s':''}</span>
       </div>
+      <p class="hint" style="margin-bottom:8px;">👤 ${registrosTexto}${masTexto}</p>
       ${chips ? '<div style="margin-bottom:8px;">'+chips+'</div>' : ''}
       <div class="subfilter" style="margin-bottom:0;">
         <select data-caso-tipo="${i}"><option value="">— tipo —</option><option value="producto_final">Producto de Square</option><option value="ingrediente">Ingrediente</option></select>
