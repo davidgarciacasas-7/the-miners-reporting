@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.78</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.80</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9002,6 +9002,16 @@ function sugerenciasSimilares(texto, candidatos){
     .slice(0,3)
     .map(x=>x.nombre);
 }
+/* TODOS los candidatos (normalmente productos de Square), ordenados de más a menos
+   parecidos al texto dado — sin filtrar ni limitar, para usar en un desplegable/datalist
+   donde el usuario puede elegir el que más se ajuste, con los mejores arriba del todo.
+   La comparación (via levenshtein) ya es insensible a mayúsculas. */
+function productosOrdenadosPorSimilitud(texto, candidatos){
+  return [...candidatos]
+    .map(c=>({ nombre:c, dist:levenshtein(texto, c) }))
+    .sort((a,b)=>a.dist-b.dist)
+    .map(x=>x.nombre);
+}
 let casosSeleccionadosSet = new Set();
 function actualizarBarraSeleccionCasos(){
   const n = casosSeleccionadosSet.size;
@@ -9265,22 +9275,42 @@ function renderMermas(){
       if(!m || !fila) return;
       const categoriasDisponibles = ['Bebidas','Verduras','Otros ingredientes de comida'];
       fila.innerHTML = `<td colspan="9">
-        <div class="subfilter" style="margin:6px 0;">
-          <input type="text" data-edit-producto="${id}" value="${m.producto.replace(/"/g,'&quot;')}" style="flex:1;background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
-          <select data-edit-tipo="${id}"><option value="ingrediente" ${m.tipo==='ingrediente'?'selected':''}>Ingrediente</option><option value="producto_final" ${m.tipo==='producto_final'?'selected':''}>Producto de Square</option></select>
-          <select data-edit-categoria="${id}">${categoriasDisponibles.map(c=>'<option value="'+c+'" '+(m.categoria===c?'selected':'')+'>'+c+'</option>').join('')}</select>
-          <button class="btn" data-guardar-edit-merma="${id}" style="padding:6px 12px;font-size:12px;">Guardar</button>
-          <button class="btn secondary" data-cancelar-edit-merma="${id}" style="padding:6px 12px;font-size:12px;">Cancelar</button>
+        <div style="margin:6px 0;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--copper);">
+          <div class="subfilter" style="margin-bottom:8px;">
+            <div class="filter-group"><label>Fecha</label><input type="date" data-edit-fecha="${id}" value="${m.fecha}"></div>
+            <div class="filter-group"><label>Hora</label><input type="time" step="1" data-edit-hora="${id}" value="${(m.hora||'00:00:00').slice(0,8)}"></div>
+            <div class="filter-group"><label>Empleado</label><input type="text" data-edit-empleado="${id}" value="${(m.empleado||'').replace(/"/g,'&quot;')}" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:8px;">
+            <input type="text" list="editMermaDatalist_${id}" data-edit-producto="${id}" value="${m.producto.replace(/"/g,'&quot;')}" placeholder="Producto" style="flex:2;background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
+            <datalist id="editMermaDatalist_${id}">${productosOrdenadosPorSimilitud(m.producto, [...getSquareProductNames()]).map(p=>'<option value="'+p.replace(/"/g,'&quot;')+'">').join('')}</datalist>
+            <input type="number" step="0.1" min="0" data-edit-cantidad="${id}" value="${m.cantidad}" placeholder="Cantidad" style="width:90px;background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
+            <input type="text" data-edit-unidad="${id}" value="${(m.unidad||'').replace(/"/g,'&quot;')}" placeholder="Unidad" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
+          </div>
+          <p class="hint" style="margin:-4px 0 8px 0;">👆 El campo de producto sugiere los artículos de Square más parecidos (empezando por el que más se ajusta) — puedes elegir uno de la lista o escribir libremente si es un ingrediente.</p>
+          <div class="subfilter" style="margin-bottom:0;">
+            <select data-edit-tipo="${id}"><option value="ingrediente" ${m.tipo==='ingrediente'?'selected':''}>Ingrediente</option><option value="producto_final" ${m.tipo==='producto_final'?'selected':''}>Producto de Square</option></select>
+            <select data-edit-categoria="${id}">${categoriasDisponibles.map(c=>'<option value="'+c+'" '+(m.categoria===c?'selected':'')+'>'+c+'</option>').join('')}</select>
+            <button class="btn" data-guardar-edit-merma="${id}" style="padding:6px 12px;font-size:12px;">Guardar</button>
+            <button class="btn secondary" data-cancelar-edit-merma="${id}" style="padding:6px 12px;font-size:12px;">Cancelar</button>
+          </div>
         </div>
       </td>`;
       fila.querySelector('[data-guardar-edit-merma]').addEventListener('click', async ()=>{
+        const fecha = fila.querySelector('[data-edit-fecha]').value;
+        const hora = fila.querySelector('[data-edit-hora]').value;
+        const empleado = fila.querySelector('[data-edit-empleado]').value.trim();
         const producto = fila.querySelector('[data-edit-producto]').value.trim();
+        const cantidad = parseFloat(fila.querySelector('[data-edit-cantidad]').value);
+        const unidad = fila.querySelector('[data-edit-unidad]').value.trim();
         const tipo = fila.querySelector('[data-edit-tipo]').value;
         const categoria = fila.querySelector('[data-edit-categoria]').value;
         if(!producto){ toast('El producto no puede quedar vacío.', true); return; }
+        if(!fecha){ toast('La fecha no puede quedar vacía.', true); return; }
+        if(isNaN(cantidad) || cantidad<0){ toast('Indica una cantidad válida.', true); return; }
         try{
-          await sbUpdate('mermas', id, { producto, tipo, categoria });
-          m.producto = producto; m.tipo = tipo; m.categoria = categoria;
+          await sbUpdate('mermas', id, { fecha, hora, empleado, producto, cantidad, unidad, tipo, categoria });
+          m.fecha=fecha; m.hora=hora; m.empleado=empleado; m.producto=producto; m.cantidad=cantidad; m.unidad=unidad; m.tipo=tipo; m.categoria=categoria;
           toast('Actualizado ✓');
           renderMermas();
         }catch(e){ toast('Error: '+e.message, true); }
