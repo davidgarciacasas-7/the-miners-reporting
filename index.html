@@ -186,7 +186,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.73</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.76</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -198,7 +198,8 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="nav-item" data-tab="mermas"><span class="dot"></span>Mermas</div>
     <div class="nav-item" data-tab="produccion"><span class="dot"></span>Producción</div>
     <div class="nav-item" data-tab="ajustedemanda"><span class="dot"></span>Ajuste de demanda</div>
-    <div class="nav-item" data-tab="simulacion"><span class="dot"></span>Simulación</div>
+    <div class="nav-item" data-tab="simulacion"><span class="dot"></span>Simulación Rentabilidad</div>
+    <div class="nav-item" data-tab="simop"><span class="dot"></span>Simulación Operacional</div>
     <div class="nav-item" data-tab="performance"><span class="dot"></span>Performance del equipo</div>
     <div class="nav-item" data-tab="rentabilidad"><span class="dot"></span>Rentabilidad por franja</div>
     <div class="nav-item" data-tab="rendimiento"><span class="dot"></span>Rendimiento operacional</div>
@@ -795,9 +796,6 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <p class="hint" style="margin-bottom:8px;">Afecta a los 4 gráficos de esta pestaña (no a la plantilla de personal, que sigue mostrando todas las franjas para poder rellenarlas).</p>
         <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartRentabilidad"></canvas></div></div>
-        <div class="card" style="margin-bottom:14px;">
-          <table id="tablaRentabilidad"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>COGS</th><th>Coste laboral</th><th>Resultado</th></tr></thead><tbody></tbody></table>
-        </div>
 
         <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
           <span>Rentabilidad típica por franja (por día)</span>
@@ -812,7 +810,12 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <div class="section-title">Días rentables vs no rentables por franja (%)</div>
         <p class="hint" style="margin-bottom:8px;">Rentable + no rentable suman siempre 100% de los días del periodo.</p>
-        <div class="card"><div class="chart-wrap"><canvas id="chartDiasRentablesPct"></canvas></div></div>
+        <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartDiasRentablesPct"></canvas></div></div>
+
+        <div style="margin-bottom:6px;"><button class="btn secondary" id="rentTablaToggleBtn" style="padding:4px 10px;font-size:11px;">Mostrar tabla completa de datos</button></div>
+        <div class="card hidden" id="rentTablaWrap">
+          <table id="tablaRentabilidad"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>COGS</th><th>Coste laboral</th><th>Resultado</th></tr></thead><tbody></tbody></table>
+        </div>
       </div>
 
       <!-- RENDIMIENTO OPERACIONAL -->
@@ -888,16 +891,14 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="card"><h3>Tickets por barista y por hora (todos)</h3><div class="chart-wrap"><canvas id="chartTicketsBarista"></canvas></div></div>
         </div>
         <div class="card" style="margin-top:14px;"><h3>Tickets de bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartTicketsBebidaBarista"></canvas></div></div>
-        <div class="card" style="margin-top:14px;">
-          <table id="tablaRendimiento"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets (todos)</th><th>Tickets con bebida</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Tickets/barista/h</th><th>Tickets bebida/barista/h</th></tr></thead><tbody></tbody></table>
-        </div>
 
         <div class="section-title">¿Cuántos días se superó un umbral, en una franja concreta?</div>
-        <p class="hint" style="margin-bottom:8px;">Define aquí una franja horaria propia (no tiene que coincidir con las de la plantilla) y uno o varios umbrales — te dice, dentro del periodo Desde/Hasta de arriba, en cuántos días esa franja superó cada umbral. Útil para preguntas como "¿cuántos días entre las 10:00 y las 12:00 tuvimos más de 8 bebidas por barista y hora?".</p>
-        <div class="card">
+        <p class="hint" style="margin-bottom:8px;">Define aquí una franja horaria propia (no tiene que coincidir con las de la plantilla) y uno o varios umbrales — te dice, dentro del periodo Desde/Hasta de arriba, en cuántos días (y qué % del total) esa franja superó cada umbral. Elige si quieres calcularlo para todos los días, o solo L-V, Sábado o Domingo por separado. Útil para preguntas como "¿cuántos sábados entre las 10:00 y las 12:00 tuvimos más de 8 bebidas por barista y hora?".</p>
+        <div class="card" style="margin-bottom:14px;">
           <div class="subfilter">
             <div class="filter-group"><label>Franja — desde</label><input type="time" step="900" id="rendUmbralHoraInicio"></div>
             <div class="filter-group"><label>Franja — hasta</label><input type="time" step="900" id="rendUmbralHoraFin"></div>
+            <div class="filter-group"><label>Días a considerar</label><select id="rendUmbralFiltroDiaTipo"><option value="todos" selected>Todos los días</option><option value="semana">Solo L-V</option><option value="sabado">Solo Sábado</option><option value="domingo">Solo Domingo</option></select></div>
           </div>
           <div class="subfilter">
             <div class="filter-group"><label>Umbral bebidas/barista/h (mayor que)</label><input type="number" step="0.1" min="0" id="rendUmbralBebidas" placeholder="ej. 8"></div>
@@ -907,7 +908,108 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <button class="btn" id="rendCalcularUmbralBtn">Calcular</button>
           <div id="rendUmbralResultado" style="margin-top:12px;"></div>
         </div>
+
+        <div style="margin-bottom:6px;"><button class="btn secondary" id="rendTablaToggleBtn" style="padding:4px 10px;font-size:11px;">Mostrar tabla completa de datos</button></div>
+        <div class="card hidden" id="rendTablaWrap">
+          <table id="tablaRendimiento"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets (todos)</th><th>Tickets con bebida</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Tickets/barista/h</th><th>Tickets bebida/barista/h</th></tr></thead><tbody></tbody></table>
+        </div>
       </div>
+
+      <div class="tabpanel" id="tab-simop">
+        <div class="card" style="margin-bottom:14px;">
+          <h3>Baristas por franja horaria (plantilla de SIMULACIÓN)</h3>
+          <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="font-weight:700;color:var(--copper);">📅 Estás editando la plantilla de baristas DE SIMULACIÓN de la semana:</label>
+            <input type="date" id="simopPlantillaDia" style="max-width:200px;">
+            <span class="hint" id="simopPlantillaSemanaLabel" style="font-weight:600;"></span>
+            <span class="hint">(independiente del Desde/Hasta de los gráficos, más abajo)</span>
+          </div>
+          <p class="hint" style="margin-bottom:6px;color:var(--copper);"><b>Esta plantilla es totalmente independiente de la de Rendimiento operacional</b> — cambiarla aquí no afecta a la real, ni al revés. Sirve para simular "¿qué habría pasado con estos números de bebidas/tickets si hubiéramos tenido esta plantilla de baristas en vez de la real?", usando tus datos de venta reales.</p><p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón para L-V, otro para Sábado, otro para Domingo.</p>
+          <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 baristas en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura L–V</label><input type="time" step="900" id="simopAperturaLVInput" value="08:00"></div>
+            <div class="filter-group"><label>Cierre L–V</label><input type="time" step="900" id="simopCierreLVInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura Sábado</label><input type="time" step="900" id="simopAperturaSabInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Sábado</label><input type="time" step="900" id="simopCierreSabInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div class="filter-group"><label>Apertura Domingo</label><input type="time" step="900" id="simopAperturaDomInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Domingo</label><input type="time" step="900" id="simopCierreDomInput" value="18:00"></div>
+            <div class="filter-group"><label>Cada</label><select id="simopGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
+            <button class="btn secondary" id="simopGenerarFranjasBtn">Generar franjas</button>
+          </div>
+          <div id="simopHistorialPlantillasWrap" style="margin-bottom:14px;">
+            <p class="hint" style="margin-bottom:4px;">Semanas con plantilla guardada:</p>
+            <div id="simopHistorialPlantillas" class="card" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn" data-plantilla-tab-simop="semana" style="padding:6px 14px;font-size:12px;">Entre semana (L–V)</button>
+            <button class="btn secondary" data-plantilla-tab-simop="sabado" style="padding:6px 14px;font-size:12px;">Sábado</button>
+            <button class="btn secondary" data-plantilla-tab-simop="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
+            <button class="btn secondary" id="simopCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde L–V (sin guardar)</button>
+            <button class="btn secondary" id="simopCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar L–V → Sábado y Domingo (sin guardar)</button>
+          </div>
+          <table id="tablaBaristasSimop">
+            <thead><tr><th>Franja</th><th>Nº baristas</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+            <button class="btn secondary" id="simopGuardarBtn">Guardar solo esta semana</button>
+            <button class="btn" id="simopAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta de los gráficos)</button>
+          </div>
+          <p class="hint" id="simopGuardarStatus" style="margin-top:8px;"></p>
+        </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">Periodo a analizar en los gráficos de abajo (puede ser una semana, un mes, varios meses...)</label>
+          <div class="subfilter" style="margin-bottom:0;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="simopDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="simopHasta"></div>
+            <div class="filter-group"><label>Ver</label><select id="simopFiltroDiaTipo"><option value="todos" selected>Todos los días</option><option value="semana">Solo L-V</option><option value="sabado">Solo Sábado</option><option value="domingo">Solo Domingo</option></select></div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="simopExcluirFuera"> Excluir "Fuera de horario"</label>
+          </div>
+          <p class="hint" style="margin-top:8px;">L-V, Sábado y Domingo pueden tener plantillas y horarios distintos — usa "Ver" para analizar cada uno por separado en vez de mezclarlos.</p>
+          <p class="hint" id="simopSemanaLabel" style="margin-top:4px;"></p>
+        </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Gráficos por franja — SIMULADOS con la plantilla de arriba</span>
+          <div style="position:relative;">
+            <button class="btn secondary" id="simopFiltroFranjasBtn" style="padding:5px 12px;font-size:12px;">Filtrar franjas en los gráficos</button>
+            <div id="simopFiltroFranjasMenu" style="display:none;position:absolute;top:100%;right:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+          </div>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Afecta a los 3 gráficos de abajo (no a la plantilla de baristas, que sigue mostrando todas las franjas para poder rellenarlas).</p>
+        <div class="grid split">
+          <div class="card"><h3>Bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartBebidasBaristaSimop"></canvas></div></div>
+          <div class="card"><h3>Tickets por barista y por hora (todos)</h3><div class="chart-wrap"><canvas id="chartTicketsBaristaSimop"></canvas></div></div>
+        </div>
+        <div class="card" style="margin-top:14px;"><h3>Tickets de bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartTicketsBebidaBaristaSimop"></canvas></div></div>
+        <div class="card" style="margin-top:14px;">
+          <table id="tablaRendimientoSimop"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets (todos)</th><th>Tickets con bebida</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Tickets/barista/h</th><th>Tickets bebida/barista/h</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="section-title">¿Cuántos días se superó un umbral, en una franja concreta?</div>
+        <p class="hint" style="margin-bottom:8px;">Define aquí una franja horaria propia (no tiene que coincidir con las de la plantilla) y uno o varios umbrales — te dice, dentro del periodo Desde/Hasta de arriba, en cuántos días esa franja superó cada umbral. Útil para preguntas como "¿cuántos días entre las 10:00 y las 12:00 tuvimos más de 8 bebidas por barista y hora?".</p>
+        <div class="card">
+          <div class="subfilter">
+            <div class="filter-group"><label>Franja — desde</label><input type="time" step="900" id="simopUmbralHoraInicio"></div>
+            <div class="filter-group"><label>Franja — hasta</label><input type="time" step="900" id="simopUmbralHoraFin"></div>
+          </div>
+          <div class="subfilter">
+            <div class="filter-group"><label>Umbral bebidas/barista/h (mayor que)</label><input type="number" step="0.1" min="0" id="simopUmbralBebidas" placeholder="ej. 8"></div>
+            <div class="filter-group"><label>Umbral tickets/barista/h — todos (mayor que)</label><input type="number" step="0.1" min="0" id="simopUmbralTickets" placeholder="ej. 5"></div>
+            <div class="filter-group"><label>Umbral tickets bebida/barista/h (mayor que)</label><input type="number" step="0.1" min="0" id="simopUmbralTicketsBebida" placeholder="ej. 4"></div>
+          </div>
+          <button class="btn" id="simopCalcularUmbralBtn">Calcular</button>
+          <div id="simopUmbralResultado" style="margin-top:12px;"></div>
+        </div>
+      </div>
+
+
+      <!-- SIMULACIÓN OPERACIONAL fin -->
 
       <!-- RESUMEN EJECUTIVO -->
       <div class="tabpanel" id="tab-resumenejecutivo">
@@ -2125,7 +2227,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación','Ingresos, costes y beneficio resultante, a modo de escenario'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
+    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación Rentabilidad','Ingresos, costes y beneficio resultante, a modo de escenario'], simop:['Simulación Operacional','Bebidas y tickets simulados por barista y hora, con una plantilla de prueba'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
     const tituloActual = titles[item.dataset.tab] || [item.dataset.tab, ''];
     document.getElementById('pageTitle').textContent = tituloActual[0];
     document.getElementById('pageSub').textContent = tituloActual[1];
@@ -2160,6 +2262,18 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       }
       actualizarRendPlantillaSemanaLabel();
       renderHistorialPlantillasRend();
+    }
+    if(item.dataset.tab==='simop'){
+      const sDesdeInp = document.getElementById('simopDesde'), sHastaInp = document.getElementById('simopHasta'), sPlantillaInp = document.getElementById('simopPlantillaDia');
+      if(!sDesdeInp.value){
+        const hoy = fechaLocalISO(new Date());
+        const inicioSemana = isoMonday(hoy);
+        const finSemana = (()=>{ const d=new Date(inicioSemana+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+        sDesdeInp.value = inicioSemana; sHastaInp.value = finSemana; sPlantillaInp.value = hoy;
+        cargarBaristasSemanaSimop(inicioSemana).then(renderSimop);
+      }
+      actualizarSimopPlantillaSemanaLabel();
+      renderHistorialPlantillasSimop();
     }
     if(item.dataset.tab==='resumenejecutivo') renderResumenEjecutivo();
     if(item.dataset.tab==='vacaciones'){
@@ -2387,7 +2501,7 @@ function franjaOrderNegocioFiltrado(){
   const orden = franjaOrderFor('negocio');
   return getExcluirFueraHorario() ? orden.filter(f=>f!=='Fuera de horario') : orden;
 }
-const EXCLUIR_FUERA_CHECKBOX_IDS = ['perfExcluirFuera','rentExcluirFuera','rendExcluirFuera'];
+const EXCLUIR_FUERA_CHECKBOX_IDS = ['perfExcluirFuera','rentExcluirFuera','rendExcluirFuera','simopExcluirFuera'];
 /* qué franjas se muestran en los 4 gráficos de resultados de Rentabilidad (no afecta
    a la plantilla de personal, que siempre muestra todas para poder rellenarla) */
 function getRentFranjasOcultasGraficos(){
@@ -2437,6 +2551,11 @@ document.getElementById('rentFiltroFranjasBtn').addEventListener('click', ()=>{
   const abrir = menu.style.display==='none';
   if(abrir) renderRentFiltroFranjasMenu();
   menu.style.display = abrir ? 'block' : 'none';
+});
+document.getElementById('rentTablaToggleBtn').addEventListener('click', ()=>{
+  const wrap = document.getElementById('rentTablaWrap');
+  const oculto = wrap.classList.toggle('hidden');
+  document.getElementById('rentTablaToggleBtn').textContent = oculto ? 'Mostrar tabla completa de datos' : 'Ocultar tabla completa de datos';
 });
 /* lo mismo, para los gráficos de Rendimiento operacional */
 function getRendFranjasOcultasGraficos(){
@@ -4865,10 +4984,9 @@ async function calcularRendimientoPeriodo(desde, hasta){
 /* calcula, día a día, bebidas/tickets/tickets-con-bebida por barista y hora dentro de una
    franja horaria CUALQUIERA que el usuario elija (no tiene que coincidir con las franjas de
    la plantilla) — las barista-horas se prorratean por solape con cada línea de la plantilla */
-async function calcularDiasFranjaPersonalizada(desde, hasta, horaInicioStr, horaFinStr){
+async function calcularDiasFranjaPersonalizada(desde, hasta, horaInicioStr, horaFinStr, filtroDiaTipo){
   const inicio = horaAMinutos(horaInicioStr), fin = horaAMinutos(horaFinStr);
   if(!(fin>inicio)) return null;
-  const filtroDiaTipo = getRendFiltroDiaTipo();
   const bebidasCats = getBebidaCategorias();
   const franjasPorTipo = { semana: getRendFranjasTipo('semana'), sabado: getRendFranjasTipo('sabado'), domingo: getRendFranjasTipo('domingo') };
 
@@ -4943,14 +5061,16 @@ document.getElementById('rendCalcularUmbralBtn').addEventListener('click', async
   if(!desde || !hasta){ toast('Elige primero el periodo Desde/Hasta de arriba.', true); return; }
   const hi = document.getElementById('rendUmbralHoraInicio').value, hf = document.getElementById('rendUmbralHoraFin').value;
   if(!hi || !hf){ toast('Elige la hora de inicio y de fin de la franja a analizar.', true); return; }
+  const filtroDia = document.getElementById('rendUmbralFiltroDiaTipo').value;
   const resEl = document.getElementById('rendUmbralResultado');
   resEl.innerHTML = '<p class="hint">Calculando...</p>';
-  const resultadosDias = await calcularDiasFranjaPersonalizada(desde, hasta, hi, hf);
+  const resultadosDias = await calcularDiasFranjaPersonalizada(desde, hasta, hi, hf, filtroDia);
   if(!resultadosDias){ resEl.innerHTML = ''; toast('La hora de fin debe ser posterior a la de inicio.', true); return; }
   const totalDias = resultadosDias.length;
   const umbralBebidas = document.getElementById('rendUmbralBebidas').value;
   const umbralTickets = document.getElementById('rendUmbralTickets').value;
   const umbralTicketsBebida = document.getElementById('rendUmbralTicketsBebida').value;
+  const pct = (n) => totalDias>0 ? ' ('+(n/totalDias*100).toFixed(0)+'%)' : '';
   const filas = [];
   if(umbralBebidas!==''){
     const n = resultadosDias.filter(d=>d.bebidasPorHora>parseFloat(umbralBebidas)).length;
@@ -4965,10 +5085,16 @@ document.getElementById('rendCalcularUmbralBtn').addEventListener('click', async
     filas.push(['Tickets bebida/barista/h > '+umbralTicketsBebida, n]);
   }
   if(filas.length===0){ resEl.innerHTML = '<p class="hint">Escribe al menos un umbral para calcular.</p>'; return; }
+  const nombreDia = {todos:'todos los días', semana:'L-V', sabado:'sábados', domingo:'domingos'}[filtroDia];
   resEl.innerHTML = `<div class="card" style="border:1px solid var(--copper)55;">
-    <p class="hint" style="margin-bottom:8px;">Franja ${hi}–${hf}, periodo ${desde} a ${hasta} (${totalDias} día${totalDias!==1?'s':''} analizados):</p>
-    ${filas.map(([label,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);"><span>${label}</span><b style="color:var(--copper);">${n} de ${totalDias} día${totalDias!==1?'s':''}</b></div>`).join('')}
+    <p class="hint" style="margin-bottom:8px;">Franja ${hi}–${hf}, periodo ${desde} a ${hasta}, considerando ${nombreDia} (${totalDias} día${totalDias!==1?'s':''} analizados):</p>
+    ${filas.map(([label,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);"><span>${label}</span><b style="color:var(--copper);">${n} de ${totalDias} día${totalDias!==1?'s':''}${pct(n)}</b></div>`).join('')}
   </div>`;
+});
+document.getElementById('rendTablaToggleBtn').addEventListener('click', ()=>{
+  const wrap = document.getElementById('rendTablaWrap');
+  const oculto = wrap.classList.toggle('hidden');
+  document.getElementById('rendTablaToggleBtn').textContent = oculto ? 'Mostrar tabla completa de datos' : 'Ocultar tabla completa de datos';
 });
 async function renderRendimiento(){
   const desde = document.getElementById('rendDesde').value;
@@ -5084,6 +5210,620 @@ document.getElementById('rendAplicarPeriodoBtn').addEventListener('click', async
   }
   renderRendimiento();
   renderHistorialPlantillasRend();
+  if(fallos===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s), '+ok+' filas guardadas.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">'+ok+' filas guardadas, '+fallos+' fallaron en '+hechas+' semana(s) — probablemente falte ejecutar una migración pendiente. Detalle: '+erroresMuestra.join(' · ')+'</span>';
+  }
+  btn.disabled = false;
+});
+
+
+/* =========================================================
+   SIMULACIÓN OPERACIONAL — igual que Rendimiento operacional, pero con una
+   plantilla de baristas totalmente independiente (tabla barista_weeks_simulacion),
+   aplicada sobre los mismos datos de venta reales, para simular escenarios sin
+   tocar la plantilla real.
+   ========================================================= */
+STATE.baristaWeekSimop = [];
+STATE.simopPlantillaTipoActivo = 'semana';
+STATE.simopPlantillaDraft = {};
+function getSimopFranjasOcultasGraficos(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_simop_franjas_ocultas_graficos')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setSimopFranjasOcultasGraficos(set){ localStorage.setItem('miners_simop_franjas_ocultas_graficos', JSON.stringify([...set])); }
+function aplicarFiltroFranjasGraficosSimop(franjaOrder){
+  const ocultas = getSimopFranjasOcultasGraficos();
+  if(ocultas.size===0) return franjaOrder;
+  return franjaOrder.filter(label=>!ocultas.has(label));
+}
+function renderSimopFiltroFranjasMenu(){
+  const menu = document.getElementById('simopFiltroFranjasMenu');
+  if(!menu) return;
+  const franjas = unionFranjas(getSimopFranjasTipo('semana'), getSimopFranjasTipo('sabado'), getSimopFranjasTipo('domingo')).map(f=>f.label).concat(getExcluirFueraHorario()?[]:['Fuera de horario']);
+  const ocultas = getSimopFranjasOcultasGraficos();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en los gráficos:</div>` +
+    franjas.map(f=>{
+      const visible = !ocultas.has(f);
+      return `<div data-toggle-franja-grafico-simop="${f.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${f}</span>
+      </div>`;
+    }).join('') +
+    `<div data-franjas-marcar-todas-simop="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todas</div>`;
+  menu.querySelectorAll('[data-toggle-franja-grafico-simop]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const f = div.getAttribute('data-toggle-franja-grafico-simop');
+      const o = getSimopFranjasOcultasGraficos();
+      if(o.has(f)) o.delete(f); else o.add(f);
+      setSimopFranjasOcultasGraficos(o);
+      renderSimopFiltroFranjasMenu();
+      renderSimop();
+    });
+  });
+  const marcarTodasSimop = menu.querySelector('[data-franjas-marcar-todas-simop]');
+  if(marcarTodasSimop) marcarTodasSimop.addEventListener('click', ()=>{
+    setSimopFranjasOcultasGraficos(new Set());
+    renderSimopFiltroFranjasMenu();
+    renderSimop();
+  });
+}
+document.getElementById('simopFiltroFranjasBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('simopFiltroFranjasMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderSimopFiltroFranjasMenu();
+  menu.style.display = abrir ? 'block' : 'none';
+});
+
+function getSimopFranjasTipo(tipo){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_simop_franjas_'+tipo));
+    if(Array.isArray(v) && v.length) return v;
+  }catch(e){}
+  return getRendFranjas();
+}
+function setSimopFranjasTipo(tipo, list){ localStorage.setItem('miners_simop_franjas_'+tipo, JSON.stringify(list)); }
+
+function inicializarDraftPlantillaSimop(){
+  const draft = {};
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    getSimopFranjasTipo(tipo).forEach(f=>{
+      const d = STATE.baristaWeekSimop.find(s=>s.franja===f.id && s.tipoDia===tipo) || {numBaristas:0};
+      draft[f.id+'|'+tipo+'|numBaristas'] = d.numBaristas;
+    });
+  });
+  STATE.simopPlantillaDraft = draft;
+}
+function renderTablaBaristasSimop(){
+  const tbody = document.querySelector('#tablaBaristasSimop tbody');
+  const tipoActivo = STATE.simopPlantillaTipoActivo || 'semana';
+  const franjas = getSimopFranjasTipo(tipoActivo);
+  const draft = STATE.simopPlantillaDraft || {};
+  const leerDraft = (fid) => draft[fid+'|'+tipoActivo+'|numBaristas'] ?? 0;
+  const inputTiempo = (val, attr, id) => `<input type="time" step="900" value="${val}" data-${attr}="${id}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 5px;font-size:12px;">`;
+  tbody.innerHTML = (franjas.length ? franjas.map((f,idx)=>{
+    const boton = idx>0 ? `<button class="btn secondary" data-copiar-fila-anterior-rend="${f.id}" title="Copiar el número de la franja anterior" style="padding:2px 5px;font-size:10px;margin-left:3px;">↑</button>` : '';
+    return `<tr>
+      <td style="white-space:nowrap;">${inputTiempo(minutosAHora(f.start),'rend-franja-inicio',f.id)} – ${inputTiempo(minutosAHora(f.end),'rend-franja-fin',f.id)} <button class="btn danger" data-rend-franja-quitar="${f.id}" style="padding:2px 6px;font-size:10px;">✕</button></td>
+      <td class="num"><input type="number" step="1" min="0" value="${leerDraft(f.id)}" data-barista="${f.id}" style="width:60px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;">${boton}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="2" class="hint">Sin franjas en esta pestaña todavía.</td></tr>')
+    + `<tr><td colspan="2" style="padding-top:10px;"><button class="btn secondary" id="simopFranjaAddBtn" style="padding:5px 10px;font-size:12px;">+ Añadir línea de horario</button></td></tr>`;
+
+  tbody.querySelectorAll('[data-copiar-fila-anterior-rend]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-copiar-fila-anterior-rend');
+      const idx = franjas.findIndex(f=>f.id===id);
+      if(idx<=0) return;
+      const valorAnterior = leerDraft(franjas[idx-1].id);
+      STATE.simopPlantillaDraft[id+'|'+tipoActivo+'|numBaristas'] = valorAnterior;
+      const input = tbody.querySelector('[data-barista="'+id+'"]');
+      if(input) input.value = valorAnterior;
+    });
+  });
+
+  tbody.querySelectorAll('[data-barista]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const id = inp.getAttribute('data-barista');
+      STATE.simopPlantillaDraft[id+'|'+tipoActivo+'|numBaristas'] = parseFloat(inp.value)||0;
+    });
+  });
+  tbody.querySelectorAll('[data-rend-franja-inicio]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const id = inp.getAttribute('data-rend-franja-inicio');
+      const fr = getSimopFranjasTipo(tipoActivo);
+      const f = fr.find(x=>x.id===id);
+      if(f){ f.start = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setSimopFranjasTipo(tipoActivo, fr); renderTablaBaristasSimop(); renderSimop(); }
+    });
+  });
+  tbody.querySelectorAll('[data-rend-franja-fin]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const id = inp.getAttribute('data-rend-franja-fin');
+      const fr = getSimopFranjasTipo(tipoActivo);
+      const f = fr.find(x=>x.id===id);
+      if(f){ f.end = horaAMinutos(inp.value); f.label = minutosAHora(f.start)+'–'+minutosAHora(f.end); setSimopFranjasTipo(tipoActivo, fr); renderTablaBaristasSimop(); renderSimop(); }
+    });
+  });
+  tbody.querySelectorAll('[data-rend-franja-quitar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!confirm('¿Quitar esta línea de horario de "'+nombreTipoDia(tipoActivo)+'"? Solo afecta a esta pestaña. El personal guardado para ella dejará de contarse.')) return;
+      setSimopFranjasTipo(tipoActivo, getSimopFranjasTipo(tipoActivo).filter(f=>f.id!==btn.getAttribute('data-rend-franja-quitar')));
+      renderTablaBaristasSimop(); renderSimop();
+    });
+  });
+  const addBtn = document.getElementById('simopFranjaAddBtn');
+  if(addBtn) addBtn.addEventListener('click', ()=>{
+    const fr = getSimopFranjasTipo(tipoActivo);
+    const maxN = fr.reduce((m,f)=>Math.max(m, parseInt((f.id||'f0').replace('f',''),10)||0), 0);
+    const lastEnd = fr.length ? fr[fr.length-1].end : 8*60;
+    const nuevoFin = Math.min(lastEnd+60, 23*60+59);
+    const nuevaFranja = { id:'f'+(maxN+1), start:lastEnd, end:nuevoFin, label:minutosAHora(lastEnd)+'–'+minutosAHora(nuevoFin) };
+    fr.push(nuevaFranja);
+    setSimopFranjasTipo(tipoActivo, fr);
+    STATE.simopPlantillaDraft[nuevaFranja.id+'|'+tipoActivo+'|numBaristas'] = 0;
+    renderTablaBaristasSimop(); renderSimop();
+  });
+}
+document.querySelectorAll('[data-plantilla-tab-simop]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    STATE.simopPlantillaTipoActivo = btn.getAttribute('data-plantilla-tab-simop');
+    document.querySelectorAll('[data-plantilla-tab-simop]').forEach(b=>{
+      b.classList.toggle('secondary', b.getAttribute('data-plantilla-tab-simop')!==STATE.simopPlantillaTipoActivo);
+    });
+    document.getElementById('simopCopiarLVBtn').style.display = STATE.simopPlantillaTipoActivo==='semana' ? 'none' : 'inline-flex';
+    renderTablaBaristasSimop();
+  });
+});
+document.getElementById('simopCopiarLVBtn').addEventListener('click', ()=>{
+  const tipoDestino = STATE.simopPlantillaTipoActivo;
+  if(tipoDestino==='semana') return;
+  const nombreDestino = nombreTipoDia(tipoDestino);
+  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye las franjas y los valores que tengas ahora en esta pestaña (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getSimopFranjasTipo('semana')));
+  setSimopFranjasTipo(tipoDestino, franjasLV);
+  franjasLV.forEach(f=>{ STATE.simopPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.simopPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  renderTablaBaristasSimop();
+  toast('Horario y valores copiados desde L-V — recuerda guardar para que se quede.');
+});
+document.getElementById('simopCopiarAmbosBtn').addEventListener('click', ()=>{
+  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye las franjas y los valores que tengas ahora en ambas (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getSimopFranjasTipo('semana')));
+  ['sabado','domingo'].forEach(tipoDestino=>{
+    setSimopFranjasTipo(tipoDestino, JSON.parse(JSON.stringify(franjasLV)));
+    franjasLV.forEach(f=>{ STATE.simopPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.simopPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  });
+  renderTablaBaristasSimop();
+  toast('Horario y valores copiados a Sábado y Domingo — recuerda guardar para que se quede.');
+});
+function actualizarSimopPlantillaSemanaLabel(){
+  const fecha = document.getElementById('simopPlantillaDia').value;
+  const labelEl = document.getElementById('simopPlantillaSemanaLabel');
+  if(!fecha || !labelEl){ if(labelEl) labelEl.textContent=''; return; }
+  const ws = isoMonday(fecha);
+  const we = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+  labelEl.textContent = 'Semana del '+ws+' al '+we;
+}
+let simopSemanasSeleccionadas = new Set();
+async function renderHistorialPlantillasSimop(){
+  const el = document.getElementById('simopHistorialPlantillas');
+  if(!el) return;
+  el.innerHTML = '<p class="hint">Cargando...</p>';
+  let semanas = [];
+  try{
+    const rows = await sbList('barista_weeks_simulacion', 'select=week_start&order=week_start.desc');
+    semanas = [...new Set(rows.map(r=>r.week_start))];
+  }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; return; }
+  if(semanas.length===0){ el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>'; simopSemanasSeleccionadas = new Set(); return; }
+  simopSemanasSeleccionadas = new Set([...simopSemanasSeleccionadas].filter(ws=>semanas.includes(ws)));
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line);">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);"><input type="checkbox" id="simopSemanasCheckAll"> Seleccionar todas</label>
+      <span class="hint" id="simopSemanasSeleccionCount"></span>
+      <button class="btn danger" id="simopBorrarSemanasBtn" style="padding:3px 10px;font-size:11px;" disabled>Borrar seleccionadas</button>
+    </div>
+  ` + semanas.map(ws=>{
+    const fin = (()=>{ const d=new Date(ws+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
+      <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" class="simop-semana-check" data-semana="${ws}" ${simopSemanasSeleccionadas.has(ws)?'checked':''}><span class="hint">Semana del ${ws} al ${fin}</span></label>
+      <div style="display:flex;gap:6px;">
+        <button class="btn secondary" data-cargar-semana-rend="${ws}" style="padding:3px 10px;font-size:11px;">Cargar</button>
+        <button class="btn danger" data-eliminar-semana-rend="${ws}" style="padding:3px 10px;font-size:11px;">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const actualizarBarraSeleccionSemanasSimop = () => {
+    const n = simopSemanasSeleccionadas.size;
+    const countEl = document.getElementById('simopSemanasSeleccionCount');
+    const btnEl = document.getElementById('simopBorrarSemanasBtn');
+    if(countEl) countEl.textContent = n>0 ? n+' seleccionada'+(n>1?'s':'') : '';
+    if(btnEl) btnEl.disabled = n===0;
+  };
+  el.querySelectorAll('.simop-semana-check').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      const ws = cb.getAttribute('data-semana');
+      if(cb.checked) simopSemanasSeleccionadas.add(ws); else simopSemanasSeleccionadas.delete(ws);
+      actualizarBarraSeleccionSemanasSimop();
+    });
+  });
+  const checkAllSimop = document.getElementById('simopSemanasCheckAll');
+  checkAllSimop.checked = semanas.length>0 && semanas.every(ws=>simopSemanasSeleccionadas.has(ws));
+  checkAllSimop.addEventListener('change', (e)=>{
+    if(e.target.checked) semanas.forEach(ws=>simopSemanasSeleccionadas.add(ws));
+    else simopSemanasSeleccionadas.clear();
+    renderHistorialPlantillasSimop();
+  });
+  document.getElementById('simopBorrarSemanasBtn').addEventListener('click', async ()=>{
+    const n = simopSemanasSeleccionadas.size;
+    if(n===0) return;
+    if(!confirm('¿Eliminar '+n+' semana(s) de plantilla guardada? No se puede deshacer.')) return;
+    const btn = document.getElementById('simopBorrarSemanasBtn');
+    btn.textContent = 'Borrando...'; btn.disabled = true;
+    try{
+      for(const ws of simopSemanasSeleccionadas){
+        const rows = await sbList('barista_weeks_simulacion', 'select=id&week_start=eq.'+ws);
+        for(const r of rows){ await sbDelete('barista_weeks_simulacion', r.id); }
+      }
+      toast(n+' semana(s) eliminada(s).');
+      simopSemanasSeleccionadas = new Set();
+      renderHistorialPlantillasSimop();
+      const diaActual = document.getElementById('simopPlantillaDia').value;
+      if(diaActual) await cargarBaristasSemanaSimop(isoMonday(diaActual));
+    }catch(e){ toast('Error: '+e.message, true); btn.textContent='Borrar seleccionadas'; btn.disabled=false; }
+  });
+  actualizarBarraSeleccionSemanasSimop();
+
+  el.querySelectorAll('[data-cargar-semana-rend]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ws = btn.getAttribute('data-cargar-semana-rend');
+      document.getElementById('simopPlantillaDia').value = ws;
+      actualizarSimopPlantillaSemanaLabel();
+      await cargarBaristasSemanaSimop(ws);
+      toast('Plantilla de la semana del '+ws+' cargada.');
+    });
+  });
+  el.querySelectorAll('[data-eliminar-semana-rend]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const ws = btn.getAttribute('data-eliminar-semana-rend');
+      if(!confirm('¿Eliminar toda la plantilla guardada para la semana del '+ws+'? No se puede deshacer.')) return;
+      btn.textContent = 'Borrando...'; btn.disabled = true;
+      try{
+        const rows = await sbList('barista_weeks_simulacion', 'select=id&week_start=eq.'+ws);
+        for(const r of rows){ await sbDelete('barista_weeks_simulacion', r.id); }
+        toast('Plantilla eliminada.');
+        renderHistorialPlantillasSimop();
+        const diaActual = document.getElementById('simopPlantillaDia').value;
+        if(diaActual && isoMonday(diaActual)===ws){ await cargarBaristasSemanaSimop(ws); }
+      }catch(e){ toast('Error: '+e.message, true); btn.textContent='Eliminar'; btn.disabled=false; }
+    });
+  });
+}
+document.getElementById('simopGenerarFranjasBtn').addEventListener('click', ()=>{
+  if(!confirm('Esto sustituye las líneas de horario de los 3 patrones (L-V, Sábado, Domingo) por unas nuevas generadas automáticamente, cada una con su propio horario de apertura/cierre — pueden salir con distinto número de franjas. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
+  const pares = {
+    semana: [horaAMinutos(document.getElementById('simopAperturaLVInput').value), horaAMinutos(document.getElementById('simopCierreLVInput').value)],
+    sabado: [horaAMinutos(document.getElementById('simopAperturaSabInput').value), horaAMinutos(document.getElementById('simopCierreSabInput').value)],
+    domingo: [horaAMinutos(document.getElementById('simopAperturaDomInput').value), horaAMinutos(document.getElementById('simopCierreDomInput').value)],
+  };
+  const gran = parseInt(document.getElementById('simopGranularidadFranja').value,10);
+  let totalFranjas = 0;
+  for(const tipo of ['semana','sabado','domingo']){
+    const [apertura, cierre] = pares[tipo];
+    if(!(cierre>apertura)){ toast('El cierre de "'+nombreTipoDia(tipo)+'" debe ser posterior a su apertura.', true); return; }
+    const franjas = generarListaFranjas(apertura, cierre, gran);
+    setSimopFranjasTipo(tipo, franjas);
+    franjas.forEach(f=>{ STATE.simopPlantillaDraft[f.id+'|'+tipo+'|numBaristas']=0; });
+    totalFranjas += franjas.length;
+  }
+  renderTablaBaristasSimop();
+  renderSimop();
+  toast('Franjas generadas para los 3 patrones ('+totalFranjas+' líneas en total, independientes entre sí).');
+});
+async function cargarBaristasSemanaSimop(weekStart){
+  try{
+    const rows = await sbList('barista_weeks_simulacion', 'select=*&week_start=eq.'+weekStart);
+    STATE.baristaWeekSimop = rows.map(r=>({ id:r.id, franja:r.franja, tipoDia:r.tipo_dia, numBaristas:parseFloat(r.num_baristas) }));
+  }catch(e){
+    STATE.baristaWeekSimop = [];
+    toast('No se pudo cargar la plantilla de baristas: '+e.message, true);
+  }
+  inicializarDraftPlantillaSimop();
+  renderTablaBaristasSimop();
+}
+/* trae TODAS las plantillas de baristas guardadas cuyas semanas caen dentro de [desde,hasta] */
+async function cargarBaristasEnRangoSimop(desde, hasta){
+  const wsDesde = isoMonday(desde), wsHasta = isoMonday(hasta);
+  try{
+    const rows = await sbList('barista_weeks_simulacion', 'select=*&week_start=gte.'+wsDesde+'&week_start=lte.'+wsHasta);
+    return rows.map(r=>({ weekStart:r.week_start, franja:r.franja, tipoDia:r.tipo_dia, numBaristas:parseFloat(r.num_baristas) }));
+  }catch(e){ toast('No se pudieron cargar las plantillas del periodo: '+e.message, true); return []; }
+}
+function getSimopFiltroDiaTipo(){ return localStorage.getItem('miners_simop_filtro_dia_tipo') || 'todos'; }
+function setSimopFiltroDiaTipo(v){ localStorage.setItem('miners_simop_filtro_dia_tipo', v); }
+async function calcularSimopPeriodo(desde, hasta){
+  const filtroDiaTipo = getSimopFiltroDiaTipo();
+  const franjasPorTipo = { semana: getSimopFranjasTipo('semana'), sabado: getSimopFranjasTipo('sabado'), domingo: getSimopFranjasTipo('domingo') };
+  const franjasReferencia = filtroDiaTipo==='todos' ? unionFranjas(franjasPorTipo.semana, franjasPorTipo.sabado, franjasPorTipo.domingo) : franjasPorTipo[filtroDiaTipo];
+  const incluirFuera = !getExcluirFueraHorario();
+  const idsOrder = franjasReferencia.map(f=>f.start+'-'+f.end).concat(incluirFuera ? ['fuera'] : []);
+  const labelDe = {}; franjasReferencia.forEach(f=>labelDe[f.start+'-'+f.end]=f.label); labelDe['fuera']='Fuera de horario';
+  const bebidasCats = getBebidaCategorias();
+  const resPorId = {}; idsOrder.forEach(id=>resPorId[id]={bebidas:0, tickets:0, ticketsBebida:0, baristaHoras:0});
+
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const porTicket = {}; // ticketIdx -> {franjaId, tieneBebida}
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
+      if(fecha<desde || fecha>hasta) return;
+      if(!esPago) return;
+      if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
+      const tipoDelDia = diaTipoDeFecha(fecha);
+      const id = clasificarEnFranjas(hora, franjasPorTipo[tipoDelDia]);
+      if(!resPorId[id]) return;
+      const esBebida = bebidasCats.includes(pd.cats[catIdx]);
+      if(esBebida) resPorId[id].bebidas += cant;
+      if(!porTicket[ticketIdx]) porTicket[ticketIdx] = { franjaId:id, tieneBebida:false };
+      if(esBebida) porTicket[ticketIdx].tieneBebida = true;
+    });
+    Object.values(porTicket).forEach(t=>{
+      if(!resPorId[t.franjaId]) return;
+      resPorId[t.franjaId].tickets++;
+      if(t.tieneBebida) resPorId[t.franjaId].ticketsBebida++;
+    });
+  }
+
+  const plantillas = await cargarBaristasEnRangoSimop(desde, hasta);
+  const semanasConPlantilla = new Set(plantillas.map(p=>p.weekStart));
+  const patronMap = {};
+  plantillas.forEach(p=>{ patronMap[p.weekStart+'|'+p.franja+'|'+p.tipoDia] = p; });
+
+  const semanasSinPlantilla = new Set();
+  let d = new Date(desde+'T00:00:00');
+  const end = new Date(hasta+'T00:00:00');
+  while(d<=end){
+    const fechaStr = fechaLocalISO(d);
+    const ws = isoMonday(fechaStr);
+    const dow = d.getDay(); // 0=domingo ... 6=sabado
+    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
+    if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
+    franjasPorTipo[tipoDia].forEach(f=>{
+      const idRef = f.start+'-'+f.end;
+      if(!resPorId[idRef]) return;
+      const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+      if(p) resPorId[idRef].baristaHoras += p.numBaristas * ((f.end-f.start)/60);
+    });
+    d.setDate(d.getDate()+1);
+  }
+
+  const franjaOrder = idsOrder.map(id=>labelDe[id]);
+  const resultado = {}; idsOrder.forEach(id=>resultado[labelDe[id]] = resPorId[id]);
+  return { franjaOrder, resultado, semanasSinPlantilla: [...semanasSinPlantilla].sort() };
+}
+/* calcula, día a día, bebidas/tickets/tickets-con-bebida por barista y hora dentro de una
+   franja horaria CUALQUIERA que el usuario elija (no tiene que coincidir con las franjas de
+   la plantilla) — las barista-horas se prorratean por solape con cada línea de la plantilla */
+async function calcularDiasFranjaPersonalizadaSimop(desde, hasta, horaInicioStr, horaFinStr){
+  const inicio = horaAMinutos(horaInicioStr), fin = horaAMinutos(horaFinStr);
+  if(!(fin>inicio)) return null;
+  const filtroDiaTipo = getSimopFiltroDiaTipo();
+  const bebidasCats = getBebidaCategorias();
+  const franjasPorTipo = { semana: getSimopFranjasTipo('semana'), sabado: getSimopFranjasTipo('sabado'), domingo: getSimopFranjasTipo('domingo') };
+
+  const porDia = {};
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const ticketsVistos = {}; // fecha_ticketIdx -> tieneBebida
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
+      if(fecha<desde || fecha>hasta) return;
+      if(!esPago) return;
+      if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
+      const min = horaAMinutos(hora);
+      if(!(min>=inicio && min<fin)) return;
+      if(!porDia[fecha]) porDia[fecha] = {bebidas:0};
+      const esBebida = bebidasCats.includes(pd.cats[catIdx]);
+      if(esBebida) porDia[fecha].bebidas += cant;
+      const key = fecha+'_'+ticketIdx;
+      if(esBebida) ticketsVistos[key] = true;
+      else if(!(key in ticketsVistos)) ticketsVistos[key] = false;
+    });
+    const contadoPorFecha = {};
+    Object.keys(ticketsVistos).forEach(key=>{
+      const fecha = key.slice(0, key.lastIndexOf('_'));
+      if(!contadoPorFecha[fecha]) contadoPorFecha[fecha] = {tickets:0, ticketsBebida:0};
+      contadoPorFecha[fecha].tickets++;
+      if(ticketsVistos[key]) contadoPorFecha[fecha].ticketsBebida++;
+    });
+    Object.keys(contadoPorFecha).forEach(fecha=>{
+      if(!porDia[fecha]) porDia[fecha] = {bebidas:0};
+      porDia[fecha].tickets = (porDia[fecha].tickets||0) + contadoPorFecha[fecha].tickets;
+      porDia[fecha].ticketsBebida = (porDia[fecha].ticketsBebida||0) + contadoPorFecha[fecha].ticketsBebida;
+    });
+  }
+
+  const plantillas = await cargarBaristasEnRangoSimop(desde, hasta);
+  const patronMap = {};
+  plantillas.forEach(p=>{ patronMap[p.weekStart+'|'+p.franja+'|'+p.tipoDia] = p; });
+
+  const resultadosDias = [];
+  let d = new Date(desde+'T00:00:00');
+  const end = new Date(hasta+'T00:00:00');
+  while(d<=end){
+    const fechaStr = fechaLocalISO(d);
+    const ws = isoMonday(fechaStr);
+    const dow = d.getDay();
+    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
+    if(filtroDiaTipo==='todos' || tipoDia===filtroDiaTipo){
+      let baristaHoras = 0;
+      franjasPorTipo[tipoDia].forEach(f=>{
+        const solapeInicio = Math.max(f.start, inicio), solapeFin = Math.min(f.end, fin);
+        if(solapeFin>solapeInicio){
+          const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+          if(p) baristaHoras += p.numBaristas * (solapeFin-solapeInicio)/60;
+        }
+      });
+      const datos = porDia[fechaStr] || {bebidas:0, tickets:0, ticketsBebida:0};
+      resultadosDias.push({
+        fecha: fechaStr,
+        baristaHoras,
+        bebidasPorHora: baristaHoras>0 ? (datos.bebidas||0)/baristaHoras : 0,
+        ticketsPorHora: baristaHoras>0 ? (datos.tickets||0)/baristaHoras : 0,
+        ticketsBebidaPorHora: baristaHoras>0 ? (datos.ticketsBebida||0)/baristaHoras : 0,
+      });
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return resultadosDias;
+}
+document.getElementById('simopCalcularUmbralBtn').addEventListener('click', async ()=>{
+  const desde = document.getElementById('simopDesde').value, hasta = document.getElementById('simopHasta').value;
+  if(!desde || !hasta){ toast('Elige primero el periodo Desde/Hasta de arriba.', true); return; }
+  const hi = document.getElementById('simopUmbralHoraInicio').value, hf = document.getElementById('simopUmbralHoraFin').value;
+  if(!hi || !hf){ toast('Elige la hora de inicio y de fin de la franja a analizar.', true); return; }
+  const resEl = document.getElementById('simopUmbralResultado');
+  resEl.innerHTML = '<p class="hint">Calculando...</p>';
+  const resultadosDias = await calcularDiasFranjaPersonalizadaSimop(desde, hasta, hi, hf);
+  if(!resultadosDias){ resEl.innerHTML = ''; toast('La hora de fin debe ser posterior a la de inicio.', true); return; }
+  const totalDias = resultadosDias.length;
+  const umbralBebidas = document.getElementById('simopUmbralBebidas').value;
+  const umbralTickets = document.getElementById('simopUmbralTickets').value;
+  const umbralTicketsBebida = document.getElementById('simopUmbralTicketsBebida').value;
+  const filas = [];
+  if(umbralBebidas!==''){
+    const n = resultadosDias.filter(d=>d.bebidasPorHora>parseFloat(umbralBebidas)).length;
+    filas.push(['Bebidas/barista/h > '+umbralBebidas, n]);
+  }
+  if(umbralTickets!==''){
+    const n = resultadosDias.filter(d=>d.ticketsPorHora>parseFloat(umbralTickets)).length;
+    filas.push(['Tickets/barista/h (todos) > '+umbralTickets, n]);
+  }
+  if(umbralTicketsBebida!==''){
+    const n = resultadosDias.filter(d=>d.ticketsBebidaPorHora>parseFloat(umbralTicketsBebida)).length;
+    filas.push(['Tickets bebida/barista/h > '+umbralTicketsBebida, n]);
+  }
+  if(filas.length===0){ resEl.innerHTML = '<p class="hint">Escribe al menos un umbral para calcular.</p>'; return; }
+  resEl.innerHTML = `<div class="card" style="border:1px solid var(--copper)55;">
+    <p class="hint" style="margin-bottom:8px;">Franja ${hi}–${hf}, periodo ${desde} a ${hasta} (${totalDias} día${totalDias!==1?'s':''} analizados):</p>
+    ${filas.map(([label,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);"><span>${label}</span><b style="color:var(--copper);">${n} de ${totalDias} día${totalDias!==1?'s':''}</b></div>`).join('')}
+  </div>`;
+});
+async function renderSimop(){
+  const desde = document.getElementById('simopDesde').value;
+  const hasta = document.getElementById('simopHasta').value;
+  if(!desde || !hasta) return;
+
+  const { franjaOrder: franjaOrderCompletoSimop, resultado, semanasSinPlantilla } = await calcularSimopPeriodo(desde, hasta);
+  const franjaOrder = aplicarFiltroFranjasGraficosSimop(franjaOrderCompletoSimop);
+  let label = 'Periodo: '+desde+' a '+hasta;
+  if(semanasSinPlantilla.length>0){
+    label += ' — <span style="color:var(--negative)">'+semanasSinPlantilla.length+' semana(s) sin plantilla de baristas guardada (sus horas cuentan como 0): '+semanasSinPlantilla.join(', ')+'</span>';
+  }
+  document.getElementById('simopSemanaLabel').innerHTML = label;
+
+  const c = chartColors();
+  const bebidasPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.bebidas/r.baristaHoras : 0; });
+  const ticketsPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.tickets/r.baristaHoras : 0; });
+  const ticketsBebidaPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.ticketsBebida/r.baristaHoras : 0; });
+
+  destroyChart('bebidasBaristaSimop');
+  STATE.charts.bebidasBaristaSimop = safeNewChart('chartBebidasBaristaSimop', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[ trendDataset('Bebidas/barista/h', bebidasPorHora.map(v=>+v.toFixed(1)), c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  });
+  destroyChart('ticketsBaristaSimop');
+  STATE.charts.ticketsBaristaSimop = safeNewChart('chartTicketsBaristaSimop', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets/barista/h', ticketsPorHora.map(v=>+v.toFixed(1)), c.verdigris) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  });
+  destroyChart('ticketsBebidaBaristaSimop');
+  STATE.charts.ticketsBebidaBaristaSimop = safeNewChart('chartTicketsBebidaBaristaSimop', {
+    type: trendChartType(),
+    data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets bebida/barista/h', ticketsBebidaPorHora.map(v=>+v.toFixed(1)), '#8B6A46') ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
+  });
+
+  document.querySelector('#tablaRendimientoSimop tbody').innerHTML = franjaOrder.map((f,i)=>{
+    const r = resultado[f];
+    return `<tr><td>${f}</td><td class="num">${r.bebidas.toFixed(0)}</td><td class="num">${r.tickets}</td><td class="num">${r.ticketsBebida}</td><td class="num">${r.baristaHoras.toFixed(0)}</td><td class="num">${bebidasPorHora[i].toFixed(1)}</td><td class="num">${ticketsPorHora[i].toFixed(1)}</td><td class="num">${ticketsBebidaPorHora[i].toFixed(1)}</td></tr>`;
+  }).join('');
+}
+document.getElementById('simopDesde').addEventListener('change', renderSimop);
+document.getElementById('simopHasta').addEventListener('change', renderSimop);
+document.getElementById('simopFiltroDiaTipo').addEventListener('change', (e)=>{
+  setSimopFiltroDiaTipo(e.target.value);
+  renderSimop();
+});
+document.getElementById('simopPlantillaDia').addEventListener('change', async ()=>{
+  const fecha = document.getElementById('simopPlantillaDia').value;
+  if(!fecha) return;
+  actualizarSimopPlantillaSemanaLabel();
+  await cargarBaristasSemanaSimop(isoMonday(fecha));
+});
+function filasDesdeDraftPlantillaSimop(){
+  const filas = [];
+  ['semana','sabado','domingo'].forEach(tipo=>{
+    getSimopFranjasTipo(tipo).forEach(f=>{
+      filas.push({ franja: f.id, tipoDia: tipo, numBaristas: STATE.simopPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0 });
+    });
+  });
+  return filas;
+}
+document.getElementById('simopGuardarBtn').addEventListener('click', async ()=>{
+  const fecha = document.getElementById('simopPlantillaDia').value;
+  if(!fecha){ toast('Elige primero qué semana estás editando.', true); return; }
+  const weekStart = isoMonday(fecha);
+  const weekEnd = (()=>{ const d=new Date(weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+  if(!confirm('Vas a guardar la plantilla de baristas para la semana del '+weekStart+' al '+weekEnd+'.\n\n¿Es esta la semana correcta?')) return;
+  const statusEl = document.getElementById('simopGuardarStatus');
+  statusEl.textContent = 'Guardando...';
+  const filas = filasDesdeDraftPlantillaSimop();
+  let ok = 0; const errores = [];
+  for(const row of filas){
+    try{
+      await sbUpsert('barista_weeks_simulacion', { week_start:weekStart, franja:row.franja, tipo_dia:row.tipoDia, num_baristas:row.numBaristas }, 'week_start,franja,tipo_dia');
+      ok++;
+    }catch(e){ errores.push(row.franja+'/'+row.tipoDia+': '+e.message); }
+  }
+  await cargarBaristasSemanaSimop(weekStart);
+  renderSimop();
+  renderHistorialPlantillasSimop();
+  if(errores.length===0){
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente: '+ok+' de '+filas.length+' filas, para la semana del '+weekStart+'.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+filas.length+' filas. Fallaron '+errores.length+' — probablemente falte ejecutar una migración pendiente. Detalle: '+errores.slice(0,3).join(' · ')+(errores.length>3?' ...':'')+'</span>';
+  }
+});
+document.getElementById('simopAplicarPeriodoBtn').addEventListener('click', async ()=>{
+  const desde = document.getElementById('simopDesde').value;
+  const hasta = document.getElementById('simopHasta').value;
+  if(!desde || !hasta){ toast('Elige primero el periodo Desde/Hasta arriba.', true); return; }
+  const wsDesde = isoMonday(desde), wsHasta = isoMonday(hasta);
+  const nSemanas = Math.round((new Date(wsHasta)-new Date(wsDesde))/(7*86400000))+1;
+  if(!confirm('Esto aplica la plantilla que ves ahora mismo (los 3 patrones: L-V, Sábado y Domingo) a las '+nSemanas+' semana(s) entre '+desde+' y '+hasta+', sobrescribiendo lo que ya hubiera guardado en cada una. ¿Continuar?')) return;
+  const btn = document.getElementById('simopAplicarPeriodoBtn');
+  const statusEl = document.getElementById('simopGuardarStatus');
+  btn.disabled = true;
+  const filas = filasDesdeDraftPlantillaSimop();
+  let ws = wsDesde, hechas = 0, ok = 0, fallos = 0;
+  const erroresMuestra = [];
+  while(ws<=wsHasta){
+    statusEl.textContent = 'Aplicando... semana '+(hechas+1)+' de '+nSemanas+' ('+ws+')';
+    for(const row of filas){
+      try{
+        await sbUpsert('barista_weeks_simulacion', { week_start:ws, franja:row.franja, tipo_dia:row.tipoDia, num_baristas:row.numBaristas }, 'week_start,franja,tipo_dia');
+        ok++;
+      }catch(e){ fallos++; if(erroresMuestra.length<3) erroresMuestra.push(ws+' '+row.franja+'/'+row.tipoDia+': '+e.message); }
+    }
+    hechas++;
+    const d = new Date(ws+'T00:00:00'); d.setDate(d.getDate()+7); ws = fechaLocalISO(d);
+  }
+  renderSimop();
+  renderHistorialPlantillasSimop();
   if(fallos===0){
     statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla aplicada a '+hechas+' semana(s), '+ok+' filas guardadas.</span>';
   } else {
