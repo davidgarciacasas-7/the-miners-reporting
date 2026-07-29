@@ -150,6 +150,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 .subfilter{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .subfilter select{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;}
 #ventasGranularidad,#ticketsGranularidad{background:var(--bg);border:1px solid var(--line);color:var(--copper);border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:600;text-transform:none;letter-spacing:0;}
+.hidden{display:none !important;}
 </style>
 </head>
 <body>
@@ -186,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.80</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.89</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -452,6 +453,22 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <p class="hint" id="pnlStatus"></p>
         <div id="pnlHiddenRowsInfo" style="margin-bottom:8px;"></div>
         <div id="pnlHiddenBucketsInfo" style="margin-bottom:8px;"></div>
+
+        <div class="section-title">Plantillas guardadas</div>
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Cada plantilla recuerda qué filas y qué columnas tienes ocultas, y cómo has llamado a las filas de totales — así puedes tener, por ejemplo, una plantilla "Para inversores" (con menos detalle) y otra "Para mí" (con todo), y cambiar entre ellas al momento.</p>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <select id="pnlPlantillaSelect" style="flex:1;"><option value="">Elegir plantilla guardada...</option></select>
+            <button class="btn secondary" id="pnlPlantillaCargarBtn" style="padding:6px 12px;font-size:12px;">Cargar</button>
+            <button class="btn danger" id="pnlPlantillaBorrarBtn" style="padding:6px 12px;font-size:12px;">Borrar</button>
+          </div>
+          <div class="subfilter" style="margin-bottom:0;">
+            <input type="text" id="pnlPlantillaNombreInput" placeholder="Nombre para guardar la vista actual (ej. 'Para inversores')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
+            <button class="btn" id="pnlPlantillaGuardarBtn" style="padding:6px 12px;font-size:12px;">Guardar vista actual como plantilla</button>
+          </div>
+          <p class="hint" id="pnlPlantillaStatus" style="margin-top:8px;"></p>
+        </div>
+
         <div class="card" style="overflow-x:auto;">
           <table id="tablaPnl" class="mono"><thead><tr></tr></thead><tbody></tbody><tfoot></tfoot></table>
         </div>
@@ -611,7 +628,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <div class="card">
           <div style="max-height:420px;overflow:auto;">
-            <table id="tablaMermas"><thead><tr><th><input type="checkbox" id="mermasCheckAll"></th><th>Fecha</th><th>Hora</th><th>Empleado</th><th>Producto</th><th>Cantidad</th><th>Categoría</th><th>Dicho originalmente</th><th></th></tr></thead><tbody></tbody></table>
+            <table id="tablaMermas"><thead><tr><th><input type="checkbox" id="mermasCheckAll"></th><th>Fecha</th><th>Hora</th><th>Empleado</th><th>Producto</th><th>Cantidad</th><th>Categoría</th><th>Coste</th><th>Dicho originalmente</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </div>
@@ -654,6 +671,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="subfilter" style="margin-top:10px;">
             <div class="filter-group"><label>Desde</label><input type="date" id="produccionDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="produccionHasta"></div>
+            <div style="position:relative;">
+              <button class="btn secondary" id="produccionFiltroProductoBtn" style="padding:5px 12px;font-size:12px;">Filtrar por producto</button>
+              <div id="produccionFiltroProductoMenu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+            </div>
             <button class="clear-btn" id="produccionRefreshBtn">Actualizar</button>
           </div>
         </div>
@@ -667,6 +688,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="subfilter" style="margin-top:10px;">
             <div class="filter-group"><label>Desde</label><input type="date" id="horneadoRegDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="horneadoRegHasta"></div>
+            <div style="position:relative;">
+              <button class="btn secondary" id="horneadoRegFiltroProductoBtn" style="padding:5px 12px;font-size:12px;">Filtrar por producto</button>
+              <div id="horneadoRegFiltroProductoMenu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+            </div>
             <button class="clear-btn" id="horneadoRegRefreshBtn">Actualizar</button>
           </div>
         </div>
@@ -678,11 +703,16 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <!-- AJUSTE DE DEMANDA -->
       <div class="tabpanel" id="tab-ajustedemanda">
         <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;">
-          <div class="field" style="margin-bottom:8px;"><label>Semana de referencia</label><input type="date" id="ajusteSemanaReferenciaInput" style="max-width:200px;"></div>
-          <p style="margin:0 0 8px 0;font-size:15px;"><b>Semana de referencia elegida:</b> <span id="ajusteSemanaReferencia" style="color:var(--copper);"></span></p>
-          <p class="hint" style="margin-bottom:0;">Los porcentajes que pongas aquí se aplican, <b>tal cual y sin acumular</b>, a todas las semanas siguientes a la de referencia — no es un incremento que vaya subiendo semana a semana (no es +5% la semana que viene, +10% la de después...); es el <b>mismo ajuste fijo</b> cada vez, comparado siempre contra la semana de referencia de arriba. Un valor positivo significa que esperas consumir más de lo normal en esa franja; uno negativo, menos.</p>
+          <div class="subfilter" style="margin-bottom:8px;">
+            <div class="field"><label>Semana de referencia (para comparar)</label><input type="date" id="ajusteSemanaReferenciaInput" style="max-width:200px;"></div>
+            <div class="field"><label>Aplica desde la semana del</label><input type="date" id="ajusteAplicaDesdeInput" style="max-width:200px;"></div>
+            <div class="field"><label>Aplica hasta la semana del (opcional)</label><input type="date" id="ajusteAplicaHastaInput" style="max-width:200px;"></div>
+          </div>
+          <p style="margin:0 0 4px 0;font-size:15px;"><b>Semana de referencia elegida:</b> <span id="ajusteSemanaReferencia" style="color:var(--copper);"></span></p>
+          <p style="margin:0 0 8px 0;font-size:15px;"><b>Este ajuste se aplicará:</b> <span id="ajusteAplicaDesde" style="color:var(--negative);"></span></p>
+          <p class="hint" style="margin-bottom:0;">Los porcentajes que pongas aquí se aplican, <b>tal cual y sin acumular</b>, durante el periodo de arriba — no es un incremento que vaya subiendo semana a semana (no es +5% la semana que viene, +10% la de después...); es el <b>mismo ajuste fijo</b> cada vez, comparado siempre contra la semana de referencia de arriba. Un valor positivo significa que esperas consumir más de lo normal en esa franja; uno negativo, menos. Si dejas "Aplica hasta" en blanco, el ajuste se queda indefinido, hasta que guardes otro distinto.</p>
         </div>
-        <div class="card">
+        <div class="card" style="margin-bottom:14px;">
           <table id="tablaAjusteDemanda">
             <thead><tr><th>Franja</th><th>L-V (%)</th><th>Sábado (%)</th><th>Domingo (%)</th></tr></thead>
             <tbody></tbody>
@@ -690,6 +720,8 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <button class="btn" id="ajusteGuardarBtn" style="margin-top:14px;">Guardar ajustes</button>
           <p class="hint" id="ajusteGuardarStatus" style="margin-top:8px;"></p>
         </div>
+        <div class="section-title">Historial de guardados</div>
+        <div class="card"><div id="ajusteHistorialList"><p class="hint">Cargando...</p></div></div>
       </div>
 
       <!-- SIMULACIÓN -->
@@ -1067,6 +1099,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <table id="tablaVacSaldo"><thead><tr><th>Empleado</th><th>Referencia</th><th>Meses desde entonces</th><th>Acumulado (×2.5)</th><th>Usado desde la referencia</th><th>Saldo disponible</th><th></th></tr></thead><tbody></tbody></table>
         </div>
         <div class="section-title">Histórico de vacaciones</div>
+        <p class="hint" style="margin-bottom:8px;">Aquí se ve cada movimiento que has ido guardando arriba, en orden. <b>Valor de referencia</b> es el punto de partida (no suma ni resta nada por sí solo, solo marca "a partir de aquí empiezo a contar"). <b>Vacaciones usadas</b> resta del saldo. <b>Ajuste manual</b> suma o resta lo que pongas (positivo o negativo).</p>
         <div class="card" style="margin-bottom:26px;">
           <div style="max-height:320px;overflow:auto;">
             <table id="tablaVacHistorico"><thead><tr><th>Fecha</th><th>Empleado</th><th>Tipo</th><th>Días</th><th>Nota</th><th></th></tr></thead><tbody></tbody></table>
@@ -1075,6 +1108,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <h3 style="margin-bottom:10px;">Horas extras</h3>
         <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Cada entrada son horas extra trabajadas en una fecha concreta. Después, en la tabla de abajo, usa el botón "Pagada / Sin pagar" de cada fila para marcar si ya se le han abonado a el empleado o no — eso es lo único que distingue una fila de otra, no hay "tipos" distintos como en vacaciones.</p>
           <div class="subfilter" style="margin-bottom:0;">
             <select id="hxEmpleado"></select>
             <input type="date" id="hxFecha">
@@ -1177,11 +1211,6 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           </div>
           <div id="uploadStatus" style="margin-top:10px;"></div>
         </div>
-        <div class="section-title">Periodos cargados</div>
-        <div id="periodsResumen" class="hint" style="margin-bottom:6px;"></div>
-        <div style="margin-bottom:6px;"><button class="btn secondary" id="periodsToggleBtn" style="padding:4px 10px;font-size:11px;">Mostrar lista completa</button></div>
-        <div class="card hidden" id="periodsList"><p class="hint">No hay periodos cargados todavía.</p></div>
-
         <div class="section-title">Propinas</div>
         <div class="card">
           <p class="hint" style="margin-bottom:10px;">Registro de referencia, mensual — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago). No afecta a ningún cálculo de esta app; para eso está la pestaña Caja, que trabaja con el extracto bancario real.</p>
@@ -1199,6 +1228,11 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <table id="tablaPropinas"><thead><tr><th>Mes</th><th>Importe</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
+
+        <div class="section-title">Periodos cargados</div>
+        <div id="periodsResumen" class="hint" style="margin-bottom:6px;"></div>
+        <div style="margin-bottom:6px;"><button class="btn secondary" id="periodsToggleBtn" style="padding:4px 10px;font-size:11px;">Mostrar lista completa</button></div>
+        <div class="card hidden" id="periodsList"><p class="hint">No hay periodos cargados todavía.</p></div>
       </div>
 
       <!-- CONFIG -->
@@ -2427,6 +2461,63 @@ function getPnlEtiquetasTotales(){
 }
 function setPnlEtiquetasTotales(obj){ localStorage.setItem('miners_pnl_etiquetas_totales', JSON.stringify(obj)); }
 function pnlEtiquetaTotal(clave, porDefecto){ return getPnlEtiquetasTotales()[clave] || porDefecto; }
+
+/* =========================================================
+   PLANTILLAS DE PNL — guardan la combinación de filas ocultas, columnas
+   ocultas y etiquetas de totales bajo un nombre, para poder cambiar entre
+   "vistas" (ej. Para inversores / Para mí) sin rehacer los ajustes cada vez.
+   ========================================================= */
+async function renderPnlPlantillasSelect(){
+  const sel = document.getElementById('pnlPlantillaSelect');
+  if(!sel) return;
+  try{
+    const rows = await sbList('pnl_plantillas', 'select=*&order=nombre.asc');
+    sel.innerHTML = '<option value="">Elegir plantilla guardada...</option>' + rows.map(r=>'<option value="'+r.id+'">'+r.nombre.replace(/</g,'&lt;')+'</option>').join('');
+    sel.dataset.plantillas = JSON.stringify(rows);
+  }catch(e){
+    sel.innerHTML = '<option value="">(error cargando plantillas)</option>';
+  }
+}
+document.getElementById('pnlPlantillaCargarBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('pnlPlantillaSelect');
+  const statusEl = document.getElementById('pnlPlantillaStatus');
+  if(!sel.value){ statusEl.innerHTML = '<span style="color:var(--negative)">Elige una plantilla de la lista primero.</span>'; return; }
+  const plantillas = JSON.parse(sel.dataset.plantillas || '[]');
+  const p = plantillas.find(x=>x.id===sel.value);
+  if(!p){ statusEl.innerHTML = '<span style="color:var(--negative)">No se encontró esa plantilla.</span>'; return; }
+  setPnlHiddenRows(new Set(p.filas_ocultas || []));
+  setPnlHiddenBuckets(new Set(p.columnas_ocultas || []));
+  setPnlEtiquetasTotales(p.etiquetas_totales || {});
+  statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla "'+p.nombre+'" cargada ✓</span>';
+  renderPnl();
+});
+document.getElementById('pnlPlantillaGuardarBtn').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('pnlPlantillaNombreInput').value.trim();
+  const statusEl = document.getElementById('pnlPlantillaStatus');
+  if(!nombre){ statusEl.innerHTML = '<span style="color:var(--negative)">Ponle un nombre a la plantilla antes de guardar.</span>'; return; }
+  try{
+    await sbInsert('pnl_plantillas', {
+      nombre,
+      filas_ocultas: [...getPnlHiddenRows()],
+      columnas_ocultas: [...getPnlHiddenBuckets()],
+      etiquetas_totales: getPnlEtiquetasTotales()
+    });
+    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla "'+nombre+'" guardada ✓</span>';
+    document.getElementById('pnlPlantillaNombreInput').value = '';
+    await renderPnlPlantillasSelect();
+  }catch(e){ statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>'; }
+});
+document.getElementById('pnlPlantillaBorrarBtn').addEventListener('click', async ()=>{
+  const sel = document.getElementById('pnlPlantillaSelect');
+  const statusEl = document.getElementById('pnlPlantillaStatus');
+  if(!sel.value){ statusEl.innerHTML = '<span style="color:var(--negative)">Elige una plantilla de la lista primero.</span>'; return; }
+  if(!confirm('¿Borrar esta plantilla guardada? No se puede deshacer.')) return;
+  try{
+    await sbDelete('pnl_plantillas', sel.value);
+    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla borrada ✓</span>';
+    await renderPnlPlantillasSelect();
+  }catch(e){ statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>'; }
+});
 function renderPnlHiddenRowsInfo(){
   const el = document.getElementById('pnlHiddenRowsInfo');
   if(!el) return;
@@ -2800,9 +2891,9 @@ function renderVentas(lines, tickets){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:metricAxisCallback(true)}, grid:{color:c.grid} } } }
   });
 
-  renderVentasTendenciaDia(lines);
-  renderVentasTendenciaFranja(lines);
-  renderVentasCombo(lines);
+  try{ renderVentasTendenciaDia(lines); }catch(e){ console.error('Error en renderVentasTendenciaDia:', e); }
+  try{ renderVentasTendenciaFranja(lines); }catch(e){ console.error('Error en renderVentasTendenciaFranja:', e); }
+  try{ renderVentasCombo(lines); }catch(e){ console.error('Error en renderVentasCombo:', e); }
 }
 document.getElementById('ventasTendenciaGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderVentasTendenciaDia(lines); renderVentasTendenciaFranja(lines); renderVentasCombo(lines); });
 
@@ -3393,7 +3484,8 @@ function renderClientesTendencia(){
     { label:'Nuevo', data:labels.map(l=>resultado[l].segCount.nuevo), color:c.verdigris },
     { label:'Repetido sin fidelidad', data:labels.map(l=>resultado[l].segCount.repetido), color:c.muted },
     { label:'Con fidelidad', data:labels.map(l=>resultado[l].segCount.fidelidad), color:c.copper },
-    { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), color:'#8B6A46' }
+    { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), color:'#8B6A46' },
+    { label:'Total', data:labels.map(l=>{ const s=resultado[l].segCount; return s.nuevo+s.repetido+s.fidelidad+s.noident; }), color:c.text }
   ]);
 
   dibujarCombinado('clientesTendenciaPct','chartClientesTendenciaPct',[
@@ -3435,6 +3527,20 @@ function costAtDate(historyMap, productName, date){
   let applicable = 0;
   for(const e of entries){ if(e.effectiveFrom<=date) applicable=e.unitCost; else break; }
   return applicable;
+}
+/* lo mismo que costAtDate, pero para Mermas: coincidencia insensible a mayúsculas (los
+   empleados pueden dictar "tomates" y el coste estar guardado como "Tomates"), y si el
+   coste más antiguo guardado es POSTERIOR a la fecha de la merma, usa ese como mejor
+   aproximación disponible en vez de dejarlo sin coste. */
+function costeMermaInfo(m){
+  const key = (m.producto||'').toLowerCase().trim();
+  const entradas = STATE.productCosts.filter(pc=>pc.productName.toLowerCase().trim()===key);
+  if(entradas.length===0) return { encontrado:false };
+  const ordenadas = [...entradas].sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom));
+  let unitCost = null;
+  for(const e of ordenadas){ if(e.effectiveFrom<=m.fecha) unitCost=e.unitCost; else break; }
+  if(unitCost===null) unitCost = ordenadas[0].unitCost;
+  return { encontrado:true, unitCost, coste: unitCost*m.cantidad };
 }
 
 function daysBetweenInclusive(a,b){ return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00'))/86400000)+1; }
@@ -6655,6 +6761,8 @@ async function renderPnl(){
   const table = document.getElementById('tablaPnl');
   if(!table || !STATE.config.url || !STATE.config.anonKey) return;
   await ensureDefaultPnlLines();
+  const plantillaSel = document.getElementById('pnlPlantillaSelect');
+  if(plantillaSel && !plantillaSel.dataset.cargado){ plantillaSel.dataset.cargado = '1'; renderPnlPlantillasSelect(); }
   const gran = document.getElementById('pnlGranularidad').value;
   const { desde, hasta } = pnlRango();
   const todosLosBuckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -7387,10 +7495,16 @@ function renderVacaciones(){
     btn.addEventListener('click', ()=>ajusteRapidoVacaciones(btn.getAttribute('data-ajuste-rapido')));
   });
 
-  document.querySelector('#tablaVacHistorico tbody').innerHTML = STATE.vacaciones.map(v=>`
-    <tr><td>${v.fecha}</td><td>${v.empleado}</td><td><span class="pill ${v.tipo==='referencia'?'nuevo':(v.tipo==='ajuste'?'repetido':'noident')}">${v.tipo}</span></td><td class="num">${v.dias}</td><td class="hint">${v.nota||''}</td>
-    <td><button class="btn danger" data-del-vac="${v.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="6" class="hint">Sin registros todavía.</td></tr>';
+  document.querySelector('#tablaVacHistorico tbody').innerHTML = STATE.vacaciones.map(v=>{
+    const etiquetas = { referencia:'Valor de referencia', usada:'Vacaciones usadas', ajuste:'Ajuste manual' };
+    const pillClase = v.tipo==='referencia'?'nuevo':(v.tipo==='ajuste'?'repetido':'noident');
+    let diasTexto;
+    if(v.tipo==='usada') diasTexto = '<span style="color:var(--negative)">−'+Math.abs(v.dias)+' días (resta del saldo)</span>';
+    else if(v.tipo==='ajuste') diasTexto = '<span style="color:'+(v.dias>=0?'var(--positive)':'var(--negative)')+'">'+(v.dias>=0?'+':'')+v.dias+' días</span>';
+    else diasTexto = v.dias+' días (punto de partida, no suma ni resta por sí solo)';
+    return `<tr><td>${v.fecha}</td><td>${v.empleado}</td><td><span class="pill ${pillClase}">${etiquetas[v.tipo]||v.tipo}</span></td><td class="num">${diasTexto}</td><td class="hint">${v.nota||''}</td>
+    <td><button class="btn danger" data-del-vac="${v.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="hint">Sin registros todavía.</td></tr>';
   document.querySelectorAll('[data-del-vac]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar este registro de vacaciones?')) return;
@@ -7445,6 +7559,11 @@ function renderHorasExtras(){
     });
   });
 }
+document.getElementById('vacTipo').addEventListener('change', (e)=>{
+  const inp = document.getElementById('vacDias');
+  const placeholders = { referencia:'Días disponibles en esa fecha (ej. 22)', usada:'Días usados, en positivo (ej. 3)', ajuste:'+ suma, − resta (ej. -2)' };
+  inp.placeholder = placeholders[e.target.value] || 'Días';
+});
 document.getElementById('vacAddBtn').addEventListener('click', async ()=>{
   const empleado = document.getElementById('vacEmpleado').value;
   const fecha = document.getElementById('vacFecha').value;
@@ -9264,9 +9383,25 @@ function renderMermas(){
   renderMermasCosteTendencia(filtradas);
 
   const seleccionadas = getMermasSeleccionadas();
-  document.querySelector('#tablaMermas tbody').innerHTML = filtradas.map(m=>`
-    <tr data-fila-merma="${m.id}"><td><input type="checkbox" class="mermas-check" data-id-merma="${m.id}" ${seleccionadas.has(m.id)?'checked':''}></td><td>${m.fecha}</td><td>${(m.hora||'').slice(0,5)}</td><td>${m.empleado||'—'}</td><td>${m.producto}</td><td class="num">${m.cantidad} ${m.unidad}</td><td><span class="pill noident">${m.categoria}</span> <span class="hint">(${m.tipo==='producto_final'?'producto':'ingrediente'})</span></td><td class="hint">${m.textoOriginal||''}</td><td style="white-space:nowrap;"><button class="btn secondary" data-editar-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn danger" data-del-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="9" class="hint">Sin registros para este filtro.</td></tr>';
+  document.querySelector('#tablaMermas tbody').innerHTML = filtradas.map(m=>{
+    const costeInfo = costeMermaInfo(m);
+    const costeCelda = costeInfo.encontrado
+      ? eur(Math.round(costeInfo.coste*100))+' <span class="hint">('+eur(Math.round(costeInfo.unitCost*100))+'/'+m.unidad+')</span>'
+      : '<button class="btn secondary" data-ir-a-coste="'+m.producto.replace(/"/g,'&quot;')+'" style="padding:2px 8px;font-size:10px;">Sin coste — añadir</button>';
+    return `
+    <tr data-fila-merma="${m.id}"><td><input type="checkbox" class="mermas-check" data-id-merma="${m.id}" ${seleccionadas.has(m.id)?'checked':''}></td><td>${m.fecha}</td><td>${(m.hora||'').slice(0,5)}</td><td>${m.empleado||'—'}</td><td>${m.producto}</td><td class="num">${m.cantidad} ${m.unidad}</td><td><span class="pill noident">${m.categoria}</span> <span class="hint">(${m.tipo==='producto_final'?'producto':'ingrediente'})</span></td><td class="num">${costeCelda}</td><td class="hint">${m.textoOriginal||''}</td><td style="white-space:nowrap;"><button class="btn secondary" data-editar-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn danger" data-del-merma="${m.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+  }).join('') || '<tr><td colspan="10" class="hint">Sin registros para este filtro.</td></tr>';
+  document.querySelectorAll('[data-ir-a-coste]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nombre = btn.getAttribute('data-ir-a-coste');
+      const navCostes = document.querySelector('.nav-item[data-tab="costes"]');
+      if(navCostes) navCostes.click();
+      setTimeout(()=>{
+        const inp = document.getElementById('costProdNombre');
+        if(inp){ inp.value = nombre; inp.scrollIntoView({behavior:'smooth', block:'center'}); document.getElementById('costProdValor').focus(); }
+      }, 150);
+    });
+  });
   document.querySelectorAll('[data-editar-merma]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.getAttribute('data-editar-merma');
@@ -9274,7 +9409,7 @@ function renderMermas(){
       const fila = document.querySelector('[data-fila-merma="'+id+'"]');
       if(!m || !fila) return;
       const categoriasDisponibles = ['Bebidas','Verduras','Otros ingredientes de comida'];
-      fila.innerHTML = `<td colspan="9">
+      fila.innerHTML = `<td colspan="10">
         <div style="margin:6px 0;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--copper);">
           <div class="subfilter" style="margin-bottom:8px;">
             <div class="filter-group"><label>Fecha</label><input type="date" data-edit-fecha="${id}" value="${m.fecha}"></div>
@@ -9394,6 +9529,43 @@ document.getElementById('exportXlsxBtn').addEventListener('click', ()=>{
    PRODUCCIÓN (leído de caja_storage... no, de produccion_semanal — misma
    tabla que usa la app de mermas/Dream Team, mismo proyecto de Supabase)
    ========================================================= */
+function getProduccionProductosOcultos(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_produccion_productos_ocultos')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setProduccionProductosOcultos(set){ localStorage.setItem('miners_produccion_productos_ocultos', JSON.stringify([...set])); }
+function renderProduccionFiltroProductoMenu(productosDisponibles){
+  const menu = document.getElementById('produccionFiltroProductoMenu');
+  const ocultos = getProduccionProductosOcultos();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en la tabla:</div>` +
+    productosDisponibles.map(p=>{
+      const visible = !ocultos.has(p);
+      return `<div data-toggle-produccion-producto="${p.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${p}</span>
+      </div>`;
+    }).join('') +
+    `<div data-produccion-producto-todos="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todos</div>`;
+  menu.querySelectorAll('[data-toggle-produccion-producto]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const p = div.getAttribute('data-toggle-produccion-producto');
+      const o = getProduccionProductosOcultos();
+      if(o.has(p)) o.delete(p); else o.add(p);
+      setProduccionProductosOcultos(o);
+      renderProduccion();
+    });
+  });
+  const todos = menu.querySelector('[data-produccion-producto-todos]');
+  if(todos) todos.addEventListener('click', ()=>{
+    setProduccionProductosOcultos(new Set());
+    renderProduccion();
+  });
+}
+document.getElementById('produccionFiltroProductoBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('produccionFiltroProductoMenu');
+  const abrir = menu.style.display==='none';
+  menu.style.display = abrir ? 'block' : 'none';
+});
 async function renderProduccion(){
   const tbody = document.querySelector('#tablaProduccion tbody');
   if(!tbody) return;
@@ -9405,7 +9577,7 @@ async function renderProduccion(){
     if(desde) query += '&week_start=gte.'+desde;
     if(hasta) query += '&week_start=lte.'+hasta;
     const rows = await sbList('produccion_semanal', query);
-    if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="5" class="hint">Sin datos de producción en este periodo (o todavía no se ha usado esa sección en la app de mermas).</td></tr>'; return; }
+    if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="5" class="hint">Sin datos de producción en este periodo (o todavía no se ha usado esa sección en la app de mermas).</td></tr>'; renderProduccionFiltroProductoMenu([]); return; }
 
     // agrupar por semana+producto: pedido = suma de todo lo encargado; producido = suma de lo marcado completado
     const grupos = {};
@@ -9416,7 +9588,11 @@ async function renderProduccion(){
       grupos[key].pedido += cant;
       if(r.completado) grupos[key].producido += cant;
     });
-    const filas = Object.values(grupos).sort((a,b)=> b.week_start.localeCompare(a.week_start) || a.producto.localeCompare(b.producto,'es'));
+    const productosDisponibles = [...new Set(Object.values(grupos).map(g=>g.producto))].sort((a,b)=>a.localeCompare(b,'es'));
+    renderProduccionFiltroProductoMenu(productosDisponibles);
+    const ocultos = getProduccionProductosOcultos();
+    const filas = Object.values(grupos).filter(g=>!ocultos.has(g.producto)).sort((a,b)=> b.week_start.localeCompare(a.week_start) || a.producto.localeCompare(b.producto,'es'));
+    if(filas.length===0){ tbody.innerHTML = '<tr><td colspan="5" class="hint">Sin productos que mostrar con este filtro.</td></tr>'; return; }
 
     tbody.innerHTML = filas.map(f=>{
       const fin = (()=>{ const d=new Date(f.week_start+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
@@ -9438,6 +9614,43 @@ document.getElementById('produccionDesde').addEventListener('change', renderProd
 document.getElementById('produccionHasta').addEventListener('change', renderProduccion);
 document.getElementById('produccionRefreshBtn').addEventListener('click', renderProduccion);
 
+function getHorneadoRegProductosOcultos(){
+  try{ const v = JSON.parse(localStorage.getItem('miners_horneadoreg_productos_ocultos')); if(Array.isArray(v)) return new Set(v); }catch(e){}
+  return new Set();
+}
+function setHorneadoRegProductosOcultos(set){ localStorage.setItem('miners_horneadoreg_productos_ocultos', JSON.stringify([...set])); }
+function renderHorneadoRegFiltroProductoMenu(productosDisponibles){
+  const menu = document.getElementById('horneadoRegFiltroProductoMenu');
+  const ocultos = getHorneadoRegProductosOcultos();
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Mostrar en la tabla:</div>` +
+    productosDisponibles.map(p=>{
+      const visible = !ocultos.has(p);
+      return `<div data-toggle-horneadoreg-producto="${p.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${visible?'var(--positive)':'var(--line)'};background:${visible?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${visible?'✓':''}</span>
+        <span style="color:${visible?'var(--text)':'var(--text-muted)'};">${p}</span>
+      </div>`;
+    }).join('') +
+    `<div data-horneadoreg-producto-todos="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Mostrar todos</div>`;
+  menu.querySelectorAll('[data-toggle-horneadoreg-producto]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const p = div.getAttribute('data-toggle-horneadoreg-producto');
+      const o = getHorneadoRegProductosOcultos();
+      if(o.has(p)) o.delete(p); else o.add(p);
+      setHorneadoRegProductosOcultos(o);
+      renderHorneadoRegistros();
+    });
+  });
+  const todos = menu.querySelector('[data-horneadoreg-producto-todos]');
+  if(todos) todos.addEventListener('click', ()=>{
+    setHorneadoRegProductosOcultos(new Set());
+    renderHorneadoRegistros();
+  });
+}
+document.getElementById('horneadoRegFiltroProductoBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('horneadoRegFiltroProductoMenu');
+  const abrir = menu.style.display==='none';
+  menu.style.display = abrir ? 'block' : 'none';
+});
 async function renderHorneadoRegistros(){
   const tbody = document.querySelector('#tablaHorneadoRegistros tbody');
   if(!tbody) return;
@@ -9449,8 +9662,13 @@ async function renderHorneadoRegistros(){
     if(desde) query += '&fecha=gte.'+desde;
     if(hasta) query += '&fecha=lte.'+hasta;
     const rows = await sbList('horneado_registros', query);
-    if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="4" class="hint">Sin horneados registrados en este periodo (o todavía no se ha confirmado ninguno desde la app de mermas).</td></tr>'; return; }
-    tbody.innerHTML = rows.map(r=>`<tr><td>${r.fecha}</td><td>${r.hora.slice(0,5)}</td><td>${r.producto}</td><td class="num">${parseFloat(r.cantidad)}</td></tr>`).join('');
+    if(rows.length===0){ tbody.innerHTML = '<tr><td colspan="4" class="hint">Sin horneados registrados en este periodo (o todavía no se ha confirmado ninguno desde la app de mermas).</td></tr>'; renderHorneadoRegFiltroProductoMenu([]); return; }
+    const productosDisponibles = [...new Set(rows.map(r=>r.producto))].sort((a,b)=>a.localeCompare(b,'es'));
+    renderHorneadoRegFiltroProductoMenu(productosDisponibles);
+    const ocultos = getHorneadoRegProductosOcultos();
+    const filasFiltradas = rows.filter(r=>!ocultos.has(r.producto));
+    if(filasFiltradas.length===0){ tbody.innerHTML = '<tr><td colspan="4" class="hint">Sin productos que mostrar con este filtro.</td></tr>'; return; }
+    tbody.innerHTML = filasFiltradas.map(r=>`<tr><td>${r.fecha}</td><td>${r.hora.slice(0,5)}</td><td>${r.producto}</td><td class="num">${parseFloat(r.cantidad)}</td></tr>`).join('');
   }catch(e){
     tbody.innerHTML = '<tr><td colspan="4" class="hint">Error cargando: '+e.message+'</td></tr>';
   }
@@ -9473,6 +9691,15 @@ async function renderAjusteDemanda(){
   const esSemanaActual = semanaRef===isoMonday(hoy);
   document.getElementById('ajusteSemanaReferencia').textContent = 'Semana del '+semanaRef+' al '+finSemanaRef+(esSemanaActual?' (coincide con la semana actual)':' (elegida a mano, distinta de la semana actual)');
 
+  const inputAplicaDesde = document.getElementById('ajusteAplicaDesdeInput');
+  if(!inputAplicaDesde.value){
+    // por defecto, la semana SIGUIENTE a la de referencia (lo más habitual: comparo esta
+    // semana contra lo normal, y aplico el ajuste a partir de la semana que viene)
+    const d = new Date(semanaRef+'T00:00:00'); d.setDate(d.getDate()+7);
+    inputAplicaDesde.value = fechaLocalISO(d);
+  }
+  actualizarTextoAplicaPeriodo();
+
   const tbody = document.querySelector('#tablaAjusteDemanda tbody');
   tbody.innerHTML = '<tr><td colspan="4" class="hint">Cargando...</td></tr>';
   let ajustesGuardados = [];
@@ -9494,29 +9721,74 @@ async function renderAjusteDemanda(){
       <td class="num"><input type="number" step="1" data-ajuste="${f}|domingo" value="${valorGuardado(f,'domingo')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
     </tr>
   `).join('');
+  renderAjusteDemandaHistorial();
 }
 document.getElementById('ajusteSemanaReferenciaInput').addEventListener('change', renderAjusteDemanda);
+function actualizarTextoAplicaPeriodo(){
+  const aplicaDesde = isoMonday(document.getElementById('ajusteAplicaDesdeInput').value);
+  const hastaValue = document.getElementById('ajusteAplicaHastaInput').value;
+  if(hastaValue){
+    const aplicaHasta = isoMonday(hastaValue);
+    document.getElementById('ajusteAplicaDesde').textContent = 'desde la semana del '+aplicaDesde+' hasta la semana del '+aplicaHasta+' (ambas incluidas)';
+  } else {
+    document.getElementById('ajusteAplicaDesde').textContent = 'desde la semana del '+aplicaDesde+' en adelante, sin fecha de fin';
+  }
+}
+document.getElementById('ajusteAplicaDesdeInput').addEventListener('change', actualizarTextoAplicaPeriodo);
+document.getElementById('ajusteAplicaHastaInput').addEventListener('change', actualizarTextoAplicaPeriodo);
 document.getElementById('ajusteGuardarBtn').addEventListener('click', async ()=>{
   const statusEl = document.getElementById('ajusteGuardarStatus');
   const btn = document.getElementById('ajusteGuardarBtn');
   const inputs = document.querySelectorAll('[data-ajuste]');
+  const hastaValue = document.getElementById('ajusteAplicaHastaInput').value;
+  const aplicaHasta = hastaValue ? isoMonday(hastaValue) : null;
+  const aplicaDesde = isoMonday(document.getElementById('ajusteAplicaDesdeInput').value);
+  if(aplicaHasta && aplicaHasta<aplicaDesde){ statusEl.innerHTML = '<span style="color:var(--negative)">"Aplica hasta" no puede ser antes que "Aplica desde".</span>'; return; }
   btn.disabled = true; statusEl.textContent = 'Guardando...';
-  let ok = 0; const errores = [];
+  let ok = 0; const errores = []; const snapshot = [];
   for(const inp of inputs){
     const [franja, tipoDia] = inp.getAttribute('data-ajuste').split('|');
     const porcentaje = parseFloat(inp.value)||0;
+    snapshot.push({ franja, tipo_dia:tipoDia, porcentaje });
     try{
-      await sbUpsert('demanda_ajustes', { franja, tipo_dia:tipoDia, porcentaje }, 'franja,tipo_dia');
+      await sbUpsert('demanda_ajustes', { franja, tipo_dia:tipoDia, porcentaje, aplica_hasta:aplicaHasta }, 'franja,tipo_dia');
       ok++;
     }catch(e){ errores.push(franja+'/'+tipoDia+': '+e.message); }
   }
   if(errores.length===0){
     statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente ('+ok+' de '+inputs.length+').</span>';
+    try{
+      await sbInsert('demanda_ajustes_historial', {
+        semana_referencia: isoMonday(document.getElementById('ajusteSemanaReferenciaInput').value),
+        aplica_desde: aplicaDesde,
+        aplica_hasta: aplicaHasta,
+        ajustes: snapshot
+      });
+    }catch(e){ /* si falla el registro del historial, los ajustes en sí ya se guardaron bien igualmente */ }
+    renderAjusteDemandaHistorial();
   } else {
     statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+inputs.length+'. Fallos: '+errores.slice(0,3).join(' · ')+'</span>';
   }
   btn.disabled = false;
 });
+async function renderAjusteDemandaHistorial(){
+  const el = document.getElementById('ajusteHistorialList');
+  if(!el) return;
+  el.innerHTML = '<p class="hint">Cargando...</p>';
+  try{
+    const rows = await sbList('demanda_ajustes_historial', 'select=*&order=guardado_en.desc&limit=50');
+    if(rows.length===0){ el.innerHTML = '<p class="hint">Sin guardados todavía.</p>'; return; }
+    el.innerHTML = rows.map(r=>{
+      const fechaGuardado = new Date(r.guardado_en);
+      const resumen = (r.ajustes||[]).filter(a=>parseFloat(a.porcentaje)!==0)
+        .map(a=>a.franja+' ('+({semana:'L-V',sabado:'Sáb',domingo:'Dom'}[a.tipo_dia]||a.tipo_dia)+'): '+(a.porcentaje>0?'+':'')+a.porcentaje+'%').join(' · ') || 'todo a 0%';
+      return `<div style="padding:8px 0;border-bottom:1px solid var(--line);">
+        <div><b>Aplicado ${r.aplica_hasta ? 'del '+r.aplica_desde+' al '+r.aplica_hasta : 'desde la semana del '+r.aplica_desde+' en adelante'}</b> <span class="hint">— guardado el ${fechaLocalISO(fechaGuardado)} a las ${fechaGuardado.toTimeString().slice(0,5)}, comparado contra la semana de referencia del ${r.semana_referencia||'—'}</span></div>
+        <div class="hint" style="margin-top:2px;">${resumen}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; }
+}
 
 /* =========================================================
    SIMULACIÓN — ingresos + líneas de coste (% o € fijo) -> beneficio
