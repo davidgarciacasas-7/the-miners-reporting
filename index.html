@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.90</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.91</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2932,7 +2932,7 @@ function mostrarDiagnosticoSiVacio(canvasId, chartKey){
 function renderVentasTendenciaDia(lines){
   const canvas = document.getElementById('chartVentasTendenciaDia');
   if(!canvas) return;
-  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
   if(!desde || !hasta){ destroyChart('ventasTendenciaDia'); return; }
   const gran = document.getElementById('ventasTendenciaGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -3001,7 +3001,7 @@ function setVentasTendenciaFranjasOcultas(set){ localStorage.setItem('miners_ven
 function renderVentasTendenciaFranja(lines){
   const canvas = document.getElementById('chartVentasTendenciaFranja');
   if(!canvas) return;
-  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
   if(!desde || !hasta){ destroyChart('ventasTendenciaFranja'); return; }
   const gran = document.getElementById('ventasTendenciaGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -3077,7 +3077,7 @@ function setVentasComboFranjas(set){ localStorage.setItem('miners_ventas_combo_f
 function renderVentasCombo(lines){
   const canvas = document.getElementById('chartVentasCombo');
   if(!canvas) return;
-  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
   const franjaOrderCompleto = franjaOrderFor(STATE.filters.franjaTipo);
   const diasElegidos = getVentasComboDias();
   const franjasElegidas = getVentasComboFranjas(franjaOrderCompleto);
@@ -3349,7 +3349,7 @@ function renderProductos(lines){
 function renderCategoriasTendencia(lines){
   const canvas = document.getElementById('chartCategoriasTendencia');
   if(!canvas) return;
-  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
   if(!desde || !hasta){ destroyChart('categoriasTendencia'); return; }
   const gran = document.getElementById('productosGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -3400,7 +3400,7 @@ function renderProductosTendenciaChart(lines){
     });
   });
 
-  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
   if(!desde || !hasta || seleccion.length===0){ destroyChart('productosTendencia'); return; }
   const gran = document.getElementById('productosGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
