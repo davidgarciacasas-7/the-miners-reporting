@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.91</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.92</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2906,12 +2906,32 @@ function getVentasTendenciaDiasOcultos(){
 function setVentasTendenciaDiasOcultos(set){ localStorage.setItem('miners_ventas_tendencia_dias_ocultos', JSON.stringify([...set])); }
 /* diagnóstico visible directamente en la pantalla (no solo en consola), para poder ver
    qué está pasando con un gráfico sin necesitar abrir las herramientas de desarrollador */
+/* si STATE.filters.desde/hasta no están puestos todavía (puede pasar en el primer
+   render, antes de que se apliquen los valores por defecto), se calculan directamente
+   a partir de las fechas mínima y máxima presentes en los propios datos ya filtrados —
+   así el gráfico funciona igual, sin depender de que el filtro esté ya sincronizado. */
+function derivarRangoFechas(lines){
+  let desde = STATE.filters.desde, hasta = STATE.filters.hasta;
+  if((!desde || !hasta) && lines && lines.length>0){
+    const fechas = lines.map(l=>l.fecha).filter(Boolean).sort();
+    if(fechas.length>0){ desde = desde || fechas[0]; hasta = hasta || fechas[fechas.length-1]; }
+  }
+  return { desde, hasta };
+}
+function limpiarDiagnostico(canvasId){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
+  if(!wrap) return;
+  wrap.querySelectorAll('.diagnostico-grafico').forEach(el=>el.remove());
+}
 function mostrarDiagnosticoError(canvasId, error){
   const canvas = document.getElementById(canvasId);
   if(!canvas) return;
   const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
   if(!wrap) return;
-  wrap.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ff8080;font-size:12px;border-radius:8px;">⚠ Error al dibujar este gráfico: '+(error&&error.message?error.message:String(error))+'</div>');
+  limpiarDiagnostico(canvasId);
+  wrap.insertAdjacentHTML('beforeend', '<div class="diagnostico-grafico" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ff8080;font-size:12px;border-radius:8px;">⚠ Error al dibujar este gráfico: '+(error&&error.message?error.message:String(error))+'</div>');
 }
 function mostrarDiagnosticoSiVacio(canvasId, chartKey){
   const canvas = document.getElementById(canvasId);
@@ -2919,20 +2939,21 @@ function mostrarDiagnosticoSiVacio(canvasId, chartKey){
   const chart = STATE.charts[chartKey];
   const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
   if(!wrap) return;
+  limpiarDiagnostico(canvasId);
   if(!chart){
-    wrap.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ffcf80;font-size:12px;border-radius:8px;">⚠ Diagnóstico: el gráfico no llegó a crearse (STATE.charts.'+chartKey+' no existe), sin lanzar ningún error. Puede ser un problema con Chart.js o con el propio canvas.</div>');
+    wrap.insertAdjacentHTML('beforeend', '<div class="diagnostico-grafico" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ffcf80;font-size:12px;border-radius:8px;">⚠ Diagnóstico: el gráfico no llegó a crearse (STATE.charts.'+chartKey+' no existe), sin lanzar ningún error. STATE.filters.desde='+JSON.stringify(STATE.filters.desde)+', STATE.filters.hasta='+JSON.stringify(STATE.filters.hasta)+'.</div>');
     return;
   }
   const datasets = chart.data && chart.data.datasets || [];
   const totalPuntos = datasets.reduce((s,d)=>s+(d.data?d.data.filter(v=>v!==0 && v!==null).length:0),0);
   if(datasets.length===0 || totalPuntos===0){
-    wrap.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ffcf80;font-size:12px;border-radius:8px;">⚠ Diagnóstico: el gráfico se creó pero sin datos visibles ('+datasets.length+' series, '+totalPuntos+' puntos distintos de cero). Revisa el periodo Desde/Hasta elegido arriba.</div>');
+    wrap.insertAdjacentHTML('beforeend', '<div class="diagnostico-grafico" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ffcf80;font-size:12px;border-radius:8px;">⚠ Diagnóstico: el gráfico se creó pero sin datos visibles ('+datasets.length+' series, '+totalPuntos+' puntos distintos de cero). Revisa el periodo Desde/Hasta elegido arriba.</div>');
   }
 }
 function renderVentasTendenciaDia(lines){
   const canvas = document.getElementById('chartVentasTendenciaDia');
   if(!canvas) return;
-  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
+  const _rango = derivarRangoFechas(lines); const desde = _rango.desde, hasta = _rango.hasta;
   if(!desde || !hasta){ destroyChart('ventasTendenciaDia'); return; }
   const gran = document.getElementById('ventasTendenciaGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -3001,7 +3022,7 @@ function setVentasTendenciaFranjasOcultas(set){ localStorage.setItem('miners_ven
 function renderVentasTendenciaFranja(lines){
   const canvas = document.getElementById('chartVentasTendenciaFranja');
   if(!canvas) return;
-  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
+  const _rango = derivarRangoFechas(lines); const desde = _rango.desde, hasta = _rango.hasta;
   if(!desde || !hasta){ destroyChart('ventasTendenciaFranja'); return; }
   const gran = document.getElementById('ventasTendenciaGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -3077,7 +3098,7 @@ function setVentasComboFranjas(set){ localStorage.setItem('miners_ventas_combo_f
 function renderVentasCombo(lines){
   const canvas = document.getElementById('chartVentasCombo');
   if(!canvas) return;
-  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
+  const _rango = derivarRangoFechas(lines); const desde = _rango.desde, hasta = _rango.hasta;
   const franjaOrderCompleto = franjaOrderFor(STATE.filters.franjaTipo);
   const diasElegidos = getVentasComboDias();
   const franjasElegidas = getVentasComboFranjas(franjaOrderCompleto);
@@ -3349,7 +3370,7 @@ function renderProductos(lines){
 function renderCategoriasTendencia(lines){
   const canvas = document.getElementById('chartCategoriasTendencia');
   if(!canvas) return;
-  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
+  const _rango = derivarRangoFechas(lines); const desde = _rango.desde, hasta = _rango.hasta;
   if(!desde || !hasta){ destroyChart('categoriasTendencia'); return; }
   const gran = document.getElementById('productosGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -3400,7 +3421,7 @@ function renderProductosTendenciaChart(lines){
     });
   });
 
-  const desde = STATE.filters.desde, hasta = STATE.filters.hasta; // fuente fiable: la misma que ya filtró 'lines', en vez de releer el campo del formulario (que puede no estar sincronizado en el primer render)
+  const _rango = derivarRangoFechas(lines); const desde = _rango.desde, hasta = _rango.hasta;
   if(!desde || !hasta || seleccion.length===0){ destroyChart('productosTendencia'); return; }
   const gran = document.getElementById('productosGranularidad').value;
   const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
