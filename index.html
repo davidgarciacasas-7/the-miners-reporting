@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.89</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.90</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2891,9 +2891,9 @@ function renderVentas(lines, tickets){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:metricAxisCallback(true)}, grid:{color:c.grid} } } }
   });
 
-  try{ renderVentasTendenciaDia(lines); }catch(e){ console.error('Error en renderVentasTendenciaDia:', e); }
-  try{ renderVentasTendenciaFranja(lines); }catch(e){ console.error('Error en renderVentasTendenciaFranja:', e); }
-  try{ renderVentasCombo(lines); }catch(e){ console.error('Error en renderVentasCombo:', e); }
+  try{ renderVentasTendenciaDia(lines); mostrarDiagnosticoSiVacio('chartVentasTendenciaDia','ventasTendenciaDia'); }catch(e){ console.error('Error en renderVentasTendenciaDia:', e); mostrarDiagnosticoError('chartVentasTendenciaDia', e); }
+  try{ renderVentasTendenciaFranja(lines); mostrarDiagnosticoSiVacio('chartVentasTendenciaFranja','ventasTendenciaFranja'); }catch(e){ console.error('Error en renderVentasTendenciaFranja:', e); mostrarDiagnosticoError('chartVentasTendenciaFranja', e); }
+  try{ renderVentasCombo(lines); mostrarDiagnosticoSiVacio('chartVentasCombo','ventasCombo'); }catch(e){ console.error('Error en renderVentasCombo:', e); mostrarDiagnosticoError('chartVentasCombo', e); }
 }
 document.getElementById('ventasTendenciaGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderVentasTendenciaDia(lines); renderVentasTendenciaFranja(lines); renderVentasCombo(lines); });
 
@@ -2904,6 +2904,31 @@ function getVentasTendenciaDiasOcultos(){
   return new Set();
 }
 function setVentasTendenciaDiasOcultos(set){ localStorage.setItem('miners_ventas_tendencia_dias_ocultos', JSON.stringify([...set])); }
+/* diagnóstico visible directamente en la pantalla (no solo en consola), para poder ver
+   qué está pasando con un gráfico sin necesitar abrir las herramientas de desarrollador */
+function mostrarDiagnosticoError(canvasId, error){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
+  if(!wrap) return;
+  wrap.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ff8080;font-size:12px;border-radius:8px;">⚠ Error al dibujar este gráfico: '+(error&&error.message?error.message:String(error))+'</div>');
+}
+function mostrarDiagnosticoSiVacio(canvasId, chartKey){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const chart = STATE.charts[chartKey];
+  const wrap = canvas.closest('.chart-wrap') || canvas.parentElement;
+  if(!wrap) return;
+  if(!chart){
+    wrap.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ffcf80;font-size:12px;border-radius:8px;">⚠ Diagnóstico: el gráfico no llegó a crearse (STATE.charts.'+chartKey+' no existe), sin lanzar ningún error. Puede ser un problema con Chart.js o con el propio canvas.</div>');
+    return;
+  }
+  const datasets = chart.data && chart.data.datasets || [];
+  const totalPuntos = datasets.reduce((s,d)=>s+(d.data?d.data.filter(v=>v!==0 && v!==null).length:0),0);
+  if(datasets.length===0 || totalPuntos===0){
+    wrap.insertAdjacentHTML('beforeend', '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;background:rgba(0,0,0,.85);color:#ffcf80;font-size:12px;border-radius:8px;">⚠ Diagnóstico: el gráfico se creó pero sin datos visibles ('+datasets.length+' series, '+totalPuntos+' puntos distintos de cero). Revisa el periodo Desde/Hasta elegido arriba.</div>');
+  }
+}
 function renderVentasTendenciaDia(lines){
   const canvas = document.getElementById('chartVentasTendenciaDia');
   if(!canvas) return;
@@ -3317,8 +3342,8 @@ function renderProductos(lines){
     return `<tr><td class="bar-cell"><div class="bar" style="width:${barPct}%"></div><span>${a.name}</span></td><td>${a.cat}</td><td class="num">${udsDisplay}</td><td class="num">${ventasDisplay}</td></tr>`;
   }).join('');
 
-  renderCategoriasTendencia(lines);
-  renderProductosTendenciaChart(lines);
+  try{ renderCategoriasTendencia(lines); mostrarDiagnosticoSiVacio('chartCategoriasTendencia','categoriasTendencia'); }catch(e){ console.error('Error en renderCategoriasTendencia:', e); mostrarDiagnosticoError('chartCategoriasTendencia', e); }
+  try{ renderProductosTendenciaChart(lines); }catch(e){ console.error('Error en renderProductosTendenciaChart:', e); mostrarDiagnosticoError('chartProductosTendencia', e); }
 }
 /* tendencia de ventas por categoría — siempre en líneas, dentro del Desde/Hasta general */
 function renderCategoriasTendencia(lines){
