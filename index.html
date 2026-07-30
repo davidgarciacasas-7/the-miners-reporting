@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.92</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.95</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -435,6 +435,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div class="filter-group"><label>Hasta</label><input type="date" id="pnlHasta"></div>
             <select id="pnlGranularidad"><option value="mes" selected>Mensual</option><option value="semana">Semanal</option></select>
             <button class="btn secondary" id="pnlAddLineBtn" style="padding:6px 12px;font-size:12px;">+ Añadir línea</button>
+            <button class="btn secondary" id="pnlAddTituloBtn" style="padding:6px 12px;font-size:12px;">+ Añadir título de sección</button>
             <button class="btn secondary" id="pnlImportBtn" style="padding:6px 12px;font-size:12px;">Importar CSV</button>
             <input type="file" id="pnlImportFile" accept=".csv" style="display:none;">
             <button class="btn secondary" id="pnlImportWideBtn" style="padding:6px 12px;font-size:12px;">Importar mi propio PNL (CSV/Excel)</button>
@@ -553,16 +554,53 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <h3>Añadir o corregir un coste a mano</h3>
           <div class="subfilter">
             <input type="text" id="otrosNombre" placeholder="Nombre (ej. Alquiler)" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;flex:1;">
+            <select id="otrosTipo">
+              <option value="fijo">Importe fijo mensual (€)</option>
+              <option value="pct_bruto">% de ventas brutas</option>
+              <option value="pct_neto">% de ventas netas</option>
+            </select>
             <input type="number" step="0.01" id="otrosValor" placeholder="Importe mensual" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;width:110px;">
             <input type="date" id="otrosFecha" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
             <button class="btn secondary" id="otrosAddBtn" style="padding:5px 10px;font-size:12px;">Guardar</button>
           </div>
-          <p class="hint" style="margin-top:6px;">Fecha = desde cuándo está vigente ese importe mensual (por defecto, hoy).</p>
+          <p class="hint" style="margin-top:6px;">Fecha = desde cuándo está vigente ese valor. Con "% de ventas", el coste de cada periodo se calcula sobre las ventas reales de ese mismo periodo (no se reparte un importe fijo) — por ejemplo, útil para royalties o comisiones.</p>
         </div>
         <div class="section-title">Historial de otros costes</div>
         <div class="card">
           <div style="max-height:350px;overflow:auto;">
-            <table id="tablaOtrosCostes"><thead><tr><th>Nombre</th><th>Importe/mes</th><th>Vigente desde</th><th>Fuente</th><th></th></tr></thead><tbody></tbody></table>
+            <table id="tablaOtrosCostes"><thead><tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Vigente desde</th><th>Fuente</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <h3 style="margin-bottom:10px;">3. Coste laboral (por tipo de empleado y hora)</h3>
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Define aquí tus tipos de empleado (Barista, Cocina, Encargado...) con su coste por hora, y cuántas horas ha trabajado cada tipo, semana a semana. Con eso, la app calcula solo el <b>coste laboral</b> de cada periodo (horas × coste/hora vigente esa semana) y lo añade como línea automática al PNL, igual que ya hace con Ventas y COGS.</p>
+          <div class="subfilter">
+            <input type="text" id="empTipoNombre" placeholder="Tipo de empleado (ej. Barista)" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;flex:1;">
+            <input type="number" step="0.01" min="0" id="empTipoCoste" placeholder="Coste/hora (€)" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;width:110px;">
+            <input type="date" id="empTipoFecha" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="empTipoAddBtn" style="padding:5px 10px;font-size:12px;">Guardar coste/hora</button>
+          </div>
+          <p class="hint" style="margin-top:6px;">Fecha = desde cuándo está vigente ese coste por hora (por defecto, hoy).</p>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div style="max-height:250px;overflow:auto;">
+            <table id="tablaEmpTipoCostes"><thead><tr><th>Tipo</th><th>Coste/hora</th><th>Vigente desde</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <h3>Horas trabajadas por semana</h3>
+          <div class="subfilter">
+            <input type="date" id="empHorasSemana" placeholder="Semana (cualquier día de ella)">
+            <select id="empHorasTipo"></select>
+            <input type="number" step="0.5" min="0" id="empHorasValor" placeholder="Horas" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;width:90px;">
+            <button class="btn secondary" id="empHorasAddBtn" style="padding:5px 10px;font-size:12px;">Guardar horas</button>
+          </div>
+          <p class="hint" style="margin-top:6px;">La fecha que elijas se ajusta sola al lunes de esa semana.</p>
+        </div>
+        <div class="card">
+          <div style="max-height:350px;overflow:auto;">
+            <table id="tablaEmpHoras"><thead><tr><th>Semana</th><th>Tipo</th><th>Horas</th><th>Coste esa semana</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
       </div>
@@ -1544,10 +1582,12 @@ async function loadAllData(){
   }
   STATE.ticketsClassified = null; // invalidar cache
   try{
-    STATE.pnlLines = (await sbList('pnl_lines', 'select=*&order=orden.asc')).map(r=>({ id:r.id, name:r.name, tipo:r.tipo, orden:r.orden, esAuto:r.es_auto, esRecurrente:r.es_recurrente, indent:r.indent||0 }));
+    STATE.pnlLines = (await sbList('pnl_lines', 'select=*&order=orden.asc')).map(r=>({ id:r.id, name:r.name, tipo:r.tipo, orden:r.orden, esAuto:r.es_auto, esRecurrente:r.es_recurrente, indent:r.indent||0, esTitulo:!!r.es_titulo }));
     STATE.pnlValues = (await sbList('pnl_values', 'select=*')).map(r=>({ id:r.id, lineId:r.line_id, dateMin:r.date_min, dateMax:r.date_max, amount:parseFloat(r.amount) }));
     STATE.productCosts = (await sbList('product_costs', 'select=*&order=product_name.asc,effective_from.asc')).map(r=>({ id:r.id, productName:r.product_name, unitCost:parseFloat(r.unit_cost), effectiveFrom:r.effective_from, source:r.source }));
-    STATE.otherCosts = (await sbList('other_costs', 'select=*&order=effective_from.asc')).map(r=>({ id:r.id, lineId:r.line_id, amount:parseFloat(r.amount), effectiveFrom:r.effective_from, source:r.source }));
+    STATE.otherCosts = (await sbList('other_costs', 'select=*&order=effective_from.asc')).map(r=>({ id:r.id, lineId:r.line_id, amount:parseFloat(r.amount), effectiveFrom:r.effective_from, source:r.source, tipo:r.tipo||'fijo' }));
+    STATE.employeeTypeCosts = (await sbList('employee_type_costs', 'select=*&order=type_name.asc,effective_from.asc')).map(r=>({ id:r.id, typeName:r.type_name, hourlyCost:parseFloat(r.hourly_cost), effectiveFrom:r.effective_from }));
+    STATE.employeeHoursWeekly = (await sbList('employee_hours_weekly', 'select=*&order=week_start.desc')).map(r=>({ id:r.id, weekStart:r.week_start, typeName:r.type_name, hours:parseFloat(r.hours) }));
     STATE.employees = (await sbList('empleados', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre, activo:r.activo }));
     STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), nota:r.nota }));
   }catch(e){
@@ -3606,18 +3646,39 @@ function buildOtherCostHistoryMap(){
   Object.keys(map).forEach(k=>map[k].sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom)));
   return map;
 }
-/* importe mensual vigente de una línea recurrente en una fecha dada */
-function otherCostAtDate(historyMap, lineId, date){
+/* entrada vigente (importe/porcentaje + tipo) de una línea recurrente en una fecha dada */
+function otherCostEntryAtDate(historyMap, lineId, date){
   const entries = historyMap[lineId];
-  if(!entries) return 0;
-  let applicable = 0;
-  for(const e of entries){ if(e.effectiveFrom<=date) applicable=e.amount; else break; }
-  return applicable;
+  if(!entries || entries.length===0) return null;
+  let vigente = null;
+  for(const e of entries){ if(e.effectiveFrom<=date) vigente=e; else break; }
+  return vigente || entries[0]; // si la más antigua es posterior a la fecha, se usa como mejor aproximación
 }
-/* un "otro coste" es un importe MENSUAL recurrente: para un bucket cualquiera (semana o mes),
-   se recorre cada mes que solapa con el bucket, se toma el importe vigente ese mes, y se
-   reparte proporcionalmente por días solapados — así funciona igual en vista semanal o mensual. */
-function otherCostValueForBucket(lineId, bucket, historyMap){
+/* importe mensual vigente de una línea recurrente en una fecha dada (solo para tipo "fijo") */
+function otherCostAtDate(historyMap, lineId, date){
+  const e = otherCostEntryAtDate(historyMap, lineId, date);
+  return (e && e.tipo!=='pct_bruto' && e.tipo!=='pct_neto') ? e.amount : 0;
+}
+/* un "otro coste" de tipo FIJO es un importe MENSUAL recurrente: para un bucket cualquiera
+   (semana o mes), se recorre cada mes que solapa con el bucket, se toma el importe vigente
+   ese mes, y se reparte proporcionalmente por días solapados. Un coste de tipo % DE VENTAS
+   (brutas o netas) no se reparte por días — se calcula directamente como ese % sobre las
+   ventas reales que hayan caído dentro del propio bucket, así que necesita "allSalesLines". */
+function otherCostValueForBucket(lineId, bucket, historyMap, allSalesLines){
+  const vigente = otherCostEntryAtDate(historyMap, lineId, bucket.dateMin);
+  if(!vigente) return 0;
+
+  if(vigente.tipo==='pct_bruto' || vigente.tipo==='pct_neto'){
+    if(!allSalesLines) return 0;
+    let sumaCentimos = 0;
+    allSalesLines.forEach(l=>{
+      if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax){
+        sumaCentimos += (vigente.tipo==='pct_bruto' ? l.bruto : l.neto);
+      }
+    });
+    return (sumaCentimos/100) * (vigente.amount/100);
+  }
+
   let sum = 0;
   let d = new Date(bucket.dateMin+'T00:00:00');
   const bucketEnd = new Date(bucket.dateMax+'T00:00:00');
@@ -6203,10 +6264,11 @@ function calcularCogsTotalMensual(buckets){
 }
 function calcularOtrosCostesTotalMensual(buckets){
   const otherCostHistory = buildOtherCostHistoryMap();
+  const allSalesLines = getAllSalesLinesRaw();
   const lineasRecurrentes = STATE.pnlLines.filter(l=>l.esRecurrente);
   const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
   lineasRecurrentes.forEach(line=>{
-    buckets.forEach(b=>{ porBucket[b.label] += otherCostValueForBucket(line.id, b, otherCostHistory); });
+    buckets.forEach(b=>{ porBucket[b.label] += otherCostValueForBucket(line.id, b, otherCostHistory, allSalesLines); });
   });
   return porBucket;
 }
@@ -6656,6 +6718,29 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   doc.save('the-miners-resumen-ejecutivo-'+fechaLocalISO(new Date())+'.pdf');
 });
 
+/* coste laboral total en un bucket (semana o mes): para cada semana con horas registradas,
+   se calcula su coste (horas × coste/hora vigente esa semana) y se reparte proporcionalmente
+   por los días que solapen con el bucket — igual que ya se hace con "otros costes" fijos. */
+function costeLaboralParaBucket(bucket){
+  if(!STATE.employeeHoursWeekly || STATE.employeeHoursWeekly.length===0) return 0;
+  const empCostHistory = {};
+  STATE.employeeTypeCosts.forEach(et=>{ (empCostHistory[et.typeName]=empCostHistory[et.typeName]||[]).push(et); });
+  Object.keys(empCostHistory).forEach(k=>empCostHistory[k].sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom)));
+  const costeVigente = (tipo, fecha) => {
+    const entries = empCostHistory[tipo];
+    if(!entries || entries.length===0) return 0;
+    let v = null;
+    for(const e of entries){ if(e.effectiveFrom<=fecha) v=e; else break; }
+    return (v || entries[0]).hourlyCost;
+  };
+  let sum = 0;
+  STATE.employeeHoursWeekly.forEach(h=>{
+    const weekEnd = (()=>{ const d=new Date(h.weekStart+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+    const costeSemana = h.hours * costeVigente(h.typeName, h.weekStart);
+    sum += allocateToBucket(h.weekStart, weekEnd, bucket.dateMin, bucket.dateMax, costeSemana);
+  });
+  return sum;
+}
 function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCostHistory){
   let valor;
   if(line.esAuto && line.name==='Ventas'){
@@ -6664,8 +6749,10 @@ function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCo
   } else if(line.esAuto && line.name==='COGS'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
+  } else if(line.esAuto && line.name==='Coste laboral'){
+    valor = costeLaboralParaBucket(bucket);
   } else if(line.esRecurrente){
-    valor = otherCostValueForBucket(line.id, bucket, otherCostHistory);
+    valor = otherCostValueForBucket(line.id, bucket, otherCostHistory, allSalesLines);
   } else {
     let sum=0;
     STATE.pnlValues.filter(v=>v.lineId===line.id).forEach(v=>{ sum += allocateToBucket(v.dateMin, v.dateMax, bucket.dateMin, bucket.dateMax, v.amount); });
@@ -6684,6 +6771,13 @@ async function ensureDefaultPnlLines(){
   }
   if(!STATE.pnlLines.find(l=>l.name==='COGS' && l.esAuto)){
     const saved = await sbInsert('pnl_lines', { name:'COGS', tipo:'coste', orden:-1, es_auto:true });
+    STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:true }); changed=true;
+  }
+  // "Coste laboral" solo se crea automáticamente una vez el usuario empieza a usar esta
+  // función (ha guardado al menos un tipo de empleado con su coste/hora) — así no aparece
+  // una línea siempre a 0 para quien no la usa.
+  if(STATE.employeeTypeCosts.length>0 && !STATE.pnlLines.find(l=>l.name==='Coste laboral' && l.esAuto)){
+    const saved = await sbInsert('pnl_lines', { name:'Coste laboral', tipo:'coste', orden:0, es_auto:true });
     STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:true }); changed=true;
   }
   if(changed) STATE.pnlLines.sort((a,b)=>a.orden-b.orden);
@@ -6707,6 +6801,10 @@ async function renderPnlWidgetInstance(w){
 
   let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
   const filas = lines.map(line=>{
+    if(line.esTitulo){
+      if(hiddenRows.has(line.id)) return '';
+      return `<tr style="background:var(--surface-2);"><td colspan="${buckets.length+1}" style="padding-left:${(line.indent||0)*20}px;font-weight:700;">${line.name}</td></tr>`;
+    }
     const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
     values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
     if(hiddenRows.has(line.id)) return '';
@@ -6736,7 +6834,7 @@ async function renderPnlLineaWidgetInstance(w, buckets){
       '<option value="__resultado__">'+etiquetaR+' (EBITDA)</option>' +
       '<option value="__totalIngresos__">'+etiquetaTI+'</option>' +
       '<option value="__totalCostes__">'+etiquetaTC+'</option>' +
-      lines.map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
+      lines.filter(l=>!l.esTitulo).map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
     sel.value = w.pnlLineaId || '__resultado__';
     sel.dataset.cargado = '1';
   }
@@ -6830,6 +6928,16 @@ async function renderPnl(){
   let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
   const hiddenRows = getPnlHiddenRows();
   const rows = lines.map(line=>{
+    if(line.esTitulo){
+      if(hiddenRows.has(line.id)) return '';
+      const indent = line.indent||0;
+      const moveBtns = `<button class="btn secondary" data-move-up="${line.id}" title="Mover arriba" style="padding:2px 6px;font-size:10px;">↑</button> <button class="btn secondary" data-move-down="${line.id}" title="Mover abajo" style="padding:2px 6px;font-size:10px;">↓</button>`;
+      const indentBtns = `<button class="btn secondary" data-indent-out="${line.id}" title="Quitar sangría" style="padding:2px 6px;font-size:10px;" ${indent<=0?'disabled':''}>←</button> <button class="btn secondary" data-indent-in="${line.id}" title="Sangrar" style="padding:2px 6px;font-size:10px;">→</button>`;
+      const hideBtn = `<button class="btn secondary" data-hide-line="${line.id}" title="Ocultar esta fila" style="padding:2px 6px;font-size:10px;">🙈</button>`;
+      return `<tr style="background:var(--surface-2);"><td colspan="${buckets.length+1}" style="padding-left:${indent*20}px;font-weight:700;letter-spacing:.3px;">
+        <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button>
+      </td><td style="white-space:nowrap;">${indentBtns} ${moveBtns} <button class="btn danger" data-del-line="${line.id}" style="padding:2px 6px;font-size:10px;">✕</button> ${hideBtn}</td></tr>`;
+    }
     const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
     values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
     if(hiddenRows.has(line.id)) return ''; // no se renderiza, pero ya ha sumado a los totales
@@ -6979,7 +7087,7 @@ async function renderPnl(){
       '<option value="__resultado__">'+etiquetaR+' (EBITDA)</option>' +
       '<option value="__totalIngresos__">'+etiquetaTI+'</option>' +
       '<option value="__totalCostes__">'+etiquetaTC+'</option>' +
-      lines.map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
+      lines.filter(l=>!l.esTitulo).map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
     if(valorPrevio && [...selLinea.options].some(o=>o.value===valorPrevio)) selLinea.value = valorPrevio;
     const seleccion = selLinea.value;
     let datosGrafico;
@@ -7147,10 +7255,12 @@ function renderCostes(){
     const line = STATE.pnlLines.find(l=>l.id===oc.lineId);
     return { ...oc, nombre: line?line.name:'(línea eliminada)' };
   }).sort((a,b)=> a.nombre===b.nombre ? b.effectiveFrom.localeCompare(a.effectiveFrom) : a.nombre.localeCompare(b.nombre));
-  tbodyOtros.innerHTML = filasOtros.map(oc=>`
-    <tr><td>${oc.nombre}</td><td class="num">${eur(Math.round(oc.amount*100))}</td><td>${oc.effectiveFrom}</td><td>${oc.source}</td>
-    <td><button class="btn danger" data-del-otro="${oc.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="5" class="hint">Sin otros costes todavía — sube un archivo o añade uno a mano arriba.</td></tr>';
+  tbodyOtros.innerHTML = filasOtros.map(oc=>{
+    const tipoLabel = { fijo:'Fijo €/mes', pct_bruto:'% ventas brutas', pct_neto:'% ventas netas' }[oc.tipo] || 'Fijo €/mes';
+    const valorTexto = (oc.tipo==='pct_bruto'||oc.tipo==='pct_neto') ? oc.amount+'%' : eur(Math.round(oc.amount*100));
+    return `<tr><td>${oc.nombre}</td><td><span class="hint">${tipoLabel}</span></td><td class="num">${valorTexto}</td><td>${oc.effectiveFrom}</td><td>${oc.source}</td>
+    <td><button class="btn danger" data-del-otro="${oc.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="hint">Sin otros costes todavía — sube un archivo o añade uno a mano arriba.</td></tr>';
   tbodyOtros.querySelectorAll('[data-del-otro]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar esta entrada del historial?')) return;
@@ -7160,7 +7270,98 @@ function renderCostes(){
       renderCostes(); renderPnl();
     });
   });
+
+  // --- Coste laboral: tipos de empleado con coste/hora ---
+  const tbodyEmpTipo = document.querySelector('#tablaEmpTipoCostes tbody');
+  if(tbodyEmpTipo){
+    const filasEmp = [...STATE.employeeTypeCosts].sort((a,b)=> a.typeName===b.typeName ? b.effectiveFrom.localeCompare(a.effectiveFrom) : a.typeName.localeCompare(b.typeName));
+    tbodyEmpTipo.innerHTML = filasEmp.map(et=>`
+      <tr><td>${et.typeName}</td><td class="num">${eur(Math.round(et.hourlyCost*100))}/h</td><td>${et.effectiveFrom}</td>
+      <td><button class="btn danger" data-del-emptipo="${et.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+    `).join('') || '<tr><td colspan="4" class="hint">Sin tipos de empleado todavía.</td></tr>';
+    tbodyEmpTipo.querySelectorAll('[data-del-emptipo]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if(!confirm('¿Eliminar esta entrada del historial de coste/hora?')) return;
+        const id = btn.getAttribute('data-del-emptipo');
+        await sbDelete('employee_type_costs', id);
+        STATE.employeeTypeCosts = STATE.employeeTypeCosts.filter(et=>et.id!==id);
+        renderCostes(); renderPnl();
+      });
+    });
+  }
+  // desplegable de tipos disponibles, para el formulario de horas
+  const selEmpHorasTipo = document.getElementById('empHorasTipo');
+  if(selEmpHorasTipo){
+    const tiposDisponibles = [...new Set(STATE.employeeTypeCosts.map(et=>et.typeName))].sort();
+    const valorPrevio = selEmpHorasTipo.value;
+    selEmpHorasTipo.innerHTML = tiposDisponibles.length
+      ? tiposDisponibles.map(t=>'<option value="'+t.replace(/"/g,'&quot;')+'">'+t+'</option>').join('')
+      : '<option value="">(añade un tipo de empleado arriba primero)</option>';
+    if(tiposDisponibles.includes(valorPrevio)) selEmpHorasTipo.value = valorPrevio;
+  }
+  // --- Coste laboral: horas trabajadas por semana ---
+  const tbodyEmpHoras = document.querySelector('#tablaEmpHoras tbody');
+  if(tbodyEmpHoras){
+    const empCostHistory = {};
+    STATE.employeeTypeCosts.forEach(et=>{ (empCostHistory[et.typeName]=empCostHistory[et.typeName]||[]).push(et); });
+    Object.keys(empCostHistory).forEach(k=>empCostHistory[k].sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom)));
+    const costeVigente = (tipo, fecha) => {
+      const entries = empCostHistory[tipo];
+      if(!entries || entries.length===0) return 0;
+      let v = null;
+      for(const e of entries){ if(e.effectiveFrom<=fecha) v=e; else break; }
+      return (v || entries[0]).hourlyCost;
+    };
+    const filasHoras = [...STATE.employeeHoursWeekly].sort((a,b)=> b.weekStart.localeCompare(a.weekStart) || a.typeName.localeCompare(b.typeName));
+    tbodyEmpHoras.innerHTML = filasHoras.map(h=>{
+      const coste = h.hours * costeVigente(h.typeName, h.weekStart);
+      return `<tr><td>Semana del ${h.weekStart}</td><td>${h.typeName}</td><td class="num">${h.hours}</td><td class="num">${eur(Math.round(coste*100))}</td>
+      <td><button class="btn danger" data-del-emphoras="${h.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+    }).join('') || '<tr><td colspan="5" class="hint">Sin horas registradas todavía.</td></tr>';
+    tbodyEmpHoras.querySelectorAll('[data-del-emphoras]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if(!confirm('¿Eliminar este registro de horas?')) return;
+        const id = btn.getAttribute('data-del-emphoras');
+        await sbDelete('employee_hours_weekly', id);
+        STATE.employeeHoursWeekly = STATE.employeeHoursWeekly.filter(h=>h.id!==id);
+        renderCostes(); renderPnl();
+      });
+    });
+  }
 }
+
+document.getElementById('empTipoAddBtn').addEventListener('click', async ()=>{
+  const typeName = document.getElementById('empTipoNombre').value.trim();
+  const hourlyCost = parseFloat(document.getElementById('empTipoCoste').value);
+  const effectiveFrom = document.getElementById('empTipoFecha').value || fechaLocalISO(new Date());
+  if(!typeName || isNaN(hourlyCost)){ toast('Rellena el tipo y el coste por hora.', true); return; }
+  try{
+    const saved = await sbUpsert('employee_type_costs', { type_name:typeName, hourly_cost:hourlyCost, effective_from:effectiveFrom }, 'type_name,effective_from');
+    const mapped = { id:saved.id, typeName:saved.type_name, hourlyCost:parseFloat(saved.hourly_cost), effectiveFrom:saved.effective_from };
+    const idx = STATE.employeeTypeCosts.findIndex(et=>et.typeName===typeName && et.effectiveFrom===effectiveFrom);
+    if(idx>=0) STATE.employeeTypeCosts[idx]=mapped; else STATE.employeeTypeCosts.push(mapped);
+    document.getElementById('empTipoNombre').value=''; document.getElementById('empTipoCoste').value='';
+    renderCostes(); renderPnl();
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+document.getElementById('empHorasAddBtn').addEventListener('click', async ()=>{
+  const fechaInput = document.getElementById('empHorasSemana').value;
+  const typeName = document.getElementById('empHorasTipo').value;
+  const hours = parseFloat(document.getElementById('empHorasValor').value);
+  if(!fechaInput){ toast('Elige una fecha de esa semana.', true); return; }
+  if(!typeName){ toast('Añade primero al menos un tipo de empleado, arriba.', true); return; }
+  if(isNaN(hours) || hours<0){ toast('Indica las horas trabajadas.', true); return; }
+  const weekStart = isoMonday(fechaInput);
+  try{
+    const saved = await sbUpsert('employee_hours_weekly', { week_start:weekStart, type_name:typeName, hours }, 'week_start,type_name');
+    const mapped = { id:saved.id, weekStart:saved.week_start, typeName:saved.type_name, hours:parseFloat(saved.hours) };
+    const idx = STATE.employeeHoursWeekly.findIndex(h=>h.weekStart===weekStart && h.typeName===typeName);
+    if(idx>=0) STATE.employeeHoursWeekly[idx]=mapped; else STATE.employeeHoursWeekly.push(mapped);
+    document.getElementById('empHorasValor').value='';
+    renderCostes(); renderPnl();
+    toast('Horas guardadas ✓');
+  }catch(e){ toast('Error: '+e.message, true); }
+});
 
 document.getElementById('pnlGranularidad').addEventListener('change', renderPnl);
 document.getElementById('pnlDesde').addEventListener('change', renderPnl);
@@ -7173,7 +7374,17 @@ document.getElementById('pnlAddLineBtn').addEventListener('click', async ()=>{
   const esCoste = confirm('Pulsa Aceptar si es un COSTE, o Cancelar si es un INGRESO.');
   const maxOrden = STATE.pnlLines.reduce((m,l)=>Math.max(m,l.orden),0);
   const saved = await sbInsert('pnl_lines', { name, tipo: esCoste?'coste':'ingreso', orden:maxOrden+1, es_auto:false });
-  STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:false });
+  STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:false, esTitulo:false });
+  renderPnl();
+});
+document.getElementById('pnlAddTituloBtn').addEventListener('click', async ()=>{
+  const name = prompt('Texto del título de sección (ej. "Costes de personal"):');
+  if(!name) return;
+  const maxOrden = STATE.pnlLines.reduce((m,l)=>Math.max(m,l.orden),0);
+  // el tipo no importa para un título (no suma ni resta en ningún lado), pero se guarda
+  // como 'coste' por tener que rellenar la columna — se ignora en todos los cálculos
+  const saved = await sbInsert('pnl_lines', { name, tipo:'coste', orden:maxOrden+1, es_auto:false, es_titulo:true });
+  STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:false, esTitulo:true, indent:0 });
   renderPnl();
 });
 document.getElementById('pnlImportBtn').addEventListener('click', ()=>document.getElementById('pnlImportFile').click());
@@ -7357,10 +7568,11 @@ async function getOrCreateOtrosCostesLine(name){
   STATE.pnlLines.push(line);
   return line;
 }
-async function saveOtroCosteEntry(name, amount, effectiveFrom, source){
+async function saveOtroCosteEntry(name, amount, effectiveFrom, source, tipo){
+  tipo = tipo || 'fijo';
   const line = await getOrCreateOtrosCostesLine(name);
-  const saved = await sbUpsert('other_costs', { line_id:line.id, amount, effective_from:effectiveFrom, source }, 'line_id,effective_from');
-  const mapped = { id:saved.id, lineId:saved.line_id, amount:parseFloat(saved.amount), effectiveFrom:saved.effective_from, source:saved.source };
+  const saved = await sbUpsert('other_costs', { line_id:line.id, amount, effective_from:effectiveFrom, source, tipo }, 'line_id,effective_from');
+  const mapped = { id:saved.id, lineId:saved.line_id, amount:parseFloat(saved.amount), effectiveFrom:saved.effective_from, source:saved.source, tipo:saved.tipo||'fijo' };
   const idx = STATE.otherCosts.findIndex(x=>x.lineId===line.id && x.effectiveFrom===effectiveFrom);
   if(idx>=0) STATE.otherCosts[idx]=mapped; else STATE.otherCosts.push(mapped);
 }
@@ -7411,13 +7623,18 @@ document.getElementById('otrosFecha').value = fechaLocalISO(new Date());
 document.getElementById('otrosAddBtn').addEventListener('click', async ()=>{
   const nombre = document.getElementById('otrosNombre').value.trim();
   const amount = parseFloat(document.getElementById('otrosValor').value);
+  const tipo = document.getElementById('otrosTipo').value;
   const effectiveFrom = document.getElementById('otrosFecha').value || fechaLocalISO(new Date());
   if(!nombre || isNaN(amount)){ toast('Rellena nombre e importe.', true); return; }
   try{
-    await saveOtroCosteEntry(nombre, amount, effectiveFrom, 'manual');
+    await saveOtroCosteEntry(nombre, amount, effectiveFrom, 'manual', tipo);
     document.getElementById('otrosNombre').value=''; document.getElementById('otrosValor').value='';
     renderCostes(); renderPnl();
   }catch(e){ toast('Error: '+e.message, true); }
+});
+document.getElementById('otrosTipo').addEventListener('change', (e)=>{
+  const inp = document.getElementById('otrosValor');
+  inp.placeholder = e.target.value==='fijo' ? 'Importe mensual (€)' : 'Porcentaje (ej. 5)';
 });
 
 /* =========================================================
