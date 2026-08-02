@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.106</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.107</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8388,7 +8388,8 @@ async function cajaSet(key, value){
   try{
     const val = typeof value==='string' ? value : JSON.stringify(value);
     await sbUpsert('caja_storage', { key, value:val, updated_at:new Date().toISOString() }, 'key');
-  }catch(e){ console.error('Error guardando en caja_storage:', e); }
+    return true;
+  }catch(e){ console.error('Error guardando en caja_storage:', e); return false; }
 }
 async function cajaLoadStorage(){
   try{
@@ -8586,57 +8587,68 @@ function cajaDeriveProvKey(mov){
   return match ? match.prov : null;
 }
 async function cajaSetSubcategoria(movementId, subcatRaw){
-  const c = STATE.caja;
-  const mov = c.data.movements.find(m=>m.id===movementId);
-  if(!mov) return;
-  const subcat = subcatRaw.trim();
-  const provKeyConocido = cajaDeriveProvKey(mov);
-  // si no hay proveedor conocido, se usa el concepto exacto de ESTE movimiento como clave
-  // — así solo afecta a él (y a movimientos con el concepto idéntico), nunca a otros
-  // proveedores distintos por una coincidencia de palabras poco fiable.
-  const provKey = provKeyConocido || mov.concept.trim();
+  try{
+    const c = STATE.caja;
+    if(!c.data){ toast('Error: no hay datos de caja cargados (c.data es nulo).', true); return; }
+    const mov = c.data.movements.find(m=>m.id===movementId);
+    if(!mov){ toast('Error: no se encontró el movimiento (id='+movementId+').', true); return; }
+    const subcat = subcatRaw.trim();
+    const provKeyConocido = cajaDeriveProvKey(mov);
+    // si no hay proveedor conocido, se usa el concepto exacto de ESTE movimiento como clave
+    // — así solo afecta a él (y a movimientos con el concepto idéntico), nunca a otros
+    // proveedores distintos por una coincidencia de palabras poco fiable.
+    const provKey = provKeyConocido || mov.concept.trim();
 
-  // guarda/actualiza el mapeo texto->subcategoría, para aplicarlo de forma automática
-  // a cualquier otro movimiento (ya guardado o futuro) que coincida con ese proveedor
-  const idx = c.savedSubcats.findIndex(s=>s.prov.toLowerCase()===provKey.toLowerCase());
-  if(subcat){
-    if(idx>=0) c.savedSubcats[idx] = {prov:provKey, subcat};
-    else c.savedSubcats.push({prov:provKey, subcat});
-  } else if(idx>=0){
-    c.savedSubcats.splice(idx,1);
-  }
-  await cajaSet('subcats', c.savedSubcats);
-
-  // aplica al momento a todos los movimientos del balance actual que coincidan
-  let afectadosActual = 0;
-  c.data.movements.forEach(m=>{ if(cajaISearch(provKey, m.concept)){ m.subcategory = subcat; afectadosActual++; } });
-
-  // aplica retroactivamente a los balances ya guardados anteriormente
-  let huboCambios = false, afectadosPrevios = 0;
-  const savedMonthsActualizados = c.savedMonths.map(entry=>{
-    let entryCambio = false;
-    const movsActualizados = entry.movements.map(m=>{
-      if(cajaISearch(provKey, m.concept) && m.subcategory!==subcat){ entryCambio=true; huboCambios=true; afectadosPrevios++; return {...m, subcategory:subcat}; }
-      return m;
-    });
-    return entryCambio ? {...entry, movements:movsActualizados} : entry;
-  });
-  if(huboCambios){
-    c.savedMonths = savedMonthsActualizados;
-    await cajaSet('months', savedMonthsActualizados);
-  }
-
-  c.data = { ...c.data, movements:[...c.data.movements] };
-  renderCajaTabContent();
-  if(subcat){
-    const totalAfectados = afectadosActual + afectadosPrevios;
-    if(provKeyConocido){
-      toast('Subcategoría guardada — aplicada a '+totalAfectados+' movimiento'+(totalAfectados!==1?'s':'')+' de "'+provKey+'" (balance actual y guardados).');
-    } else {
-      toast('Subcategoría guardada para este movimiento. No hay un proveedor "'+mov.concept.slice(0,30)+(mov.concept.length>30?'…':'')+'" registrado en la pestaña Proveedores, así que solo afecta a movimientos con este concepto exacto — regístralo ahí si quieres que se aplique a más líneas parecidas.');
+    if(!Array.isArray(c.savedSubcats)) c.savedSubcats = [];
+    // guarda/actualiza el mapeo texto->subcategoría, para aplicarlo de forma automática
+    // a cualquier otro movimiento (ya guardado o futuro) que coincida con ese proveedor
+    const idx = c.savedSubcats.findIndex(s=>s.prov.toLowerCase()===provKey.toLowerCase());
+    if(subcat){
+      if(idx>=0) c.savedSubcats[idx] = {prov:provKey, subcat};
+      else c.savedSubcats.push({prov:provKey, subcat});
+    } else if(idx>=0){
+      c.savedSubcats.splice(idx,1);
     }
-  } else {
-    toast('Subcategoría quitada.');
+    const guardadoOk = await cajaSet('subcats', c.savedSubcats);
+
+    // aplica al momento a todos los movimientos del balance actual que coincidan
+    let afectadosActual = 0;
+    c.data.movements.forEach(m=>{ if(cajaISearch(provKey, m.concept)){ m.subcategory = subcat; afectadosActual++; } });
+
+    // aplica retroactivamente a los balances ya guardados anteriormente
+    let huboCambios = false, afectadosPrevios = 0;
+    const savedMonthsActualizados = (c.savedMonths||[]).map(entry=>{
+      let entryCambio = false;
+      const movsActualizados = (entry.movements||[]).map(m=>{
+        if(cajaISearch(provKey, m.concept) && m.subcategory!==subcat){ entryCambio=true; huboCambios=true; afectadosPrevios++; return {...m, subcategory:subcat}; }
+        return m;
+      });
+      return entryCambio ? {...entry, movements:movsActualizados} : entry;
+    });
+    if(huboCambios){
+      c.savedMonths = savedMonthsActualizados;
+      await cajaSet('months', savedMonthsActualizados);
+    }
+
+    c.data = { ...c.data, movements:[...c.data.movements] };
+    renderCajaTabContent();
+    if(!guardadoOk){
+      toast('⚠ Se aplicó en pantalla, pero no se pudo guardar en la base de datos — al recargar la página se perderá. Revisa tu conexión e inténtalo de nuevo.', true);
+      return;
+    }
+    if(subcat){
+      const totalAfectados = afectadosActual + afectadosPrevios;
+      if(provKeyConocido){
+        toast('Subcategoría guardada — aplicada a '+totalAfectados+' movimiento'+(totalAfectados!==1?'s':'')+' de "'+provKey+'" (balance actual y guardados).');
+      } else {
+        toast('Subcategoría guardada para este movimiento ('+afectadosActual+' en este balance). No hay un proveedor "'+mov.concept.slice(0,30)+(mov.concept.length>30?'…':'')+'" registrado en la pestaña Proveedores, así que solo afecta a movimientos con este concepto exacto — regístralo ahí si quieres que se aplique a más líneas parecidas.');
+      }
+    } else {
+      toast('Subcategoría quitada.');
+    }
+  }catch(err){
+    console.error('Error en cajaSetSubcategoria:', err);
+    toast('Error al guardar la subcategoría: '+err.message, true);
   }
 }
 function attachCajaCatSelectHandlers(container){
