@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.102</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.106</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8310,6 +8310,9 @@ STATE.caja = {
   tab: 'categorizar',
   search: '',
   categoriaFiltro: '',
+  tipoFiltro: '',
+  importeMin: '',
+  importeMax: '',
   savedMonths: [],
   savedCats: { gastos:[], ingresos:[] },
   savedProviders: [],
@@ -8574,20 +8577,24 @@ function cajaCatSelectHtml(id, currentValue, options, placeholder){
   </select>`;
 }
 function cajaDeriveProvKey(mov){
-  // si ya hay un proveedor guardado que coincide con este movimiento, se usa exactamente
-  // ese mismo texto como clave — así la subcategoría se aplica al mismo grupo de
-  // movimientos que ya comparte categoría automática por ese proveedor.
+  // solo se considera "el mismo proveedor" si coincide con uno ya registrado en la
+  // pestaña Proveedores — adivinar con las primeras palabras del concepto es poco fiable
+  // (dos compras del mismo sitio pueden no compartir ni las 3 primeras palabras), así que
+  // si no hay proveedor conocido, se devuelve null y solo se actúa sobre ESTE movimiento.
   const c = STATE.caja;
   const match = c.savedProviders.find(p=>cajaISearch(p.prov, mov.concept));
-  if(match) return match.prov;
-  return mov.concept.trim().split(/\s+/).slice(0,3).join(' ');
+  return match ? match.prov : null;
 }
 async function cajaSetSubcategoria(movementId, subcatRaw){
   const c = STATE.caja;
   const mov = c.data.movements.find(m=>m.id===movementId);
   if(!mov) return;
   const subcat = subcatRaw.trim();
-  const provKey = cajaDeriveProvKey(mov);
+  const provKeyConocido = cajaDeriveProvKey(mov);
+  // si no hay proveedor conocido, se usa el concepto exacto de ESTE movimiento como clave
+  // — así solo afecta a él (y a movimientos con el concepto idéntico), nunca a otros
+  // proveedores distintos por una coincidencia de palabras poco fiable.
+  const provKey = provKeyConocido || mov.concept.trim();
 
   // guarda/actualiza el mapeo texto->subcategoría, para aplicarlo de forma automática
   // a cualquier otro movimiento (ya guardado o futuro) que coincida con ese proveedor
@@ -8601,14 +8608,15 @@ async function cajaSetSubcategoria(movementId, subcatRaw){
   await cajaSet('subcats', c.savedSubcats);
 
   // aplica al momento a todos los movimientos del balance actual que coincidan
-  c.data.movements.forEach(m=>{ if(cajaISearch(provKey, m.concept)) m.subcategory = subcat; });
+  let afectadosActual = 0;
+  c.data.movements.forEach(m=>{ if(cajaISearch(provKey, m.concept)){ m.subcategory = subcat; afectadosActual++; } });
 
   // aplica retroactivamente a los balances ya guardados anteriormente
-  let huboCambios = false;
+  let huboCambios = false, afectadosPrevios = 0;
   const savedMonthsActualizados = c.savedMonths.map(entry=>{
     let entryCambio = false;
     const movsActualizados = entry.movements.map(m=>{
-      if(cajaISearch(provKey, m.concept) && m.subcategory!==subcat){ entryCambio=true; huboCambios=true; return {...m, subcategory:subcat}; }
+      if(cajaISearch(provKey, m.concept) && m.subcategory!==subcat){ entryCambio=true; huboCambios=true; afectadosPrevios++; return {...m, subcategory:subcat}; }
       return m;
     });
     return entryCambio ? {...entry, movements:movsActualizados} : entry;
@@ -8620,7 +8628,16 @@ async function cajaSetSubcategoria(movementId, subcatRaw){
 
   c.data = { ...c.data, movements:[...c.data.movements] };
   renderCajaTabContent();
-  toast(subcat ? 'Subcategoría guardada — aplicada a todos los movimientos de "'+provKey+'" (incluidos balances ya guardados).' : 'Subcategoría quitada.');
+  if(subcat){
+    const totalAfectados = afectadosActual + afectadosPrevios;
+    if(provKeyConocido){
+      toast('Subcategoría guardada — aplicada a '+totalAfectados+' movimiento'+(totalAfectados!==1?'s':'')+' de "'+provKey+'" (balance actual y guardados).');
+    } else {
+      toast('Subcategoría guardada para este movimiento. No hay un proveedor "'+mov.concept.slice(0,30)+(mov.concept.length>30?'…':'')+'" registrado en la pestaña Proveedores, así que solo afecta a movimientos con este concepto exacto — regístralo ahí si quieres que se aplique a más líneas parecidas.');
+    }
+  } else {
+    toast('Subcategoría quitada.');
+  }
 }
 function attachCajaCatSelectHandlers(container){
   container.querySelectorAll('[data-cat-select]').forEach(sel=>{
@@ -8860,7 +8877,11 @@ function renderCajaMovimientosTab(el){
   const catsGasto = [...new Set(c.data.movements.filter(m=>m.amount<0).map(m=>m.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
   const subcatsConocidas = [...new Set([...c.savedSubcats.map(s=>s.subcat), ...c.data.movements.map(m=>m.subcategory).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'es'));
   let filtered = c.data.movements.filter(m=>{
+    if(c.tipoFiltro==='ingresos' && m.amount<0) return false;
+    if(c.tipoFiltro==='gastos' && m.amount>=0) return false;
     if(c.categoriaFiltro && m.category!==c.categoriaFiltro) return false;
+    if(c.importeMin!=='' && Math.abs(m.amount)<parseFloat(c.importeMin)) return false;
+    if(c.importeMax!=='' && Math.abs(m.amount)>parseFloat(c.importeMax)) return false;
     return !q||m.concept.toLowerCase().includes(q)||m.category.toLowerCase().includes(q)||(m.subcategory||'').toLowerCase().includes(q);
   });
   if(c.sortMovimientos==='desc') filtered = [...filtered].sort((a,b)=>b.amount-a.amount);
@@ -8870,11 +8891,18 @@ function renderCajaMovimientosTab(el){
   el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="text" id="cajaBuscarInput" placeholder="Buscar…" value="${c.search}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;width:100%;max-width:340px;">
+        <select id="cajaTipoFiltro" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;">
+          <option value="" ${c.tipoFiltro===''?'selected':''}>Ingresos y gastos</option>
+          <option value="ingresos" ${c.tipoFiltro==='ingresos'?'selected':''}>Solo ingresos</option>
+          <option value="gastos" ${c.tipoFiltro==='gastos'?'selected':''}>Solo gastos</option>
+        </select>
         <select id="cajaCategoriaFiltro" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;">
           <option value="">Todas las categorías</option>
           ${catsIngreso.length ? '<optgroup label="Fuentes de ingreso">'+catsIngreso.map(cat=>'<option value="'+cat.replace(/"/g,'&quot;')+'" '+(c.categoriaFiltro===cat?'selected':'')+'>'+cat+'</option>').join('')+'</optgroup>' : ''}
           ${catsGasto.length ? '<optgroup label="Categorías de gasto">'+catsGasto.map(cat=>'<option value="'+cat.replace(/"/g,'&quot;')+'" '+(c.categoriaFiltro===cat?'selected':'')+'>'+cat+'</option>').join('')+'</optgroup>' : ''}
         </select>
+        <input type="number" step="0.01" min="0" id="cajaImporteMin" placeholder="Importe mín. €" value="${c.importeMin}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;width:120px;">
+        <input type="number" step="0.01" min="0" id="cajaImporteMax" placeholder="Importe máx. €" value="${c.importeMax}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;width:120px;">
       </div>
       ${pendingCount>0?`<button class="btn" id="cajaAplicarBtn2">Aplicar ${pendingCount} cambio${pendingCount>1?'s':''}</button>`:''}
     </div>
@@ -8894,13 +8922,17 @@ function renderCajaMovimientosTab(el){
     </div>`;
   attachCajaCatSelectHandlers(el);
   document.getElementById('cajaBuscarInput').addEventListener('input', (e)=>{ c.search=e.target.value; renderCajaTabContent(); });
+  document.getElementById('cajaTipoFiltro').addEventListener('change', (e)=>{ c.tipoFiltro=e.target.value; renderCajaTabContent(); });
   document.getElementById('cajaCategoriaFiltro').addEventListener('change', (e)=>{ c.categoriaFiltro=e.target.value; renderCajaTabContent(); });
+  document.getElementById('cajaImporteMin').addEventListener('change', (e)=>{ c.importeMin=e.target.value; renderCajaTabContent(); });
+  document.getElementById('cajaImporteMax').addEventListener('change', (e)=>{ c.importeMax=e.target.value; renderCajaTabContent(); });
   document.getElementById('cajaOrdenImporte').addEventListener('click', ()=>{
     c.sortMovimientos = c.sortMovimientos==='desc' ? 'asc' : (c.sortMovimientos==='asc' ? '' : 'desc');
     renderCajaTabContent();
   });
   el.querySelectorAll('[data-subcat-input]').forEach(inp=>{
     inp.addEventListener('change', (e)=>{ cajaSetSubcategoria(inp.getAttribute('data-subcat-input'), e.target.value); });
+    inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
   });
   const aplicarBtn2 = document.getElementById('cajaAplicarBtn2'); if(aplicarBtn2) aplicarBtn2.addEventListener('click', cajaApplyPending);
 }
@@ -9158,6 +9190,24 @@ function cajaDetalleCatData(){
   });
   return { months, cats, table };
 }
+function cajaDetalleSubcatData(){
+  const c = STATE.caja;
+  if(!c.savedMonths.length) return {months:[], subcats:[], table:{}};
+  const months = c.savedMonths.map(m=>m.title||m.month);
+  const subcatSet = new Set();
+  c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0 && mv.subcategory).forEach(mv=>subcatSet.add(mv.subcategory)));
+  const subcats = [...subcatSet].sort();
+  const table = {};
+  subcats.forEach(sc=>{
+    table[sc] = {};
+    c.savedMonths.forEach(m=>{
+      const totalGasto = Math.abs(m.totalExpense)||1;
+      const euros = (m.movements||[]).filter(mv=>mv.amount<0 && mv.subcategory===sc).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+      table[sc][m.title||m.month] = { euros, pct: +(euros/totalGasto*100).toFixed(1) };
+    });
+  });
+  return { months, subcats, table };
+}
 function cajaDetalleProvData(){
   const c = STATE.caja;
   if(!c.savedMonths.length) return {months:[], providers:[], table:{}};
@@ -9188,7 +9238,8 @@ function renderCajaGraficosTab(el){
   el.innerHTML = `
     <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
       <div style="display:flex;gap:8px;">
-        <button class="btn ${c.detalleMode!=='proveedor'?'':'secondary'}" data-detalle-mode="categoria" style="padding:7px 14px;font-size:12px;">Por categoría</button>
+        <button class="btn ${c.detalleMode==='categoria'||!c.detalleMode?'':'secondary'}" data-detalle-mode="categoria" style="padding:7px 14px;font-size:12px;">Por categoría</button>
+        <button class="btn ${c.detalleMode==='subcategoria'?'':'secondary'}" data-detalle-mode="subcategoria" style="padding:7px 14px;font-size:12px;">Por subcategoría</button>
         <button class="btn ${c.detalleMode==='proveedor'?'':'secondary'}" data-detalle-mode="proveedor" style="padding:7px 14px;font-size:12px;">Por proveedor</button>
       </div>
       <input type="text" id="cajaDetalleSearch" placeholder="Buscar…" value="${c.detalleSearch||''}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12px;width:200px;">
@@ -9211,7 +9262,7 @@ function renderCajaGraficosTab(el){
   `;
 
   el.querySelectorAll('[data-detalle-mode]').forEach(btn=>btn.addEventListener('click', ()=>{
-    c.detalleMode = btn.getAttribute('data-detalle-mode'); c.detalleSelected=null; c.detalleCatSelected=null; renderCajaTabContent();
+    c.detalleMode = btn.getAttribute('data-detalle-mode'); c.detalleSelected=null; c.detalleCatSelected=null; c.detalleSubcatSelected=null; renderCajaTabContent();
   }));
   document.getElementById('cajaDetalleSearch').addEventListener('input', e=>{ c.detalleSearch = e.target.value; renderCajaGraficosGrid(); });
   el.querySelectorAll('[data-tend-view]').forEach(btn=>btn.addEventListener('click', ()=>{ c.tendView = btn.getAttribute('data-tend-view'); renderCajaTabContent(); }));
@@ -9230,7 +9281,63 @@ function renderCajaGraficosGrid(){
   const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
   const c2 = chartColors();
 
-  if(c.detalleMode!=='proveedor'){
+  if(c.detalleMode==='subcategoria'){
+    const detalleSubcatData = cajaDetalleSubcatData();
+    const search = (c.detalleSearch||'').toLowerCase();
+    const subcats = detalleSubcatData.subcats.filter(sc=>!search||sc.toLowerCase().includes(search)).filter(sc=>periodMonthNames.some(m=>(detalleSubcatData.table[sc]?.[m]?.euros||0)>0));
+    const getSubcatVal = (sc,month) => {
+      const euros = detalleSubcatData.table[sc]?.[month]?.euros||0;
+      if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0? +(euros/sq*100).toFixed(1):0; }
+      return euros;
+    };
+    let html = '';
+    if(c.detalleSubcatSelected){
+      html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleSubcatSelected}</div><button class="btn secondary" id="cajaCerrarSubcatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
+        <div class="chart-wrap" style="height:180px;"><canvas id="cajaSubcatDestacado"></canvas></div>
+      </div>`;
+    }
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
+    subcats.forEach((sc,si)=>{
+      const total = periodMonthNames.reduce((s,m)=>s+getSubcatVal(sc,m),0);
+      html += `<div class="card" data-select-subcat="${sc.replace(/"/g,'&quot;')}" style="cursor:pointer;border:1px solid ${c.detalleSubcatSelected===sc?'var(--copper)':'var(--line)'};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <div style="color:${c.detalleSubcatSelected===sc?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;">${sc}</div>
+          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;">${cajaFmt(total)}</div>`:''}
+        </div>
+        <div class="chart-wrap" style="height:120px;"><canvas id="cajaSubcatMini_${si}"></canvas></div>
+      </div>`;
+    });
+    html += `</div>`;
+    if(subcats.length===0) html = `<p class="hint" style="text-align:center;padding:40px;">Sin subcategorías con datos en este periodo — ponlas en la pestaña Movimientos.</p>`;
+    gridEl.innerHTML = html;
+
+    if(c.detalleSubcatSelected){
+      destroyChart('cajaSubcatDestacado');
+      STATE.charts.cajaSubcatDestacado = safeNewChart('cajaSubcatDestacado', {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatVal(c.detalleSubcatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>c.tendView==='pct'?v+'%':v+'€'}, grid:{color:c2.grid} } } }
+      });
+      const cerrarBtn = document.getElementById('cajaCerrarSubcatDest');
+      if(cerrarBtn) cerrarBtn.addEventListener('click', ()=>{ c.detalleSubcatSelected=null; renderCajaGraficosGrid(); });
+    }
+    subcats.forEach((sc,si)=>{
+      destroyChart('cajaSubcatMini_'+si);
+      STATE.charts['cajaSubcatMini_'+si] = safeNewChart('cajaSubcatMini_'+si, {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatVal(sc,m)), borderColor:CAJA_CHART_PALETTE[si%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[si%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}}, grid:{color:c2.grid} } } }
+      });
+    });
+    gridEl.querySelectorAll('[data-select-subcat]').forEach(card=>{
+      card.addEventListener('click', ()=>{
+        const sc = card.getAttribute('data-select-subcat');
+        c.detalleSubcatSelected = (c.detalleSubcatSelected===sc) ? null : sc;
+        renderCajaGraficosGrid();
+      });
+    });
+  } else if(c.detalleMode!=='proveedor'){
     const detalleCatData = cajaDetalleCatData();
     const search = (c.detalleSearch||'').toLowerCase();
     const cats = detalleCatData.cats.filter(cat=>!search||cat.toLowerCase().includes(search)).filter(cat=>periodMonthNames.some(m=>(detalleCatData.table[cat]?.[m]?.euros||0)>0));
