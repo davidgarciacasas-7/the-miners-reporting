@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.107</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.110</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8294,6 +8294,29 @@ function renderFacturasHistorico(){
 const CAJA_BANK_HEADER_ROW = 16;
 const CAJA_COL_AMOUNT   = 'IMPORTE';
 const CAJA_COL_DATE     = 'F. VALOR';
+const CAJA_COL_DATE_ALTERNATIVAS = ['F. VALOR','FECHA VALOR','Fecha Valor','F.VALOR','F VALOR','FECHA','Fecha','F. OPERACIÓN','FECHA OPERACIÓN','F. OPERACION','Fecha Operación','FECHA CONTABLE','F. CONTABLE'];
+/* AnAliza una fecha de extracto bancario de forma robusta. El analizador nativo de
+   JavaScript (`new Date(texto)`) es poco fiable con fechas en formato español
+   (DD/MM/AAAA) — a veces las confunde con MM/DD/AAAA o directamente da "fecha inválida".
+   Por eso aquí se reconoce ese formato explícitamente antes de intentar nada más. */
+function cajaParseFecha(dateRaw){
+  if(dateRaw===null || dateRaw===undefined || dateRaw==='') return null;
+  if(typeof dateRaw==='number'){
+    const d = new Date(Math.round((dateRaw-25569)*86400*1000));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const s = String(dateRaw).trim();
+  if(!s) return null;
+  // DD/MM/AAAA o DD-MM-AAAA (lo habitual en extractos españoles)
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m){ const d=new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)); return isNaN(d.getTime())?null:d; }
+  // AAAA-MM-DD (ISO)
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m){ const d=new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10)); return isNaN(d.getTime())?null:d; }
+  // último recurso: dejar que el navegador lo intente
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
 const CAJA_COL_SEARCH   = ['CONCEPTO','BENEFICIARIO/ORDENANTE','OBSERVACIONES'];
 const CAJA_COL_CONCEPT1 = 'BENEFICIARIO/ORDENANTE';
 const CAJA_COL_CONCEPT2 = 'OBSERVACIONES';
@@ -8475,6 +8498,7 @@ async function cajaProcess(){
     if(!bankRows || bankRows.length===0){ c.error='Extracto vacío.'; c.loading=false; renderCajaUploadScreen(); return; }
     const cols = Object.keys(bankRows[0]);
     if(!cols.includes(CAJA_COL_AMOUNT)){ c.error='Columna "'+CAJA_COL_AMOUNT+'" no encontrada. Disponibles: '+cols.join(' | '); c.loading=false; renderCajaUploadScreen(); return; }
+    const colFechaReal = CAJA_COL_DATE_ALTERNATIVAS.find(name=>cols.includes(name)) || null;
 
     const uploadedProvs = providerRows.map(r=>{
       const k=Object.keys(r);
@@ -8513,10 +8537,10 @@ async function cajaProcess(){
       const c2=String(row[CAJA_COL_CONCEPT2]||'').trim();
       const concept=[c1,c2].filter(Boolean).join(' · ');
       const searchTexts=CAJA_COL_SEARCH.map(cc=>String(row[cc]||''));
-      const dateRaw=CAJA_COL_DATE?row[CAJA_COL_DATE]:'';
-      let dateObj=null;
-      if(dateRaw){ if(typeof dateRaw==='number') dateObj=new Date(Math.round((dateRaw-25569)*86400*1000)); else dateObj=new Date(dateRaw); }
-      const month=dateObj&&!isNaN(dateObj.getTime())?`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`:'Sin fecha';
+      const dateRaw=colFechaReal?row[colFechaReal]:'';
+      const dateObj=cajaParseFecha(dateRaw);
+      const month=dateObj?`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`:'Sin fecha';
+      const fechaDia=dateObj?`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`:'';
       if(amount<0) rawGastos+=Math.abs(amount); else rawIngresos+=amount;
 
       const pMatch = amount>0 ? null : personalList.find(pe=>{
@@ -8525,9 +8549,9 @@ async function cajaProcess(){
         if(pe.qty===0) return true;
         return Math.abs(Math.abs(amount)-Math.abs(pe.qty))<=1;
       });
-      if(pMatch&&pMatch.qty>0){ movements.push({id:idx,concept,amount,month,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
-      if(pMatch&&pMatch.qty<0){ movements.push({id:idx,concept,amount,month,category:CAJA_UNCATEGORIZED,autoCat:false,isAdelanto:true,rawG:c1}); return; }
-      if(pMatch&&pMatch.qty===0){ movements.push({id:idx,concept,amount,month,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
+      if(pMatch&&pMatch.qty>0){ movements.push({id:idx,concept,amount,month,fechaDia,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
+      if(pMatch&&pMatch.qty<0){ movements.push({id:idx,concept,amount,month,fechaDia,category:CAJA_UNCATEGORIZED,autoCat:false,isAdelanto:true,rawG:c1}); return; }
+      if(pMatch&&pMatch.qty===0){ movements.push({id:idx,concept,amount,month,fechaDia,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
 
       let category=null;
       if(amount>=0){
@@ -8539,7 +8563,7 @@ async function cajaProcess(){
       const needsManualCat=category===null&&amount<0;
       let subcategory='';
       for(const {prov,subcat} of c.savedSubcats){ if(subcat && searchTexts.some(t=>cajaISearch(prov,t))){ subcategory=subcat; break; } }
-      movements.push({id:idx,concept,amount,month,category:category||CAJA_UNCATEGORIZED,autoCat:category!==null&&!needsManualCat,needsManualCat,subcategory,rawG:c1});
+      movements.push({id:idx,concept,amount,month,fechaDia,category:category||CAJA_UNCATEGORIZED,autoCat:category!==null&&!needsManualCat,needsManualCat,subcategory,rawG:c1});
     });
 
     if(movements.length===0){ c.error='No se encontraron movimientos válidos.'; c.loading=false; renderCajaUploadScreen(); return; }
@@ -8590,7 +8614,7 @@ async function cajaSetSubcategoria(movementId, subcatRaw){
   try{
     const c = STATE.caja;
     if(!c.data){ toast('Error: no hay datos de caja cargados (c.data es nulo).', true); return; }
-    const mov = c.data.movements.find(m=>m.id===movementId);
+    const mov = c.data.movements.find(m=>String(m.id)===String(movementId));
     if(!mov){ toast('Error: no se encontró el movimiento (id='+movementId+').', true); return; }
     const subcat = subcatRaw.trim();
     const provKeyConocido = cajaDeriveProvKey(mov);
@@ -8919,9 +8943,9 @@ function renderCajaMovimientosTab(el){
       ${pendingCount>0?`<button class="btn" id="cajaAplicarBtn2">Aplicar ${pendingCount} cambio${pendingCount>1?'s':''}</button>`:''}
     </div>
     <div class="card" style="padding:0;overflow:auto;">
-      <table><thead><tr><th>Mes</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th></tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th></tr></thead>
       <tbody>${filtered.slice(0,400).map(m=>`
-        <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">${m.month}</td>
+        <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">${m.fechaDia || m.month}</td>
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.concept}</td>
         <td>${cajaCatSelectHtml(m.id, c.pending[m.id]||'', m.amount<0?cajaGasCatOpts():cajaIncCatOpts(), m.category)}</td>
         <td><input type="text" list="cajaSubcatDatalist" data-subcat-input="${m.id}" value="${(m.subcategory||'').replace(/"/g,'&quot;')}" placeholder="—" style="background:var(--bg);border:1px solid ${m.subcategory?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:130px;"></td>
