@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.95</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.101</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -558,6 +558,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
               <option value="fijo">Importe fijo mensual (€)</option>
               <option value="pct_bruto">% de ventas brutas</option>
               <option value="pct_neto">% de ventas netas</option>
+              <option value="pct_tarjeta">% de ventas pagadas con tarjeta</option>
             </select>
             <input type="number" step="0.01" id="otrosValor" placeholder="Importe mensual" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;width:110px;">
             <input type="date" id="otrosFecha" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
@@ -3593,7 +3594,9 @@ function getAllSalesLinesRaw(){
     const pd = STATE.periodsData[periodId];
     pd.lines.forEach(row=>{
       const [fecha, hora, catIdx, artIdx, cant, bruto, neto, ticketIdx, esPago] = row;
-      out.push({ fecha, hora, articulo: pd.arts[artIdx], categoria: pd.cats[catIdx], cant, bruto, neto });
+      const ticket = pd.tickets && pd.tickets[ticketIdx];
+      const esTarjeta = !!(ticket && ticket[0]);
+      out.push({ fecha, hora, articulo: pd.arts[artIdx], categoria: pd.cats[catIdx], cant, bruto, neto, esTarjeta });
     });
   }
   return out;
@@ -3668,12 +3671,13 @@ function otherCostValueForBucket(lineId, bucket, historyMap, allSalesLines){
   const vigente = otherCostEntryAtDate(historyMap, lineId, bucket.dateMin);
   if(!vigente) return 0;
 
-  if(vigente.tipo==='pct_bruto' || vigente.tipo==='pct_neto'){
+  if(vigente.tipo==='pct_bruto' || vigente.tipo==='pct_neto' || vigente.tipo==='pct_tarjeta'){
     if(!allSalesLines) return 0;
     let sumaCentimos = 0;
     allSalesLines.forEach(l=>{
       if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax){
-        sumaCentimos += (vigente.tipo==='pct_bruto' ? l.bruto : l.neto);
+        if(vigente.tipo==='pct_tarjeta'){ if(l.esTarjeta) sumaCentimos += l.bruto; }
+        else sumaCentimos += (vigente.tipo==='pct_bruto' ? l.bruto : l.neto);
       }
     });
     return (sumaCentimos/100) * (vigente.amount/100);
@@ -6873,6 +6877,34 @@ async function movePnlLine(lineId, dir){
   await sbUpdate('pnl_lines', b.id, { orden:b.orden });
   renderPnl();
 }
+let pnlDragSrc = null;
+function attachPnlDragHandlers(){
+  document.querySelectorAll('#tablaPnl tbody tr[data-pnl-line-id]').forEach(row=>{
+    row.addEventListener('dragstart', ()=>{ pnlDragSrc = row.getAttribute('data-pnl-line-id'); row.style.opacity='0.4'; });
+    row.addEventListener('dragend', ()=>{ row.style.opacity=''; });
+    row.addEventListener('dragover', (e)=>{ e.preventDefault(); });
+    row.addEventListener('drop', async (e)=>{
+      e.preventDefault();
+      const targetId = row.getAttribute('data-pnl-line-id');
+      if(!pnlDragSrc || pnlDragSrc===targetId) return;
+      const sorted = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+      const fromIdx = sorted.findIndex(l=>l.id===pnlDragSrc);
+      const toIdx = sorted.findIndex(l=>l.id===targetId);
+      if(fromIdx<0||toIdx<0) return;
+      const [moved] = sorted.splice(fromIdx,1);
+      sorted.splice(toIdx,0,moved);
+      // reasigna el orden secuencial (0,1,2...) y guarda solo las líneas cuyo orden cambió
+      for(let i=0;i<sorted.length;i++){
+        if(sorted[i].orden!==i){
+          sorted[i].orden = i;
+          await sbUpdate('pnl_lines', sorted[i].id, { orden:i });
+        }
+      }
+      pnlDragSrc = null;
+      renderPnl();
+    });
+  });
+}
 
 function snapToMonthStart(dateStr){ const d=new Date(dateStr+'T00:00:00'); return fechaLocalISO(new Date(d.getFullYear(), d.getMonth(), 1)); }
 function snapToMonthEnd(dateStr){ const d=new Date(dateStr+'T00:00:00'); return fechaLocalISO(new Date(d.getFullYear(), d.getMonth()+1, 0)); }
@@ -6934,8 +6966,8 @@ async function renderPnl(){
       const moveBtns = `<button class="btn secondary" data-move-up="${line.id}" title="Mover arriba" style="padding:2px 6px;font-size:10px;">↑</button> <button class="btn secondary" data-move-down="${line.id}" title="Mover abajo" style="padding:2px 6px;font-size:10px;">↓</button>`;
       const indentBtns = `<button class="btn secondary" data-indent-out="${line.id}" title="Quitar sangría" style="padding:2px 6px;font-size:10px;" ${indent<=0?'disabled':''}>←</button> <button class="btn secondary" data-indent-in="${line.id}" title="Sangrar" style="padding:2px 6px;font-size:10px;">→</button>`;
       const hideBtn = `<button class="btn secondary" data-hide-line="${line.id}" title="Ocultar esta fila" style="padding:2px 6px;font-size:10px;">🙈</button>`;
-      return `<tr style="background:var(--surface-2);"><td colspan="${buckets.length+1}" style="padding-left:${indent*20}px;font-weight:700;letter-spacing:.3px;">
-        <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button>
+      return `<tr draggable="true" data-pnl-line-id="${line.id}" style="background:var(--surface-2);cursor:grab;"><td colspan="${buckets.length+1}" style="padding-left:${indent*20}px;font-weight:700;letter-spacing:.3px;">
+        <span class="no-print" style="color:var(--text-muted);">✥</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button>
       </td><td style="white-space:nowrap;">${indentBtns} ${moveBtns} <button class="btn danger" data-del-line="${line.id}" style="padding:2px 6px;font-size:10px;">✕</button> ${hideBtn}</td></tr>`;
     }
     const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
@@ -6952,8 +6984,8 @@ async function renderPnl(){
     const hideBtn = `<button class="btn secondary" data-hide-line="${line.id}" title="Ocultar esta fila (no sale ni en pantalla ni al imprimir)" style="padding:2px 6px;font-size:10px;">🙈</button>`;
     const indent = line.indent||0;
     const indentBtns = `<button class="btn secondary" data-indent-out="${line.id}" title="Quitar sangría" style="padding:2px 6px;font-size:10px;" ${indent<=0?'disabled':''}>←</button> <button class="btn secondary" data-indent-in="${line.id}" title="Sangrar (mover hacia la derecha)" style="padding:2px 6px;font-size:10px;">→</button>`;
-    const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-flex;align-items:center;gap:6px;"><span class="pill ${line.tipo==='ingreso'?'nuevo':'noident'}">${line.tipo}</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
-    return `<tr><td>${nombreCelda}</td>${cells}<td style="white-space:nowrap;">${indentBtns} ${accionesBase} ${hideBtn}</td></tr>`;
+    const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-flex;align-items:center;gap:6px;"><span class="no-print" style="color:var(--text-muted);cursor:grab;">✥</span><span class="pill ${line.tipo==='ingreso'?'nuevo':'noident'}">${line.tipo}</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
+    return `<tr draggable="true" data-pnl-line-id="${line.id}" style="cursor:grab;"><td>${nombreCelda}</td>${cells}<td style="white-space:nowrap;">${indentBtns} ${accionesBase} ${hideBtn}</td></tr>`;
   }).filter(Boolean).join('');
   document.querySelector('#tablaPnl tbody').innerHTML = rows || '<tr><td class="hint">Sin líneas todavía (o todas están ocultas).</td></tr>';
   renderPnlHiddenRowsInfo();
@@ -6994,6 +7026,7 @@ async function renderPnl(){
       setTimeout(()=>{ document.getElementById('otrosNombre').scrollIntoView({behavior:'smooth', block:'center'}); }, 150);
     });
   });
+  attachPnlDragHandlers();
 
   const resultado = totalIngresos.map((v,i)=>v-totalCostes[i]);
   const etiquetaTI = pnlEtiquetaTotal('totalIngresos','Total ingresos'), etiquetaTC = pnlEtiquetaTotal('totalCostes','Total costes'), etiquetaR = pnlEtiquetaTotal('resultado','Resultado');
@@ -7256,11 +7289,49 @@ function renderCostes(){
     return { ...oc, nombre: line?line.name:'(línea eliminada)' };
   }).sort((a,b)=> a.nombre===b.nombre ? b.effectiveFrom.localeCompare(a.effectiveFrom) : a.nombre.localeCompare(b.nombre));
   tbodyOtros.innerHTML = filasOtros.map(oc=>{
-    const tipoLabel = { fijo:'Fijo €/mes', pct_bruto:'% ventas brutas', pct_neto:'% ventas netas' }[oc.tipo] || 'Fijo €/mes';
-    const valorTexto = (oc.tipo==='pct_bruto'||oc.tipo==='pct_neto') ? oc.amount+'%' : eur(Math.round(oc.amount*100));
-    return `<tr><td>${oc.nombre}</td><td><span class="hint">${tipoLabel}</span></td><td class="num">${valorTexto}</td><td>${oc.effectiveFrom}</td><td>${oc.source}</td>
-    <td><button class="btn danger" data-del-otro="${oc.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+    const tipoLabel = { fijo:'Fijo €/mes', pct_bruto:'% ventas brutas', pct_neto:'% ventas netas', pct_tarjeta:'% ventas con tarjeta' }[oc.tipo] || 'Fijo €/mes';
+    const valorTexto = (oc.tipo==='pct_bruto'||oc.tipo==='pct_neto'||oc.tipo==='pct_tarjeta') ? oc.amount+'%' : eur(Math.round(oc.amount*100));
+    return `<tr data-fila-otro="${oc.id}"><td>${oc.nombre}</td><td><span class="hint">${tipoLabel}</span></td><td class="num">${valorTexto}</td><td>${oc.effectiveFrom}</td><td>${oc.source}</td>
+    <td style="white-space:nowrap;"><button class="btn secondary" data-editar-otro="${oc.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn danger" data-del-otro="${oc.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="hint">Sin otros costes todavía — sube un archivo o añade uno a mano arriba.</td></tr>';
+  tbodyOtros.querySelectorAll('[data-editar-otro]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-editar-otro');
+      const oc = STATE.otherCosts.find(x=>x.id===id);
+      const fila = document.querySelector('[data-fila-otro="'+id+'"]');
+      if(!oc || !fila) return;
+      fila.innerHTML = `<td colspan="6">
+        <div style="margin:6px 0;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--copper);">
+          <div class="subfilter" style="margin-bottom:0;">
+            <select data-edit-otro-tipo="${id}">
+              <option value="fijo" ${oc.tipo==='fijo'?'selected':''}>Importe fijo mensual (€)</option>
+              <option value="pct_bruto" ${oc.tipo==='pct_bruto'?'selected':''}>% de ventas brutas</option>
+              <option value="pct_neto" ${oc.tipo==='pct_neto'?'selected':''}>% de ventas netas</option>
+              <option value="pct_tarjeta" ${oc.tipo==='pct_tarjeta'?'selected':''}>% de ventas con tarjeta</option>
+            </select>
+            <input type="number" step="0.01" data-edit-otro-valor="${id}" value="${oc.amount}" style="width:110px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <input type="date" data-edit-otro-fecha="${id}" value="${oc.effectiveFrom}" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn" data-guardar-edit-otro="${id}" style="padding:6px 12px;font-size:12px;">Guardar</button>
+            <button class="btn secondary" data-cancelar-edit-otro="${id}" style="padding:6px 12px;font-size:12px;">Cancelar</button>
+          </div>
+        </div>
+      </td>`;
+      fila.querySelector('[data-guardar-edit-otro]').addEventListener('click', async ()=>{
+        const tipo = fila.querySelector('[data-edit-otro-tipo]').value;
+        const amount = parseFloat(fila.querySelector('[data-edit-otro-valor]').value);
+        const effectiveFrom = fila.querySelector('[data-edit-otro-fecha]').value;
+        if(isNaN(amount)){ toast('Indica un valor válido.', true); return; }
+        if(!effectiveFrom){ toast('La fecha de vigencia no puede quedar vacía.', true); return; }
+        try{
+          await sbUpdate('other_costs', id, { tipo, amount, effective_from:effectiveFrom });
+          oc.tipo = tipo; oc.amount = amount; oc.effectiveFrom = effectiveFrom;
+          toast('Actualizado ✓');
+          renderCostes(); renderPnl();
+        }catch(e){ toast('Error: '+e.message, true); }
+      });
+      fila.querySelector('[data-cancelar-edit-otro]').addEventListener('click', ()=>renderCostes());
+    });
+  });
   tbodyOtros.querySelectorAll('[data-del-otro]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('¿Eliminar esta entrada del historial?')) return;
@@ -7276,9 +7347,43 @@ function renderCostes(){
   if(tbodyEmpTipo){
     const filasEmp = [...STATE.employeeTypeCosts].sort((a,b)=> a.typeName===b.typeName ? b.effectiveFrom.localeCompare(a.effectiveFrom) : a.typeName.localeCompare(b.typeName));
     tbodyEmpTipo.innerHTML = filasEmp.map(et=>`
-      <tr><td>${et.typeName}</td><td class="num">${eur(Math.round(et.hourlyCost*100))}/h</td><td>${et.effectiveFrom}</td>
-      <td><button class="btn danger" data-del-emptipo="${et.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+      <tr data-fila-emptipo="${et.id}"><td>${et.typeName}</td><td class="num">${eur(Math.round(et.hourlyCost*100))}/h</td><td>${et.effectiveFrom}</td>
+      <td style="white-space:nowrap;"><button class="btn secondary" data-editar-emptipo="${et.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn danger" data-del-emptipo="${et.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
     `).join('') || '<tr><td colspan="4" class="hint">Sin tipos de empleado todavía.</td></tr>';
+    tbodyEmpTipo.querySelectorAll('[data-editar-emptipo]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-editar-emptipo');
+        const et = STATE.employeeTypeCosts.find(x=>x.id===id);
+        const fila = document.querySelector('[data-fila-emptipo="'+id+'"]');
+        if(!et || !fila) return;
+        fila.innerHTML = `<td colspan="4">
+          <div style="margin:6px 0;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--copper);">
+            <div class="subfilter" style="margin-bottom:0;">
+              <input type="text" data-edit-emptipo-nombre="${id}" value="${et.typeName.replace(/"/g,'&quot;')}" placeholder="Tipo" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+              <input type="number" step="0.01" min="0" data-edit-emptipo-coste="${id}" value="${et.hourlyCost}" style="width:110px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+              <input type="date" data-edit-emptipo-fecha="${id}" value="${et.effectiveFrom}" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+              <button class="btn" data-guardar-edit-emptipo="${id}" style="padding:6px 12px;font-size:12px;">Guardar</button>
+              <button class="btn secondary" data-cancelar-edit-emptipo="${id}" style="padding:6px 12px;font-size:12px;">Cancelar</button>
+            </div>
+          </div>
+        </td>`;
+        fila.querySelector('[data-guardar-edit-emptipo]').addEventListener('click', async ()=>{
+          const typeName = fila.querySelector('[data-edit-emptipo-nombre]').value.trim();
+          const hourlyCost = parseFloat(fila.querySelector('[data-edit-emptipo-coste]').value);
+          const effectiveFrom = fila.querySelector('[data-edit-emptipo-fecha]').value;
+          if(!typeName){ toast('El tipo no puede quedar vacío.', true); return; }
+          if(isNaN(hourlyCost) || hourlyCost<0){ toast('Indica un coste/hora válido.', true); return; }
+          if(!effectiveFrom){ toast('La fecha de vigencia no puede quedar vacía.', true); return; }
+          try{
+            await sbUpdate('employee_type_costs', id, { type_name:typeName, hourly_cost:hourlyCost, effective_from:effectiveFrom });
+            et.typeName = typeName; et.hourlyCost = hourlyCost; et.effectiveFrom = effectiveFrom;
+            toast('Actualizado ✓');
+            renderCostes(); renderPnl();
+          }catch(e){ toast('Error: '+e.message, true); }
+        });
+        fila.querySelector('[data-cancelar-edit-emptipo]').addEventListener('click', ()=>renderCostes());
+      });
+    });
     tbodyEmpTipo.querySelectorAll('[data-del-emptipo]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         if(!confirm('¿Eliminar esta entrada del historial de coste/hora?')) return;
@@ -7315,9 +7420,45 @@ function renderCostes(){
     const filasHoras = [...STATE.employeeHoursWeekly].sort((a,b)=> b.weekStart.localeCompare(a.weekStart) || a.typeName.localeCompare(b.typeName));
     tbodyEmpHoras.innerHTML = filasHoras.map(h=>{
       const coste = h.hours * costeVigente(h.typeName, h.weekStart);
-      return `<tr><td>Semana del ${h.weekStart}</td><td>${h.typeName}</td><td class="num">${h.hours}</td><td class="num">${eur(Math.round(coste*100))}</td>
-      <td><button class="btn danger" data-del-emphoras="${h.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+      return `<tr data-fila-emphoras="${h.id}"><td>Semana del ${h.weekStart}</td><td>${h.typeName}</td><td class="num">${h.hours}</td><td class="num">${eur(Math.round(coste*100))}</td>
+      <td style="white-space:nowrap;"><button class="btn secondary" data-editar-emphoras="${h.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn danger" data-del-emphoras="${h.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
     }).join('') || '<tr><td colspan="5" class="hint">Sin horas registradas todavía.</td></tr>';
+    const tiposDisponiblesEdit = [...new Set(STATE.employeeTypeCosts.map(et=>et.typeName))].sort();
+    tbodyEmpHoras.querySelectorAll('[data-editar-emphoras]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-editar-emphoras');
+        const h = STATE.employeeHoursWeekly.find(x=>x.id===id);
+        const fila = document.querySelector('[data-fila-emphoras="'+id+'"]');
+        if(!h || !fila) return;
+        fila.innerHTML = `<td colspan="5">
+          <div style="margin:6px 0;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--copper);">
+            <div class="subfilter" style="margin-bottom:0;">
+              <input type="date" data-edit-emphoras-fecha="${id}" value="${h.weekStart}">
+              <select data-edit-emphoras-tipo="${id}">${tiposDisponiblesEdit.map(t=>'<option value="'+t.replace(/"/g,'&quot;')+'" '+(t===h.typeName?'selected':'')+'>'+t+'</option>').join('')}</select>
+              <input type="number" step="0.5" min="0" data-edit-emphoras-horas="${id}" value="${h.hours}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+              <button class="btn" data-guardar-edit-emphoras="${id}" style="padding:6px 12px;font-size:12px;">Guardar</button>
+              <button class="btn secondary" data-cancelar-edit-emphoras="${id}" style="padding:6px 12px;font-size:12px;">Cancelar</button>
+            </div>
+            <p class="hint" style="margin-top:6px;">La fecha se ajusta sola al lunes de esa semana.</p>
+          </div>
+        </td>`;
+        fila.querySelector('[data-guardar-edit-emphoras]').addEventListener('click', async ()=>{
+          const fechaInput = fila.querySelector('[data-edit-emphoras-fecha]').value;
+          const typeName = fila.querySelector('[data-edit-emphoras-tipo]').value;
+          const hours = parseFloat(fila.querySelector('[data-edit-emphoras-horas]').value);
+          if(!fechaInput){ toast('Elige una fecha.', true); return; }
+          if(isNaN(hours) || hours<0){ toast('Indica las horas.', true); return; }
+          const weekStart = isoMonday(fechaInput);
+          try{
+            await sbUpdate('employee_hours_weekly', id, { week_start:weekStart, type_name:typeName, hours });
+            h.weekStart = weekStart; h.typeName = typeName; h.hours = hours;
+            toast('Actualizado ✓');
+            renderCostes(); renderPnl();
+          }catch(e){ toast('Error: '+e.message, true); }
+        });
+        fila.querySelector('[data-cancelar-edit-emphoras]').addEventListener('click', ()=>renderCostes());
+      });
+    });
     tbodyEmpHoras.querySelectorAll('[data-del-emphoras]').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         if(!confirm('¿Eliminar este registro de horas?')) return;
@@ -8168,6 +8309,7 @@ STATE.caja = {
   error: '',
   tab: 'categorizar',
   search: '',
+  categoriaFiltro: '',
   savedMonths: [],
   savedCats: { gastos:[], ingresos:[] },
   savedProviders: [],
@@ -8660,10 +8802,22 @@ function renderCajaCategorizarTab(el){
 function renderCajaMovimientosTab(el){
   const c = STATE.caja;
   const q = c.search.toLowerCase();
-  const filtered = c.data.movements.filter(m=>!q||m.concept.toLowerCase().includes(q)||m.category.toLowerCase().includes(q));
+  const catsIngreso = [...new Set(c.data.movements.filter(m=>m.amount>=0).map(m=>m.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const catsGasto = [...new Set(c.data.movements.filter(m=>m.amount<0).map(m=>m.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const filtered = c.data.movements.filter(m=>{
+    if(c.categoriaFiltro && m.category!==c.categoriaFiltro) return false;
+    return !q||m.concept.toLowerCase().includes(q)||m.category.toLowerCase().includes(q);
+  });
   const pendingCount = Object.keys(c.pending).length;
   el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
-      <input type="text" id="cajaBuscarInput" placeholder="Buscar…" value="${c.search}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;width:100%;max-width:340px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="cajaBuscarInput" placeholder="Buscar…" value="${c.search}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;width:100%;max-width:340px;">
+        <select id="cajaCategoriaFiltro" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;">
+          <option value="">Todas las categorías</option>
+          ${catsIngreso.length ? '<optgroup label="Fuentes de ingreso">'+catsIngreso.map(cat=>'<option value="'+cat.replace(/"/g,'&quot;')+'" '+(c.categoriaFiltro===cat?'selected':'')+'>'+cat+'</option>').join('')+'</optgroup>' : ''}
+          ${catsGasto.length ? '<optgroup label="Categorías de gasto">'+catsGasto.map(cat=>'<option value="'+cat.replace(/"/g,'&quot;')+'" '+(c.categoriaFiltro===cat?'selected':'')+'>'+cat+'</option>').join('')+'</optgroup>' : ''}
+        </select>
+      </div>
       ${pendingCount>0?`<button class="btn" id="cajaAplicarBtn2">Aplicar ${pendingCount} cambio${pendingCount>1?'s':''}</button>`:''}
     </div>
     <div class="card" style="padding:0;overflow:auto;">
@@ -8680,6 +8834,7 @@ function renderCajaMovimientosTab(el){
     </div>`;
   attachCajaCatSelectHandlers(el);
   document.getElementById('cajaBuscarInput').addEventListener('input', (e)=>{ c.search=e.target.value; renderCajaTabContent(); });
+  document.getElementById('cajaCategoriaFiltro').addEventListener('change', (e)=>{ c.categoriaFiltro=e.target.value; renderCajaTabContent(); });
   const aplicarBtn2 = document.getElementById('cajaAplicarBtn2'); if(aplicarBtn2) aplicarBtn2.addEventListener('click', cajaApplyPending);
 }
 
