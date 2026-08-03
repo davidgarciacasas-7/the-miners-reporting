@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.113</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.114</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1117,16 +1117,25 @@ Bowl de acai,Acai,150,g</pre>
       <!-- ROTACIÓN DE STOCK -->
       <div class="tabpanel" id="tab-rotacion">
         <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Consumo teórico de cada ingrediente, calculado a partir de tus ventas reales y las recetas del Recetario — para los productos de la categoría <b>Brunch</b> que tengan una receta con el mismo nombre. Los productos de Brunch que se compran ya hechos (sin receta) se cuentan directamente, unidad vendida = unidad consumida.</p>
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="rotacionDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="rotacionHasta"></div>
             <button class="clear-btn" id="rotacionRefreshBtn">Actualizar</button>
           </div>
         </div>
+        <div class="section-title">Producto final (comprado ya hecho, sin receta)</div>
         <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Productos de Brunch vendidos que no tienen ninguna receta con ese nombre en el Recetario — se cuentan directamente: cada unidad vendida es una unidad consumida.</p>
+          <div style="max-height:300px;overflow:auto;">
+            <table id="tablaRotacionProductoFinal"><thead><tr><th>Producto</th><th>Consumo teórico</th><th>Unidad</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div class="section-title">Ingredientes (según recetas)</div>
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Consumo teórico de cada ingrediente, calculado a partir de tus ventas reales y las recetas del Recetario — para los productos de Brunch que sí tienen una receta con el mismo nombre.</p>
           <div style="max-height:400px;overflow:auto;">
-            <table id="tablaRotacionStock"><thead><tr><th>Ingrediente / producto</th><th>Consumo teórico</th><th>Unidad</th><th>Procedencia</th></tr></thead><tbody></tbody></table>
+            <table id="tablaRotacionStock"><thead><tr><th>Ingrediente</th><th>Consumo teórico</th><th>Unidad</th><th>Procedencia (recetas)</th></tr></thead><tbody></tbody></table>
           </div>
         </div>
         <p class="hint" id="rotacionSinRecetaAviso" style="margin-bottom:26px;"></p>
@@ -6319,17 +6328,22 @@ document.getElementById('recetarioAddRecetaBtn').addEventListener('click', async
 function renderRotacionStock(){
   const desde = document.getElementById('rotacionDesde').value;
   const hasta = document.getElementById('rotacionHasta').value;
-  const tbody = document.querySelector('#tablaRotacionStock tbody');
+  const tbodyIng = document.querySelector('#tablaRotacionStock tbody');
+  const tbodyFinal = document.querySelector('#tablaRotacionProductoFinal tbody');
   const avisoEl = document.getElementById('rotacionSinRecetaAviso');
-  if(!tbody) return;
-  if(!desde || !hasta){ tbody.innerHTML = '<tr><td colspan="4" class="hint">Elige un periodo Desde/Hasta.</td></tr>'; return; }
+  if(!tbodyIng || !tbodyFinal) return;
+  if(!desde || !hasta){
+    tbodyIng.innerHTML = '<tr><td colspan="4" class="hint">Elige un periodo Desde/Hasta.</td></tr>';
+    tbodyFinal.innerHTML = '<tr><td colspan="3" class="hint">Elige un periodo Desde/Hasta.</td></tr>';
+    return;
+  }
 
   const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta && (l.categoria||'').toLowerCase()==='brunch');
   const ventasPorProducto = {};
   allLines.forEach(l=>{ ventasPorProducto[l.articulo] = (ventasPorProducto[l.articulo]||0) + l.cant; });
 
-  const consumo = {};
-  const productosSinReceta = [];
+  const consumoIngredientes = {};
+  const productoFinal = {};
   Object.keys(ventasPorProducto).forEach(producto=>{
     const unidadesVendidas = ventasPorProducto[producto];
     const receta = STATE.recetas.find(r=>r.nombre.toLowerCase()===producto.toLowerCase());
@@ -6337,25 +6351,27 @@ function renderRotacionStock(){
       const ingredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId===receta.id);
       ingredientes.forEach(ing=>{
         const key = ing.ingrediente+'|'+ing.unidad;
-        if(!consumo[key]) consumo[key] = { ingrediente:ing.ingrediente, unidad:ing.unidad, cantidad:0, procedencias:new Set() };
-        consumo[key].cantidad += ing.cantidad * unidadesVendidas;
-        consumo[key].procedencias.add(producto);
+        if(!consumoIngredientes[key]) consumoIngredientes[key] = { ingrediente:ing.ingrediente, unidad:ing.unidad, cantidad:0, procedencias:new Set() };
+        consumoIngredientes[key].cantidad += ing.cantidad * unidadesVendidas;
+        consumoIngredientes[key].procedencias.add(producto);
       });
     } else {
-      productosSinReceta.push(producto);
-      const key = producto+'|unidad (directo)';
-      if(!consumo[key]) consumo[key] = { ingrediente:producto, unidad:'unidad', cantidad:0, procedencias:new Set(['Producto directo, sin receta']) };
-      consumo[key].cantidad += unidadesVendidas;
+      productoFinal[producto] = (productoFinal[producto]||0) + unidadesVendidas;
     }
   });
 
-  const filas = Object.values(consumo).sort((a,b)=>b.cantidad-a.cantidad);
-  tbody.innerHTML = filas.map(f=>`
+  const filasIng = Object.values(consumoIngredientes).sort((a,b)=>b.cantidad-a.cantidad);
+  tbodyIng.innerHTML = filasIng.map(f=>`
     <tr><td>${f.ingrediente}</td><td class="num">${+f.cantidad.toFixed(2)}</td><td>${f.unidad}</td><td class="hint">${[...f.procedencias].join(', ')}</td></tr>
-  `).join('') || '<tr><td colspan="4" class="hint">Sin ventas de Brunch en este periodo.</td></tr>';
+  `).join('') || '<tr><td colspan="4" class="hint">Sin productos de Brunch con receta vendidos en este periodo.</td></tr>';
 
-  avisoEl.innerHTML = productosSinReceta.length
-    ? '⚠ '+productosSinReceta.length+' producto(s) de Brunch vendidos sin receta encontrada (se cuentan como consumo directo, 1 unidad vendida = 1 unidad consumida): '+productosSinReceta.join(', ')+'. Añádeles una receta en Recetario si quieres desglosarlos en ingredientes.'
+  const nombresFinal = Object.keys(productoFinal).sort((a,b)=>productoFinal[b]-productoFinal[a]);
+  tbodyFinal.innerHTML = nombresFinal.map(nombre=>`
+    <tr><td>${nombre}</td><td class="num">${+productoFinal[nombre].toFixed(2)}</td><td>unidad</td></tr>
+  `).join('') || '<tr><td colspan="3" class="hint">Sin producto final vendido en este periodo (o todo tenía receta).</td></tr>';
+
+  avisoEl.innerHTML = nombresFinal.length
+    ? '⚠ '+nombresFinal.length+' producto(s) de Brunch vendidos sin receta encontrada — están en la tabla de arriba "Producto final". Añádeles una receta en Recetario si quieres desglosarlos en ingredientes.'
     : '';
 }
 document.getElementById('rotacionRefreshBtn').addEventListener('click', renderRotacionStock);
