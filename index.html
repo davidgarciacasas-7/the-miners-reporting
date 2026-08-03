@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.110</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.113</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -201,6 +201,8 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="nav-item" data-tab="ajustedemanda"><span class="dot"></span>Ajuste de demanda</div>
     <div class="nav-item" data-tab="simulacion"><span class="dot"></span>Simulación Rentabilidad</div>
     <div class="nav-item" data-tab="simop"><span class="dot"></span>Simulación Operacional</div>
+    <div class="nav-item" data-tab="recetario"><span class="dot"></span>Recetario</div>
+    <div class="nav-item" data-tab="rotacion"><span class="dot"></span>Rotación de Stock</div>
     <div class="nav-item" data-tab="performance"><span class="dot"></span>Performance del equipo</div>
     <div class="nav-item" data-tab="rentabilidad"><span class="dot"></span>Rentabilidad por franja</div>
     <div class="nav-item" data-tab="rendimiento"><span class="dot"></span>Rendimiento operacional</div>
@@ -1082,6 +1084,68 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
       <!-- SIMULACIÓN OPERACIONAL fin -->
 
+      <!-- RECETARIO -->
+      <div class="tabpanel" id="tab-recetario">
+        <div class="card" style="margin-bottom:14px;">
+          <h3>Subir archivo de recetas</h3>
+          <p class="hint" style="margin-bottom:10px;">Sube un CSV con una fila por cada ingrediente de cada receta, repitiendo el nombre de la receta en todas sus filas. Columnas esperadas: <code>Receta,Ingrediente,Cantidad,Unidad</code>. Ejemplo:</p>
+          <pre class="hint" style="background:var(--bg);padding:10px 14px;border-radius:8px;overflow:auto;margin-bottom:10px;">Receta,Ingrediente,Cantidad,Unidad
+Tostada de aguacate,Pan de masa madre,2,unidad
+Tostada de aguacate,Aguacate,1,unidad
+Tostada de aguacate,Huevo,1,unidad
+Bowl de acai,Acai,150,g</pre>
+          <p class="hint" style="margin-bottom:10px;">Si una receta que subes ya existía, se sustituyen sus ingredientes por los nuevos del archivo (no se duplican).</p>
+          <input type="file" id="recetarioImportFile" accept=".csv" style="display:none;">
+          <button class="btn secondary" id="recetarioImportBtn">Elegir archivo CSV</button>
+          <p class="hint" id="recetarioImportStatus" style="margin-top:8px;"></p>
+        </div>
+
+        <div class="section-title">Historial de archivos subidos</div>
+        <div class="card" style="margin-bottom:26px;">
+          <div style="max-height:220px;overflow:auto;">
+            <table id="tablaRecetarioHistorial"><thead><tr><th>Archivo</th><th>Fecha</th><th>Recetas</th><th>Ingredientes</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Recetas</span>
+          <button class="btn secondary" id="recetarioAddRecetaBtn" style="padding:6px 12px;font-size:12px;">+ Añadir receta a mano</button>
+        </div>
+        <div id="recetarioListaRecetas"></div>
+      </div>
+
+      <!-- ROTACIÓN DE STOCK -->
+      <div class="tabpanel" id="tab-rotacion">
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Consumo teórico de cada ingrediente, calculado a partir de tus ventas reales y las recetas del Recetario — para los productos de la categoría <b>Brunch</b> que tengan una receta con el mismo nombre. Los productos de Brunch que se compran ya hechos (sin receta) se cuentan directamente, unidad vendida = unidad consumida.</p>
+          <div class="subfilter" style="margin-bottom:0;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="rotacionDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="rotacionHasta"></div>
+            <button class="clear-btn" id="rotacionRefreshBtn">Actualizar</button>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div style="max-height:400px;overflow:auto;">
+            <table id="tablaRotacionStock"><thead><tr><th>Ingrediente / producto</th><th>Consumo teórico</th><th>Unidad</th><th>Procedencia</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+        <p class="hint" id="rotacionSinRecetaAviso" style="margin-bottom:26px;"></p>
+
+        <div class="section-title">Inventario</div>
+        <div class="card" style="margin-bottom:14px;">
+          <p class="hint" style="margin-bottom:10px;">Registra aquí, de vez en cuando, un recuento real de lo que tienes en stock — comparándolo con el consumo teórico de arriba podrás ver si cuadra o hay mermas/desajustes no explicados.</p>
+          <div class="subfilter">
+            <input type="date" id="invNuevaFecha">
+            <input type="text" id="invNuevaNota" placeholder="Nota (opcional, ej. 'recuento semanal')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="invNuevoBtn">+ Nuevo inventario</button>
+          </div>
+        </div>
+        <div id="invFormNuevo"></div>
+
+        <div class="section-title">Últimos inventarios</div>
+        <div class="card"><div id="invHistorialList"><p class="hint">Cargando...</p></div></div>
+      </div>
+
       <!-- RESUMEN EJECUTIVO -->
       <div class="tabpanel" id="tab-resumenejecutivo">
         <div style="text-align:center;margin-bottom:16px;padding:14px 0;border-bottom:1px solid var(--line);">
@@ -1589,6 +1653,11 @@ async function loadAllData(){
     STATE.otherCosts = (await sbList('other_costs', 'select=*&order=effective_from.asc')).map(r=>({ id:r.id, lineId:r.line_id, amount:parseFloat(r.amount), effectiveFrom:r.effective_from, source:r.source, tipo:r.tipo||'fijo' }));
     STATE.employeeTypeCosts = (await sbList('employee_type_costs', 'select=*&order=type_name.asc,effective_from.asc')).map(r=>({ id:r.id, typeName:r.type_name, hourlyCost:parseFloat(r.hourly_cost), effectiveFrom:r.effective_from }));
     STATE.employeeHoursWeekly = (await sbList('employee_hours_weekly', 'select=*&order=week_start.desc')).map(r=>({ id:r.id, weekStart:r.week_start, typeName:r.type_name, hours:parseFloat(r.hours) }));
+    STATE.recetas = (await sbList('recetas', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre }));
+    STATE.recetaIngredientes = (await sbList('receta_ingredientes', 'select=*')).map(r=>({ id:r.id, recetaId:r.receta_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad }));
+    STATE.recetasHistorial = (await sbList('recetas_archivos_historial', 'select=*&order=fecha_subida.desc')).map(r=>({ id:r.id, nombreArchivo:r.nombre_archivo, fechaSubida:r.fecha_subida, numRecetas:r.num_recetas, numIngredientes:r.num_ingredientes }));
+    STATE.inventarios = (await sbList('inventarios', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, nota:r.nota }));
+    STATE.inventarioItems = (await sbList('inventario_items', 'select=*')).map(r=>({ id:r.id, inventarioId:r.inventario_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad }));
     STATE.employees = (await sbList('empleados', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre, activo:r.activo }));
     STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), nota:r.nota }));
   }catch(e){
@@ -2302,7 +2371,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación Rentabilidad','Ingresos, costes y beneficio resultante, a modo de escenario'], simop:['Simulación Operacional','Bebidas y tickets simulados por barista y hora, con una plantilla de prueba'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
+    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación Rentabilidad','Ingresos, costes y beneficio resultante, a modo de escenario'], simop:['Simulación Operacional','Bebidas y tickets simulados por barista y hora, con una plantilla de prueba'], recetario:['Recetario','Recetas de brunch con sus ingredientes y cantidades'], rotacion:['Rotación de Stock','Consumo teórico de ingredientes según las ventas reales'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
     const tituloActual = titles[item.dataset.tab] || [item.dataset.tab, ''];
     document.getElementById('pageTitle').textContent = tituloActual[0];
     document.getElementById('pageSub').textContent = tituloActual[1];
@@ -2351,6 +2420,17 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       renderHistorialPlantillasSimop();
     }
     if(item.dataset.tab==='resumenejecutivo') renderResumenEjecutivo();
+    if(item.dataset.tab==='recetario') renderRecetario();
+    if(item.dataset.tab==='rotacion'){
+      const rDesdeInp = document.getElementById('rotacionDesde'), rHastaInp = document.getElementById('rotacionHasta');
+      if(!rDesdeInp.value){
+        const hoy = fechaLocalISO(new Date());
+        const hace4Semanas = (()=>{ const d=new Date(hoy+'T00:00:00'); d.setDate(d.getDate()-28); return fechaLocalISO(d); })();
+        rDesdeInp.value = hace4Semanas; rHastaInp.value = hoy;
+      }
+      renderRotacionStock();
+      renderInventarioHistorial();
+    }
     if(item.dataset.tab==='vacaciones'){
       if(STATE.vacaciones.length===0 && STATE.horasExtras.length===0) loadAndRenderVacaciones();
       else { poblarSelectEmpleados('vacEmpleado'); poblarSelectEmpleados('hxEmpleado'); renderVacaciones(); renderHorasExtras(); }
@@ -6050,6 +6130,326 @@ document.getElementById('simopAplicarPeriodoBtn').addEventListener('click', asyn
 });
 
 /* =========================================================
+   RECETARIO — recetas de brunch con sus ingredientes, y su historial de subidas
+   ========================================================= */
+function parseRecetarioCSV(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(lines.length<2) return { recetas:{}, errores:['El archivo está vacío o no tiene filas de datos.'] };
+  const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const idxReceta = header.indexOf('receta');
+  const idxIngrediente = header.indexOf('ingrediente');
+  const idxCantidad = header.indexOf('cantidad');
+  const idxUnidad = header.indexOf('unidad');
+  if(idxReceta===-1 || idxIngrediente===-1 || idxCantidad===-1){
+    return { recetas:{}, errores:['Faltan columnas obligatorias. Se esperaba: Receta,Ingrediente,Cantidad,Unidad. Encontrado: '+lines[0]] };
+  }
+  const recetas = {};
+  const errores = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(',').map(c=>c.trim());
+    const receta = cols[idxReceta], ingrediente = cols[idxIngrediente];
+    const cantidad = parseFloat(cols[idxCantidad]);
+    const unidad = idxUnidad!==-1 ? (cols[idxUnidad]||'unidad') : 'unidad';
+    if(!receta || !ingrediente || isNaN(cantidad)){ errores.push('Fila '+(i+1)+' incompleta o con cantidad inválida, se ha saltado.'); continue; }
+    if(!recetas[receta]) recetas[receta] = [];
+    recetas[receta].push({ ingrediente, cantidad, unidad });
+  }
+  return { recetas, errores };
+}
+document.getElementById('recetarioImportBtn').addEventListener('click', ()=>document.getElementById('recetarioImportFile').click());
+document.getElementById('recetarioImportFile').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('recetarioImportStatus');
+  statusEl.textContent = 'Leyendo archivo...';
+  try{
+    const text = await file.text();
+    const { recetas, errores } = parseRecetarioCSV(text);
+    const nombresRecetas = Object.keys(recetas);
+    if(nombresRecetas.length===0){ statusEl.innerHTML = '<span style="color:var(--negative)">No se ha podido extraer ninguna receta. '+(errores[0]||'')+'</span>'; return; }
+    statusEl.textContent = 'Guardando '+nombresRecetas.length+' receta(s)...';
+    let totalIngredientes = 0;
+    for(const nombreReceta of nombresRecetas){
+      let recetaExistente = STATE.recetas.find(r=>r.nombre.toLowerCase()===nombreReceta.toLowerCase());
+      let recetaId;
+      if(recetaExistente){
+        recetaId = recetaExistente.id;
+        const idsABorrar = STATE.recetaIngredientes.filter(ri=>ri.recetaId===recetaId).map(ri=>ri.id);
+        for(const idBorrar of idsABorrar) await sbDelete('receta_ingredientes', idBorrar);
+        STATE.recetaIngredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId!==recetaId);
+      } else {
+        const saved = await sbInsert('recetas', { nombre:nombreReceta });
+        recetaId = saved.id;
+        STATE.recetas.push({ id:recetaId, nombre:nombreReceta });
+      }
+      for(const ing of recetas[nombreReceta]){
+        const saved = await sbInsert('receta_ingredientes', { receta_id:recetaId, ingrediente:ing.ingrediente, cantidad:ing.cantidad, unidad:ing.unidad });
+        STATE.recetaIngredientes.push({ id:saved.id, recetaId, ingrediente:ing.ingrediente, cantidad:ing.cantidad, unidad:ing.unidad });
+        totalIngredientes++;
+      }
+    }
+    const histSaved = await sbInsert('recetas_archivos_historial', { nombre_archivo:file.name, num_recetas:nombresRecetas.length, num_ingredientes:totalIngredientes });
+    STATE.recetasHistorial.unshift({ id:histSaved.id, nombreArchivo:file.name, fechaSubida:histSaved.fecha_subida, numRecetas:nombresRecetas.length, numIngredientes:totalIngredientes });
+    statusEl.innerHTML = '<span style="color:var(--positive)">Listo: '+nombresRecetas.length+' receta(s), '+totalIngredientes+' ingrediente(s) guardados.</span>'+(errores.length?' <span class="hint">('+errores.length+' fila(s) con avisos)</span>':'');
+    renderRecetario();
+  }catch(err){
+    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+err.message+'</span>';
+  }
+  e.target.value = '';
+});
+function renderRecetarioHistorial(){
+  const tbody = document.querySelector('#tablaRecetarioHistorial tbody');
+  if(!tbody) return;
+  tbody.innerHTML = STATE.recetasHistorial.map(h=>`
+    <tr><td>${h.nombreArchivo}</td><td class="hint">${fechaLocalISO(new Date(h.fechaSubida))}</td><td class="num">${h.numRecetas}</td><td class="num">${h.numIngredientes}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="hint">Sin archivos subidos todavía.</td></tr>';
+}
+function renderRecetario(){
+  renderRecetarioHistorial();
+  const cont = document.getElementById('recetarioListaRecetas');
+  if(!cont) return;
+  const recetasOrdenadas = [...STATE.recetas].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  if(recetasOrdenadas.length===0){ cont.innerHTML = '<p class="hint">Sin recetas todavía — sube un archivo o añade una a mano.</p>'; return; }
+  cont.innerHTML = recetasOrdenadas.map(r=>{
+    const ingredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId===r.id).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+    return `<div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3 style="margin:0;">${r.nombre}</h3>
+        <div style="display:flex;gap:6px;">
+          <button class="btn secondary" data-renombrar-receta="${r.id}" style="padding:3px 10px;font-size:11px;">✏️ Renombrar</button>
+          <button class="btn danger" data-borrar-receta="${r.id}" style="padding:3px 10px;font-size:11px;">✕ Borrar receta</button>
+        </div>
+      </div>
+      <table><thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th></th></tr></thead>
+      <tbody>${ingredientes.map(ing=>`
+        <tr><td>${ing.ingrediente}</td><td class="num">${ing.cantidad}</td><td>${ing.unidad}</td>
+        <td><button class="btn secondary" data-editar-ingrediente="${ing.id}" style="padding:2px 8px;font-size:10px;">✏️</button> <button class="btn danger" data-borrar-ingrediente="${ing.id}" style="padding:2px 8px;font-size:10px;">✕</button></td></tr>
+      `).join('') || '<tr><td colspan="4" class="hint">Sin ingredientes todavía.</td></tr>'}</tbody></table>
+      <button class="btn secondary" data-anadir-ingrediente="${r.id}" style="margin-top:10px;padding:5px 12px;font-size:12px;">+ Añadir ingrediente</button>
+    </div>`;
+  }).join('');
+
+  cont.querySelectorAll('[data-anadir-ingrediente]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const recetaId = btn.getAttribute('data-anadir-ingrediente');
+      const ingrediente = prompt('Nombre del ingrediente:');
+      if(!ingrediente) return;
+      const cantidadStr = prompt('Cantidad (número):', '1');
+      const cantidad = parseFloat(cantidadStr);
+      if(isNaN(cantidad)){ toast('Cantidad no válida.', true); return; }
+      const unidad = prompt('Unidad (ej. g, kg, unidad, ml):', 'unidad') || 'unidad';
+      try{
+        const saved = await sbInsert('receta_ingredientes', { receta_id:recetaId, ingrediente, cantidad, unidad });
+        STATE.recetaIngredientes.push({ id:saved.id, recetaId, ingrediente, cantidad, unidad });
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+  cont.querySelectorAll('[data-editar-ingrediente]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-editar-ingrediente');
+      const ing = STATE.recetaIngredientes.find(x=>x.id===id);
+      if(!ing) return;
+      const nuevoNombre = prompt('Nombre del ingrediente:', ing.ingrediente);
+      if(!nuevoNombre) return;
+      const nuevaCantidadStr = prompt('Cantidad:', ing.cantidad);
+      const nuevaCantidad = parseFloat(nuevaCantidadStr);
+      if(isNaN(nuevaCantidad)){ toast('Cantidad no válida.', true); return; }
+      const nuevaUnidad = prompt('Unidad:', ing.unidad) || ing.unidad;
+      try{
+        await sbUpdate('receta_ingredientes', id, { ingrediente:nuevoNombre, cantidad:nuevaCantidad, unidad:nuevaUnidad });
+        ing.ingrediente=nuevoNombre; ing.cantidad=nuevaCantidad; ing.unidad=nuevaUnidad;
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+  cont.querySelectorAll('[data-borrar-ingrediente]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('¿Borrar este ingrediente de la receta?')) return;
+      const id = btn.getAttribute('data-borrar-ingrediente');
+      try{
+        await sbDelete('receta_ingredientes', id);
+        STATE.recetaIngredientes = STATE.recetaIngredientes.filter(x=>x.id!==id);
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+  cont.querySelectorAll('[data-renombrar-receta]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-renombrar-receta');
+      const r = STATE.recetas.find(x=>x.id===id);
+      if(!r) return;
+      const nuevoNombre = prompt('Nuevo nombre de la receta:', r.nombre);
+      if(!nuevoNombre || nuevoNombre===r.nombre) return;
+      try{
+        await sbUpdate('recetas', id, { nombre:nuevoNombre });
+        r.nombre = nuevoNombre;
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+  cont.querySelectorAll('[data-borrar-receta]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-borrar-receta');
+      const r = STATE.recetas.find(x=>x.id===id);
+      if(!confirm('¿Borrar la receta "'+(r?r.nombre:'')+'" y todos sus ingredientes? No se puede deshacer.')) return;
+      try{
+        await sbDelete('recetas', id);
+        STATE.recetas = STATE.recetas.filter(x=>x.id!==id);
+        STATE.recetaIngredientes = STATE.recetaIngredientes.filter(x=>x.recetaId!==id);
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+}
+document.getElementById('recetarioAddRecetaBtn').addEventListener('click', async ()=>{
+  const nombre = prompt('Nombre de la nueva receta:');
+  if(!nombre) return;
+  if(STATE.recetas.find(r=>r.nombre.toLowerCase()===nombre.toLowerCase())){ toast('Ya existe una receta con ese nombre.', true); return; }
+  try{
+    const saved = await sbInsert('recetas', { nombre });
+    STATE.recetas.push({ id:saved.id, nombre });
+    renderRecetario();
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+
+/* =========================================================
+   ROTACIÓN DE STOCK — consumo teórico de ingredientes, según ventas reales de Brunch
+   ========================================================= */
+function renderRotacionStock(){
+  const desde = document.getElementById('rotacionDesde').value;
+  const hasta = document.getElementById('rotacionHasta').value;
+  const tbody = document.querySelector('#tablaRotacionStock tbody');
+  const avisoEl = document.getElementById('rotacionSinRecetaAviso');
+  if(!tbody) return;
+  if(!desde || !hasta){ tbody.innerHTML = '<tr><td colspan="4" class="hint">Elige un periodo Desde/Hasta.</td></tr>'; return; }
+
+  const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta && (l.categoria||'').toLowerCase()==='brunch');
+  const ventasPorProducto = {};
+  allLines.forEach(l=>{ ventasPorProducto[l.articulo] = (ventasPorProducto[l.articulo]||0) + l.cant; });
+
+  const consumo = {};
+  const productosSinReceta = [];
+  Object.keys(ventasPorProducto).forEach(producto=>{
+    const unidadesVendidas = ventasPorProducto[producto];
+    const receta = STATE.recetas.find(r=>r.nombre.toLowerCase()===producto.toLowerCase());
+    if(receta){
+      const ingredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId===receta.id);
+      ingredientes.forEach(ing=>{
+        const key = ing.ingrediente+'|'+ing.unidad;
+        if(!consumo[key]) consumo[key] = { ingrediente:ing.ingrediente, unidad:ing.unidad, cantidad:0, procedencias:new Set() };
+        consumo[key].cantidad += ing.cantidad * unidadesVendidas;
+        consumo[key].procedencias.add(producto);
+      });
+    } else {
+      productosSinReceta.push(producto);
+      const key = producto+'|unidad (directo)';
+      if(!consumo[key]) consumo[key] = { ingrediente:producto, unidad:'unidad', cantidad:0, procedencias:new Set(['Producto directo, sin receta']) };
+      consumo[key].cantidad += unidadesVendidas;
+    }
+  });
+
+  const filas = Object.values(consumo).sort((a,b)=>b.cantidad-a.cantidad);
+  tbody.innerHTML = filas.map(f=>`
+    <tr><td>${f.ingrediente}</td><td class="num">${+f.cantidad.toFixed(2)}</td><td>${f.unidad}</td><td class="hint">${[...f.procedencias].join(', ')}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="hint">Sin ventas de Brunch en este periodo.</td></tr>';
+
+  avisoEl.innerHTML = productosSinReceta.length
+    ? '⚠ '+productosSinReceta.length+' producto(s) de Brunch vendidos sin receta encontrada (se cuentan como consumo directo, 1 unidad vendida = 1 unidad consumida): '+productosSinReceta.join(', ')+'. Añádeles una receta en Recetario si quieres desglosarlos en ingredientes.'
+    : '';
+}
+document.getElementById('rotacionRefreshBtn').addEventListener('click', renderRotacionStock);
+
+/* --- Inventario (dentro de Rotación de Stock) --- */
+let invDraftItems = [];
+document.getElementById('invNuevoBtn').addEventListener('click', ()=>{
+  const fecha = document.getElementById('invNuevaFecha').value || fechaLocalISO(new Date());
+  document.getElementById('invNuevaFecha').value = fecha;
+  invDraftItems = [];
+  renderInvFormNuevo(fecha);
+});
+function renderInvFormNuevo(fecha){
+  const cont = document.getElementById('invFormNuevo');
+  cont.innerHTML = `<div class="card" style="margin-bottom:26px;border:2px solid var(--copper);">
+    <h3>Nuevo inventario — ${fecha}</h3>
+    <table><thead><tr><th>Ingrediente / producto</th><th>Cantidad</th><th>Unidad</th><th></th></tr></thead>
+    <tbody id="invDraftTbody">${invDraftItems.map((it,i)=>`
+      <tr><td><input type="text" data-inv-draft-nombre="${i}" value="${it.ingrediente.replace(/"/g,'&quot;')}" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;"></td>
+      <td class="num"><input type="number" step="0.1" data-inv-draft-cantidad="${i}" value="${it.cantidad}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
+      <td><input type="text" data-inv-draft-unidad="${i}" value="${it.unidad.replace(/"/g,'&quot;')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;"></td>
+      <td><button class="btn danger" data-inv-draft-quitar="${i}" style="padding:2px 8px;font-size:10px;">✕</button></td></tr>
+    `).join('') || '<tr><td colspan="4" class="hint">Sin líneas todavía.</td></tr>'}</tbody></table>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn secondary" id="invDraftAnadirBtn">+ Añadir línea</button>
+      <button class="btn" id="invDraftGuardarBtn">Guardar inventario</button>
+      <button class="btn secondary" id="invDraftCancelarBtn">Cancelar</button>
+    </div>
+  </div>`;
+  cont.querySelectorAll('[data-inv-draft-nombre]').forEach(inp=>inp.addEventListener('input', e=>{ invDraftItems[+inp.getAttribute('data-inv-draft-nombre')].ingrediente = e.target.value; }));
+  cont.querySelectorAll('[data-inv-draft-cantidad]').forEach(inp=>inp.addEventListener('input', e=>{ invDraftItems[+inp.getAttribute('data-inv-draft-cantidad')].cantidad = parseFloat(e.target.value)||0; }));
+  cont.querySelectorAll('[data-inv-draft-unidad]').forEach(inp=>inp.addEventListener('input', e=>{ invDraftItems[+inp.getAttribute('data-inv-draft-unidad')].unidad = e.target.value; }));
+  cont.querySelectorAll('[data-inv-draft-quitar]').forEach(btn=>btn.addEventListener('click', ()=>{ invDraftItems.splice(+btn.getAttribute('data-inv-draft-quitar'),1); renderInvFormNuevo(fecha); }));
+  document.getElementById('invDraftAnadirBtn').addEventListener('click', ()=>{ invDraftItems.push({ingrediente:'',cantidad:0,unidad:'unidad'}); renderInvFormNuevo(fecha); });
+  document.getElementById('invDraftCancelarBtn').addEventListener('click', ()=>{ invDraftItems=[]; cont.innerHTML=''; });
+  document.getElementById('invDraftGuardarBtn').addEventListener('click', async ()=>{
+    const validos = invDraftItems.filter(it=>it.ingrediente.trim());
+    if(validos.length===0){ toast('Añade al menos una línea con nombre.', true); return; }
+    try{
+      const nota = document.getElementById('invNuevaNota').value.trim();
+      const savedInv = await sbInsert('inventarios', { fecha, nota });
+      STATE.inventarios.unshift({ id:savedInv.id, fecha, nota });
+      for(const it of validos){
+        const saved = await sbInsert('inventario_items', { inventario_id:savedInv.id, ingrediente:it.ingrediente, cantidad:it.cantidad, unidad:it.unidad });
+        STATE.inventarioItems.push({ id:saved.id, inventarioId:savedInv.id, ingrediente:it.ingrediente, cantidad:it.cantidad, unidad:it.unidad });
+      }
+      invDraftItems = [];
+      cont.innerHTML = '';
+      document.getElementById('invNuevaNota').value = '';
+      toast('Inventario guardado ✓');
+      renderInventarioHistorial();
+    }catch(e){ toast('Error: '+e.message, true); }
+  });
+}
+function renderInventarioHistorial(){
+  const el = document.getElementById('invHistorialList');
+  if(!el) return;
+  const ordenados = [...STATE.inventarios].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(ordenados.length===0){ el.innerHTML = '<p class="hint">Sin inventarios registrados todavía.</p>'; return; }
+  el.innerHTML = ordenados.map((inv,idx)=>{
+    const items = STATE.inventarioItems.filter(it=>it.inventarioId===inv.id);
+    return `<div style="border-bottom:1px solid var(--line);padding:12px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" data-toggle-inv="${inv.id}">
+        <div><b>${inv.fecha}</b>${idx===0?' <span class="pill nuevo" style="font-size:10px;">Más reciente</span>':''} <span class="hint">${inv.nota||''} — ${items.length} línea(s)</span></div>
+        <button class="btn danger" data-borrar-inv="${inv.id}" style="padding:3px 10px;font-size:11px;">✕</button>
+      </div>
+      <div id="invDetalle_${inv.id}" class="hidden" style="margin-top:10px;">
+        <table><thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th></tr></thead>
+        <tbody>${items.map(it=>`<tr><td>${it.ingrediente}</td><td class="num">${it.cantidad}</td><td>${it.unidad}</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-toggle-inv]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const id = div.getAttribute('data-toggle-inv');
+      document.getElementById('invDetalle_'+id).classList.toggle('hidden');
+    });
+  });
+  el.querySelectorAll('[data-borrar-inv]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      if(!confirm('¿Borrar este inventario completo?')) return;
+      const id = btn.getAttribute('data-borrar-inv');
+      try{
+        await sbDelete('inventarios', id);
+        STATE.inventarios = STATE.inventarios.filter(x=>x.id!==id);
+        STATE.inventarioItems = STATE.inventarioItems.filter(x=>x.inventarioId!==id);
+        renderInventarioHistorial();
+      }catch(e2){ toast('Error: '+e2.message, true); }
+    });
+  });
+}
+
+/* =========================================================
    RESUMEN EJECUTIVO
    ========================================================= */
 function weekBucketsInRange(desde, hasta){
@@ -9266,12 +9666,71 @@ function cajaDetalleProvData(){
   return { months, providers, table };
 }
 
+function renderCajaPieCharts(){
+  const c = STATE.caja;
+  const canvasCat = document.getElementById('cajaPieCategoria');
+  const canvasSub = document.getElementById('cajaPieSubcategoria');
+  if(!canvasCat || !canvasSub) return;
+  const monthKey = c.pieMonth || (c.savedMonths.length ? c.savedMonths[c.savedMonths.length-1].month : null);
+  const entry = c.savedMonths.find(m=>m.month===monthKey);
+  const c2 = chartColors();
+  if(!entry){ destroyChart('cajaPieCategoria'); destroyChart('cajaPieSubcategoria'); return; }
+  const gastos = (entry.movements||[]).filter(m=>m.amount<0);
+
+  const porCategoria = {};
+  gastos.forEach(m=>{ const k=m.category||CAJA_UNCATEGORIZED; porCategoria[k]=(porCategoria[k]||0)+Math.abs(m.amount); });
+  const catLabels = Object.keys(porCategoria).sort((a,b)=>porCategoria[b]-porCategoria[a]);
+  const catValues = catLabels.map(k=>porCategoria[k]);
+  const totalCat = catValues.reduce((s,v)=>s+v,0)||1;
+
+  const porSubcategoria = {};
+  gastos.forEach(m=>{ const k=m.subcategory||m.category||CAJA_UNCATEGORIZED; porSubcategoria[k]=(porSubcategoria[k]||0)+Math.abs(m.amount); });
+  const subLabels = Object.keys(porSubcategoria).sort((a,b)=>porSubcategoria[b]-porSubcategoria[a]);
+  const subValues = subLabels.map(k=>porSubcategoria[k]);
+  const totalSub = subValues.reduce((s,v)=>s+v,0)||1;
+
+  destroyChart('cajaPieCategoria');
+  STATE.charts.cajaPieCategoria = safeNewChart('cajaPieCategoria', {
+    type:'doughnut',
+    data:{ labels:catLabels, datasets:[{ data:catValues, backgroundColor:catLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}}},
+      tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalCat*100).toFixed(1)+'%)' } },
+      datalabels:{ display:false } } }
+  });
+  destroyChart('cajaPieSubcategoria');
+  STATE.charts.cajaPieSubcategoria = safeNewChart('cajaPieSubcategoria', {
+    type:'doughnut',
+    data:{ labels:subLabels, datasets:[{ data:subValues, backgroundColor:subLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}}},
+      tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalSub*100).toFixed(1)+'%)' } },
+      datalabels:{ display:false } } }
+  });
+}
 function renderCajaGraficosTab(el){
   const c = STATE.caja;
   if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
   if(c.savedMonths.length<2){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Necesitas al menos 2 balances. Tienes '+c.savedMonths.length+'.</p>'; return; }
 
   el.innerHTML = `
+    <div class="card" style="margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="color:var(--copper);font-weight:700;font-size:14px;">Reparto de gastos del mes (categoría y subcategoría)</div>
+        <select id="cajaPieMonth" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;">
+          ${[...c.savedMonths].sort((a,b)=>b.month.localeCompare(a.month)).map(m=>'<option value="'+m.month+'" '+((c.pieMonth||c.savedMonths[c.savedMonths.length-1].month)===m.month?'selected':'')+'>'+(m.title||m.month)+'</option>').join('')}
+        </select>
+      </div>
+      <p class="hint" style="margin-bottom:14px;">Cómo se calcula: se cogen todos los gastos (importes negativos) del mes elegido, y cada porción es el % que representa esa categoría (o subcategoría) sobre el <b>total de gastos de ese mismo mes</b> — no se mezclan meses. En el de subcategoría, los movimientos que todavía no tienen subcategoría puesta se agrupan bajo el nombre de su categoría.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+        <div>
+          <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">Por categoría</div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="cajaPieCategoria"></canvas></div>
+        </div>
+        <div>
+          <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">Por subcategoría</div>
+          <div class="chart-wrap" style="height:260px;"><canvas id="cajaPieSubcategoria"></canvas></div>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
       <div style="display:flex;gap:8px;">
         <button class="btn ${c.detalleMode==='categoria'||!c.detalleMode?'':'secondary'}" data-detalle-mode="categoria" style="padding:7px 14px;font-size:12px;">Por categoría</button>
@@ -9296,6 +9755,8 @@ function renderCajaGraficosTab(el){
       <div id="cajaGruposCharts" style="display:flex;flex-direction:column;gap:16px;"></div>
     </div>
   `;
+  renderCajaPieCharts();
+  document.getElementById('cajaPieMonth').addEventListener('change', (e)=>{ c.pieMonth = e.target.value; renderCajaPieCharts(); });
 
   el.querySelectorAll('[data-detalle-mode]').forEach(btn=>btn.addEventListener('click', ()=>{
     c.detalleMode = btn.getAttribute('data-detalle-mode'); c.detalleSelected=null; c.detalleCatSelected=null; c.detalleSubcatSelected=null; renderCajaTabContent();
