@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.119</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.120</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -922,11 +922,18 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div id="rendHistorialPlantillas" class="card" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-            <button class="btn" data-plantilla-tab-rend="semana" style="padding:6px 14px;font-size:12px;">Entre semana (L–V)</button>
+            <button class="btn" data-plantilla-tab-rend="lunes" style="padding:6px 14px;font-size:12px;">Lunes</button>
+            <button class="btn secondary" data-plantilla-tab-rend="martes" style="padding:6px 14px;font-size:12px;">Martes</button>
+            <button class="btn secondary" data-plantilla-tab-rend="miercoles" style="padding:6px 14px;font-size:12px;">Miércoles</button>
+            <button class="btn secondary" data-plantilla-tab-rend="jueves" style="padding:6px 14px;font-size:12px;">Jueves</button>
+            <button class="btn secondary" data-plantilla-tab-rend="viernes" style="padding:6px 14px;font-size:12px;">Viernes</button>
             <button class="btn secondary" data-plantilla-tab-rend="sabado" style="padding:6px 14px;font-size:12px;">Sábado</button>
             <button class="btn secondary" data-plantilla-tab-rend="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
-            <button class="btn secondary" id="rendCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde L–V (sin guardar)</button>
-            <button class="btn secondary" id="rendCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar L–V → Sábado y Domingo (sin guardar)</button>
+          </div>
+          <p class="hint" style="margin-bottom:10px;">Cada día de la semana tiene ahora su propia plantilla independiente — si un día concreto no tiene nada guardado todavía, usa de respaldo lo que haya en "Lunes" (el primer día laborable) hasta que lo edites.</p>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn secondary" id="rendCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde Lunes (sin guardar)</button>
+            <button class="btn secondary" id="rendCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar Lunes → todos los demás días (sin guardar)</button>
           </div>
           <table id="tablaBaristas">
             <thead><tr><th>Franja</th><th>Nº baristas</th></tr></thead>
@@ -944,10 +951,13 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="rendDesde"></div>
             <div class="filter-group"><label>Hasta</label><input type="date" id="rendHasta"></div>
-            <div class="filter-group"><label>Ver</label><select id="rendFiltroDiaTipo"><option value="todos" selected>Todos los días</option><option value="semana">Solo L-V</option><option value="sabado">Solo Sábado</option><option value="domingo">Solo Domingo</option></select></div>
+            <div class="filter-group" style="position:relative;"><label>Ver</label>
+              <button class="btn secondary" id="rendFiltroDiaTipoBtn" type="button" style="padding:5px 12px;font-size:12px;">Todos los días</button>
+              <div id="rendFiltroDiaTipoMenu" style="display:none;position:absolute;top:100%;left:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:200px;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
+            </div>
             <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rendExcluirFuera"> Excluir "Fuera de horario"</label>
           </div>
-          <p class="hint" style="margin-top:8px;">L-V, Sábado y Domingo pueden tener plantillas y horarios distintos — usa "Ver" para analizar cada uno por separado en vez de mezclarlos.</p>
+          <p class="hint" style="margin-top:8px;">Cada día de la semana puede tener plantilla y horario propios — usa "Ver" para elegir uno o varios días concretos, en vez de mezclarlos todos.</p>
           <p class="hint" id="rendSemanaLabel" style="margin-top:4px;"></p>
         </div>
 
@@ -4328,11 +4338,28 @@ function getRentFranjasTipo(tipo){
   return getRentFranjas(); // migración: lo que hubiera en la lista única antigua, o el valor por defecto
 }
 function setRentFranjasTipo(tipo, list){ localStorage.setItem('miners_rent_franjas_'+tipo, JSON.stringify(list)); }
+const RIND_DIAS_INDIVIDUALES = ['lunes','martes','miercoles','jueves','viernes'];
 function getRendFranjasTipo(tipo){
   try{
     const v = JSON.parse(localStorage.getItem('miners_rend_franjas_'+tipo));
     if(Array.isArray(v) && v.length) return v;
   }catch(e){}
+  // cadena de respaldo: martes/miércoles/jueves/viernes, si no tienen franjas propias
+  // guardadas, recurren a "lunes"; y "lunes" (o cualquiera de los otros, si tampoco hay
+  // nada en "lunes"), recurre a la antigua clave compartida "semana" — así, quien ya
+  // tenía configurada la plantilla L-V de antes, la sigue viendo sin tener que rehacerla.
+  if(RIND_DIAS_INDIVIDUALES.includes(tipo) && tipo!=='lunes'){
+    try{
+      const vLunes = JSON.parse(localStorage.getItem('miners_rend_franjas_lunes'));
+      if(Array.isArray(vLunes) && vLunes.length) return vLunes;
+    }catch(e){}
+  }
+  if(RIND_DIAS_INDIVIDUALES.includes(tipo) || tipo==='lunes'){
+    try{
+      const vSemana = JSON.parse(localStorage.getItem('miners_rend_franjas_semana'));
+      if(Array.isArray(vSemana) && vSemana.length) return vSemana;
+    }catch(e){}
+  }
   return getRendFranjas();
 }
 function setRendFranjasTipo(tipo, list){ localStorage.setItem('miners_rend_franjas_'+tipo, JSON.stringify(list)); }
@@ -4467,7 +4494,10 @@ function renderTablaPlantilla(){
     renderTablaPlantilla(); renderRentabilidad();
   });
 }
-function nombreTipoDia(tipo){ return tipo==='semana' ? 'Entre semana (L-V)' : (tipo==='sabado' ? 'Sábado' : 'Domingo'); }
+function nombreTipoDia(tipo){
+  const nombres = { semana:'Entre semana (L-V)', sabado:'Sábado', domingo:'Domingo', lunes:'Lunes', martes:'Martes', miercoles:'Miércoles', jueves:'Jueves', viernes:'Viernes' };
+  return nombres[tipo] || tipo;
+}
 document.querySelectorAll('[data-plantilla-tab]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     STATE.rentPlantillaTipoActivo = btn.getAttribute('data-plantilla-tab');
@@ -4982,14 +5012,19 @@ document.getElementById('rentAplicarPeriodoBtn').addEventListener('click', async
    RENDIMIENTO OPERACIONAL (bebidas y tickets por barista/hora)
    ========================================================= */
 STATE.baristaWeek = []; // plantilla cargada de la semana que se está EDITANDO (rendPlantillaDia)
-STATE.rendPlantillaTipoActivo = 'semana';
+STATE.rendPlantillaTipoActivo = 'lunes';
 STATE.rendPlantillaDraft = {};
 function inicializarDraftPlantillaRend(){
   const draft = {};
-  ['semana','sabado','domingo'].forEach(tipo=>{
+  ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'].forEach(tipo=>{
     getRendFranjasTipo(tipo).forEach(f=>{
-      const d = STATE.baristaWeek.find(s=>s.franja===f.id && s.tipoDia===tipo) || {numBaristas:0};
-      draft[f.id+'|'+tipo+'|numBaristas'] = d.numBaristas;
+      // igual que en el cálculo: si no hay un valor guardado bajo el nombre exacto del
+      // día, se recurre a la antigua clave compartida "semana" (solo para L-V)
+      let d = STATE.baristaWeek.find(s=>s.franja===f.id && s.tipoDia===tipo);
+      if(!d && tipo!=='sabado' && tipo!=='domingo'){
+        d = STATE.baristaWeek.find(s=>s.franja===f.id && s.tipoDia==='semana');
+      }
+      draft[f.id+'|'+tipo+'|numBaristas'] = d ? d.numBaristas : 0;
     });
   });
   STATE.rendPlantillaDraft = draft;
@@ -5070,30 +5105,30 @@ document.querySelectorAll('[data-plantilla-tab-rend]').forEach(btn=>{
     document.querySelectorAll('[data-plantilla-tab-rend]').forEach(b=>{
       b.classList.toggle('secondary', b.getAttribute('data-plantilla-tab-rend')!==STATE.rendPlantillaTipoActivo);
     });
-    document.getElementById('rendCopiarLVBtn').style.display = STATE.rendPlantillaTipoActivo==='semana' ? 'none' : 'inline-flex';
+    document.getElementById('rendCopiarLVBtn').style.display = STATE.rendPlantillaTipoActivo==='lunes' ? 'none' : 'inline-flex';
     renderTablaBaristas();
   });
 });
 document.getElementById('rendCopiarLVBtn').addEventListener('click', ()=>{
   const tipoDestino = STATE.rendPlantillaTipoActivo;
-  if(tipoDestino==='semana') return;
+  if(tipoDestino==='lunes') return;
   const nombreDestino = nombreTipoDia(tipoDestino);
-  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a "'+nombreDestino+'"? Sustituye las franjas y los valores que tengas ahora en esta pestaña (todavía sin guardar).')) return;
-  const franjasLV = JSON.parse(JSON.stringify(getRendFranjasTipo('semana')));
+  if(!confirm('¿Copiar el horario y los valores de "Lunes" a "'+nombreDestino+'"? Sustituye las franjas y los valores que tengas ahora en esta pestaña (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getRendFranjasTipo('lunes')));
   setRendFranjasTipo(tipoDestino, franjasLV);
-  franjasLV.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+  franjasLV.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|lunes|numBaristas'] ?? 0; });
   renderTablaBaristas();
-  toast('Horario y valores copiados desde L-V — recuerda guardar para que se quede.');
+  toast('Horario y valores copiados desde Lunes — recuerda guardar para que se quede.');
 });
 document.getElementById('rendCopiarAmbosBtn').addEventListener('click', ()=>{
-  if(!confirm('¿Copiar el horario y los valores de "Entre semana (L-V)" a Sábado y a Domingo a la vez? Sustituye las franjas y los valores que tengas ahora en ambas (todavía sin guardar).')) return;
-  const franjasLV = JSON.parse(JSON.stringify(getRendFranjasTipo('semana')));
-  ['sabado','domingo'].forEach(tipoDestino=>{
+  if(!confirm('¿Copiar el horario y los valores de "Lunes" a Martes, Miércoles, Jueves, Viernes, Sábado y Domingo a la vez? Sustituye las franjas y los valores que tengas ahora en todos esos días (todavía sin guardar).')) return;
+  const franjasLV = JSON.parse(JSON.stringify(getRendFranjasTipo('lunes')));
+  ['martes','miercoles','jueves','viernes','sabado','domingo'].forEach(tipoDestino=>{
     setRendFranjasTipo(tipoDestino, JSON.parse(JSON.stringify(franjasLV)));
-    franjasLV.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|semana|numBaristas'] ?? 0; });
+    franjasLV.forEach(f=>{ STATE.rendPlantillaDraft[f.id+'|'+tipoDestino+'|numBaristas'] = STATE.rendPlantillaDraft[f.id+'|lunes|numBaristas'] ?? 0; });
   });
   renderTablaBaristas();
-  toast('Horario y valores copiados a Sábado y Domingo — recuerda guardar para que se quede.');
+  toast('Horario y valores copiados a los demás días — recuerda guardar para que se quede.');
 });
 function actualizarRendPlantillaSemanaLabel(){
   const fecha = document.getElementById('rendPlantillaDia').value;
@@ -5238,12 +5273,47 @@ async function cargarBaristasEnRango(desde, hasta){
     return rows.map(r=>({ weekStart:r.week_start, franja:r.franja, tipoDia:r.tipo_dia, numBaristas:parseFloat(r.num_baristas) }));
   }catch(e){ toast('No se pudieron cargar las plantillas del periodo: '+e.message, true); return []; }
 }
-function getRendFiltroDiaTipo(){ return localStorage.getItem('miners_rend_filtro_dia_tipo') || 'todos'; }
-function setRendFiltroDiaTipo(v){ localStorage.setItem('miners_rend_filtro_dia_tipo', v); }
+function getRendFiltroDiaTipo(){
+  try{
+    const v = JSON.parse(localStorage.getItem('miners_rend_filtro_dia_tipo'));
+    if(Array.isArray(v)) return v;
+    if(v==='todos' || v===null) return 'todos';
+    // valores antiguos guardados como texto plano (de antes de admitir varios días)
+    if(v==='semana') return ['lunes','martes','miercoles','jueves','viernes'];
+    if(v==='sabado' || v==='domingo') return [v];
+  }catch(e){
+    const raw = localStorage.getItem('miners_rend_filtro_dia_tipo');
+    if(raw==='semana') return ['lunes','martes','miercoles','jueves','viernes'];
+    if(raw==='sabado' || raw==='domingo') return [raw];
+  }
+  return 'todos';
+}
+function setRendFiltroDiaTipo(v){ localStorage.setItem('miners_rend_filtro_dia_tipo', JSON.stringify(v)); }
+/* convierte el valor del filtro "Ver" (puede ser 'todos', o un array de días concretos
+   elegidos a mano) en la lista real de días a incluir en el cálculo. */
+function rindDiasIncluidosDelFiltro(filtro){
+  if(filtro==='todos' || !Array.isArray(filtro) || filtro.length===0) return [...RIND_TODOS_LOS_DIAS];
+  return filtro.filter(d=>RIND_TODOS_LOS_DIAS.includes(d));
+}
+const RIND_TODOS_LOS_DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+function rindDiaDeFecha(fecha){
+  const d = new Date(fecha+'T00:00:00');
+  const dow = d.getDay(); // 0=domingo ... 6=sabado
+  return ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][dow];
+}
+/* busca el patrón de baristas para un día concreto — si no hay nada guardado bajo el
+   nombre exacto del día (ej. "lunes"), recurre a la antigua clave compartida "semana",
+   para que los datos ya guardados antes de este cambio se sigan viendo sin más. */
+function rindPatronPara(patronMap, ws, franjaId, dia){
+  return patronMap[ws+'|'+franjaId+'|'+dia] || (dia!=='sabado' && dia!=='domingo' ? patronMap[ws+'|'+franjaId+'|semana'] : undefined);
+}
 async function calcularRendimientoPeriodo(desde, hasta){
   const filtroDiaTipo = getRendFiltroDiaTipo();
-  const franjasPorTipo = { semana: getRendFranjasTipo('semana'), sabado: getRendFranjasTipo('sabado'), domingo: getRendFranjasTipo('domingo') };
-  const franjasReferencia = filtroDiaTipo==='todos' ? unionFranjas(franjasPorTipo.semana, franjasPorTipo.sabado, franjasPorTipo.domingo) : franjasPorTipo[filtroDiaTipo];
+  const diasIncluidos = rindDiasIncluidosDelFiltro(filtroDiaTipo);
+  const franjasPorTipo = {}; RIND_TODOS_LOS_DIAS.forEach(t=>{ franjasPorTipo[t] = getRendFranjasTipo(t); });
+  const franjasReferencia = diasIncluidos.length>1
+    ? unionFranjas(...diasIncluidos.map(t=>franjasPorTipo[t]))
+    : franjasPorTipo[diasIncluidos[0]];
   const incluirFuera = !getExcluirFueraHorario();
   const idsOrder = franjasReferencia.map(f=>f.start+'-'+f.end).concat(incluirFuera ? ['fuera'] : []);
   const labelDe = {}; franjasReferencia.forEach(f=>labelDe[f.start+'-'+f.end]=f.label); labelDe['fuera']='Fuera de horario';
@@ -5257,9 +5327,9 @@ async function calcularRendimientoPeriodo(desde, hasta){
       const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
       if(fecha<desde || fecha>hasta) return;
       if(!esPago) return;
-      if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
-      const tipoDelDia = diaTipoDeFecha(fecha);
-      const id = clasificarEnFranjas(hora, franjasPorTipo[tipoDelDia]);
+      const diaDeEstaFecha = rindDiaDeFecha(fecha);
+      if(!diasIncluidos.includes(diaDeEstaFecha)) return;
+      const id = clasificarEnFranjas(hora, franjasPorTipo[diaDeEstaFecha]);
       if(!resPorId[id]) return;
       const esBebida = bebidasCats.includes(pd.cats[catIdx]);
       if(esBebida) resPorId[id].bebidas += cant;
@@ -5284,14 +5354,13 @@ async function calcularRendimientoPeriodo(desde, hasta){
   while(d<=end){
     const fechaStr = fechaLocalISO(d);
     const ws = isoMonday(fechaStr);
-    const dow = d.getDay(); // 0=domingo ... 6=sabado
-    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
-    if(filtroDiaTipo!=='todos' && tipoDia!==filtroDiaTipo){ d.setDate(d.getDate()+1); continue; }
+    const dia = rindDiaDeFecha(fechaStr);
+    if(!diasIncluidos.includes(dia)){ d.setDate(d.getDate()+1); continue; }
     if(!semanasConPlantilla.has(ws)) semanasSinPlantilla.add(ws);
-    franjasPorTipo[tipoDia].forEach(f=>{
+    franjasPorTipo[dia].forEach(f=>{
       const idRef = f.start+'-'+f.end;
       if(!resPorId[idRef]) return;
-      const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+      const p = rindPatronPara(patronMap, ws, f.id, dia);
       if(p){ resPorId[idRef].baristaHoras += p.numBaristas * ((f.end-f.start)/60); resPorId[idRef].numBaristas += p.numBaristas; }
     });
     d.setDate(d.getDate()+1);
@@ -5308,7 +5377,12 @@ async function calcularDiasFranjaPersonalizada(desde, hasta, horaInicioStr, hora
   const inicio = horaAMinutos(horaInicioStr), fin = horaAMinutos(horaFinStr);
   if(!(fin>inicio)) return null;
   const bebidasCats = getBebidaCategorias();
-  const franjasPorTipo = { semana: getRendFranjasTipo('semana'), sabado: getRendFranjasTipo('sabado'), domingo: getRendFranjasTipo('domingo') };
+  const franjasPorTipo = {}; RIND_TODOS_LOS_DIAS.forEach(t=>{ franjasPorTipo[t] = getRendFranjasTipo(t); });
+  // este selector concreto (el del umbral) sigue siendo "todos/semana/sabado/domingo" —
+  // se traduce a la lista real de días individuales que representa
+  const diasIncluidos = filtroDiaTipo==='todos' ? [...RIND_TODOS_LOS_DIAS]
+    : filtroDiaTipo==='semana' ? ['lunes','martes','miercoles','jueves','viernes']
+    : [filtroDiaTipo];
 
   const porDia = {};
   for(const periodId in STATE.periodsData){
@@ -5318,7 +5392,7 @@ async function calcularDiasFranjaPersonalizada(desde, hasta, horaInicioStr, hora
       const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
       if(fecha<desde || fecha>hasta) return;
       if(!esPago) return;
-      if(!coincideFiltroDiaTipo(fecha, filtroDiaTipo)) return;
+      if(!diasIncluidos.includes(rindDiaDeFecha(fecha))) return;
       const min = horaAMinutos(hora);
       if(!(min>=inicio && min<fin)) return;
       if(!porDia[fecha]) porDia[fecha] = {bebidas:0};
@@ -5352,14 +5426,13 @@ async function calcularDiasFranjaPersonalizada(desde, hasta, horaInicioStr, hora
   while(d<=end){
     const fechaStr = fechaLocalISO(d);
     const ws = isoMonday(fechaStr);
-    const dow = d.getDay();
-    const tipoDia = dow===0 ? 'domingo' : (dow===6 ? 'sabado' : 'semana');
-    if(filtroDiaTipo==='todos' || tipoDia===filtroDiaTipo){
+    const dia = rindDiaDeFecha(fechaStr);
+    if(diasIncluidos.includes(dia)){
       let baristaHoras = 0;
-      franjasPorTipo[tipoDia].forEach(f=>{
+      franjasPorTipo[dia].forEach(f=>{
         const solapeInicio = Math.max(f.start, inicio), solapeFin = Math.min(f.end, fin);
         if(solapeFin>solapeInicio){
-          const p = patronMap[ws+'|'+f.id+'|'+tipoDia];
+          const p = rindPatronPara(patronMap, ws, f.id, dia);
           if(p) baristaHoras += p.numBaristas * (solapeFin-solapeInicio)/60;
         }
       });
@@ -5501,9 +5574,55 @@ async function renderRendimiento(){
 }
 document.getElementById('rendDesde').addEventListener('change', renderRendimiento);
 document.getElementById('rendHasta').addEventListener('change', renderRendimiento);
-document.getElementById('rendFiltroDiaTipo').addEventListener('change', (e)=>{
-  setRendFiltroDiaTipo(e.target.value);
-  renderRendimiento();
+const RIND_DIA_LABEL = { lunes:'Lunes', martes:'Martes', miercoles:'Miércoles', jueves:'Jueves', viernes:'Viernes', sabado:'Sábado', domingo:'Domingo' };
+function actualizarRendFiltroDiaTipoBoton(){
+  const btn = document.getElementById('rendFiltroDiaTipoBtn');
+  if(!btn) return;
+  const filtro = getRendFiltroDiaTipo();
+  if(filtro==='todos') btn.textContent = 'Todos los días';
+  else if(filtro.length===0) btn.textContent = '(ninguno elegido)';
+  else if(filtro.length===7) btn.textContent = 'Todos los días';
+  else btn.textContent = filtro.map(d=>RIND_DIA_LABEL[d]).join(', ');
+}
+function renderRendFiltroDiaTipoMenu(){
+  const menu = document.getElementById('rendFiltroDiaTipoMenu');
+  if(!menu) return;
+  const filtroActual = getRendFiltroDiaTipo();
+  const elegidos = new Set(filtroActual==='todos' ? RIND_TODOS_LOS_DIAS : filtroActual);
+  menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Elegir uno o varios días:</div>` +
+    RIND_TODOS_LOS_DIAS.map(d=>{
+      const on = elegidos.has(d);
+      return `<div data-toggle-rend-dia="${d}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+        <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${on?'var(--positive)':'var(--line)'};background:${on?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${on?'✓':''}</span>
+        <span style="color:${on?'var(--text)':'var(--text-muted)'};">${RIND_DIA_LABEL[d]}</span>
+      </div>`;
+    }).join('') +
+    `<div data-rend-dia-todos="1" style="padding:6px 14px;cursor:pointer;font-size:11px;color:var(--copper);border-top:1px solid var(--line);margin-top:4px;">Elegir todos</div>`;
+  menu.querySelectorAll('[data-toggle-rend-dia]').forEach(div=>{
+    div.addEventListener('click', ()=>{
+      const d = div.getAttribute('data-toggle-rend-dia');
+      const actual = getRendFiltroDiaTipo();
+      const set = new Set(actual==='todos' ? RIND_TODOS_LOS_DIAS : actual);
+      if(set.has(d)) set.delete(d); else set.add(d);
+      setRendFiltroDiaTipo([...set]);
+      renderRendFiltroDiaTipoMenu();
+      actualizarRendFiltroDiaTipoBoton();
+      renderRendimiento();
+    });
+  });
+  const todos = menu.querySelector('[data-rend-dia-todos]');
+  if(todos) todos.addEventListener('click', ()=>{
+    setRendFiltroDiaTipo('todos');
+    renderRendFiltroDiaTipoMenu();
+    actualizarRendFiltroDiaTipoBoton();
+    renderRendimiento();
+  });
+}
+document.getElementById('rendFiltroDiaTipoBtn').addEventListener('click', ()=>{
+  const menu = document.getElementById('rendFiltroDiaTipoMenu');
+  const abrir = menu.style.display==='none';
+  if(abrir) renderRendFiltroDiaTipoMenu();
+  menu.style.display = abrir ? 'block' : 'none';
 });
 document.getElementById('rendPlantillaDia').addEventListener('change', async ()=>{
   const fecha = document.getElementById('rendPlantillaDia').value;
@@ -5513,7 +5632,7 @@ document.getElementById('rendPlantillaDia').addEventListener('change', async ()=
 });
 function filasDesdeDraftPlantillaRend(){
   const filas = [];
-  ['semana','sabado','domingo'].forEach(tipo=>{
+  ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'].forEach(tipo=>{
     getRendFranjasTipo(tipo).forEach(f=>{
       filas.push({ franja: f.id, tipoDia: tipo, numBaristas: STATE.rendPlantillaDraft[f.id+'|'+tipo+'|numBaristas'] ?? 0 });
     });
@@ -11118,8 +11237,7 @@ function showApp(){
   EXCLUIR_FUERA_CHECKBOX_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.checked = getExcluirFueraHorario(); });
   const rentFiltroDiaTipoEl = document.getElementById('rentFiltroDiaTipo');
   if(rentFiltroDiaTipoEl) rentFiltroDiaTipoEl.value = getRentFiltroDiaTipo();
-  const rendFiltroDiaTipoEl = document.getElementById('rendFiltroDiaTipo');
-  if(rendFiltroDiaTipoEl) rendFiltroDiaTipoEl.value = getRendFiltroDiaTipo();
+  actualizarRendFiltroDiaTipoBoton();
   const hoy = fechaLocalISO(new Date());
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
   const propinaAnioEl = document.getElementById('propinaAnio');
