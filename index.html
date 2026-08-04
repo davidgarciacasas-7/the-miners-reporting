@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.120</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.122</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -894,59 +894,6 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <!-- RENDIMIENTO OPERACIONAL -->
       <div class="tabpanel" id="tab-rendimiento">
         <div class="card" style="margin-bottom:14px;">
-          <h3>Baristas por franja horaria</h3>
-          <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <label style="font-weight:700;color:var(--copper);">📅 Estás editando la plantilla de baristas de la semana:</label>
-            <input type="date" id="rendPlantillaDia" style="max-width:200px;">
-            <span class="hint" id="rendPlantillaSemanaLabel" style="font-weight:600;"></span>
-            <span class="hint">(independiente del Desde/Hasta de los gráficos, más abajo)</span>
-          </div>
-          <p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón para L-V, otro para Sábado, otro para Domingo.</p>
-          <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 baristas en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
-          <div class="subfilter" style="margin-bottom:6px;">
-            <div class="filter-group"><label>Apertura L–V</label><input type="time" step="900" id="rendAperturaLVInput" value="08:00"></div>
-            <div class="filter-group"><label>Cierre L–V</label><input type="time" step="900" id="rendCierreLVInput" value="21:00"></div>
-          </div>
-          <div class="subfilter" style="margin-bottom:6px;">
-            <div class="filter-group"><label>Apertura Sábado</label><input type="time" step="900" id="rendAperturaSabInput" value="09:00"></div>
-            <div class="filter-group"><label>Cierre Sábado</label><input type="time" step="900" id="rendCierreSabInput" value="21:00"></div>
-          </div>
-          <div class="subfilter" style="margin-bottom:10px;">
-            <div class="filter-group"><label>Apertura Domingo</label><input type="time" step="900" id="rendAperturaDomInput" value="09:00"></div>
-            <div class="filter-group"><label>Cierre Domingo</label><input type="time" step="900" id="rendCierreDomInput" value="18:00"></div>
-            <div class="filter-group"><label>Cada</label><select id="rendGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
-            <button class="btn secondary" id="rendGenerarFranjasBtn">Generar franjas</button>
-          </div>
-          <div id="rendHistorialPlantillasWrap" style="margin-bottom:14px;">
-            <p class="hint" style="margin-bottom:4px;">Semanas con plantilla guardada:</p>
-            <div id="rendHistorialPlantillas" class="card" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-            <button class="btn" data-plantilla-tab-rend="lunes" style="padding:6px 14px;font-size:12px;">Lunes</button>
-            <button class="btn secondary" data-plantilla-tab-rend="martes" style="padding:6px 14px;font-size:12px;">Martes</button>
-            <button class="btn secondary" data-plantilla-tab-rend="miercoles" style="padding:6px 14px;font-size:12px;">Miércoles</button>
-            <button class="btn secondary" data-plantilla-tab-rend="jueves" style="padding:6px 14px;font-size:12px;">Jueves</button>
-            <button class="btn secondary" data-plantilla-tab-rend="viernes" style="padding:6px 14px;font-size:12px;">Viernes</button>
-            <button class="btn secondary" data-plantilla-tab-rend="sabado" style="padding:6px 14px;font-size:12px;">Sábado</button>
-            <button class="btn secondary" data-plantilla-tab-rend="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
-          </div>
-          <p class="hint" style="margin-bottom:10px;">Cada día de la semana tiene ahora su propia plantilla independiente — si un día concreto no tiene nada guardado todavía, usa de respaldo lo que haya en "Lunes" (el primer día laborable) hasta que lo edites.</p>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-            <button class="btn secondary" id="rendCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde Lunes (sin guardar)</button>
-            <button class="btn secondary" id="rendCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar Lunes → todos los demás días (sin guardar)</button>
-          </div>
-          <table id="tablaBaristas">
-            <thead><tr><th>Franja</th><th>Nº baristas</th></tr></thead>
-            <tbody></tbody>
-          </table>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
-            <button class="btn secondary" id="rendGuardarBtn">Guardar solo esta semana</button>
-            <button class="btn" id="rendAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta de los gráficos)</button>
-          </div>
-          <p class="hint" id="rendGuardarStatus" style="margin-top:8px;"></p>
-        </div>
-
-        <div class="card" style="margin-bottom:14px;">
           <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;">Periodo a analizar en los gráficos de abajo (puede ser una semana, un mes, varios meses...)</label>
           <div class="subfilter" style="margin-bottom:0;">
             <div class="filter-group"><label>Desde</label><input type="date" id="rendDesde"></div>
@@ -1007,6 +954,60 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div style="margin-bottom:6px;"><button class="btn secondary" id="rendTablaToggleBtn" style="padding:4px 10px;font-size:11px;">Mostrar tabla completa de datos</button></div>
         <div class="card hidden" id="rendTablaWrap">
           <table id="tablaRendimiento"><thead><tr><th>Franja</th><th>Bebidas</th><th>Tickets (todos)</th><th>Tickets con bebida</th><th>Barista-horas</th><th>Bebidas/barista/h</th><th>Bebidas reales/barista</th><th>Tickets/barista/h</th><th>Tickets reales/barista</th><th>Tickets bebida/barista/h</th><th>Tickets bebida reales/barista</th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="section-title">Baristas por franja horaria (plantilla)</div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="card" style="border:2px solid var(--copper);margin-bottom:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="font-weight:700;color:var(--copper);">📅 Estás editando la plantilla de baristas de la semana:</label>
+            <input type="date" id="rendPlantillaDia" style="max-width:200px;">
+            <span class="hint" id="rendPlantillaSemanaLabel" style="font-weight:600;"></span>
+            <span class="hint">(independiente del Desde/Hasta de los gráficos, más arriba)</span>
+          </div>
+          <p class="hint" style="margin-bottom:6px;">Solo el personal que prepara bebidas en barra (no cocina) — un patrón para L-V, otro para Sábado, otro para Domingo.</p>
+          <p class="hint" style="margin-bottom:8px;">L-V, Sábado y Domingo pueden tener apertura y cierre distintos. Se generan franjas cubriendo el horario más amplio de los tres, así puedes poner 0 baristas en las franjas donde alguno de los tres no abra. También puedes editar/añadir/quitar líneas sueltas a mano en la tabla de abajo.</p>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura L–V</label><input type="time" step="900" id="rendAperturaLVInput" value="08:00"></div>
+            <div class="filter-group"><label>Cierre L–V</label><input type="time" step="900" id="rendCierreLVInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:6px;">
+            <div class="filter-group"><label>Apertura Sábado</label><input type="time" step="900" id="rendAperturaSabInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Sábado</label><input type="time" step="900" id="rendCierreSabInput" value="21:00"></div>
+          </div>
+          <div class="subfilter" style="margin-bottom:10px;">
+            <div class="filter-group"><label>Apertura Domingo</label><input type="time" step="900" id="rendAperturaDomInput" value="09:00"></div>
+            <div class="filter-group"><label>Cierre Domingo</label><input type="time" step="900" id="rendCierreDomInput" value="18:00"></div>
+            <div class="filter-group"><label>Cada</label><select id="rendGranularidadFranja"><option value="30">30 min</option><option value="60" selected>1 hora</option></select></div>
+            <button class="btn secondary" id="rendGenerarFranjasBtn">Generar franjas</button>
+          </div>
+          <div id="rendHistorialPlantillasWrap" style="margin-bottom:14px;">
+            <p class="hint" id="rendHistorialPlantillasResumen" style="margin-bottom:6px;"></p>
+            <button class="btn secondary" id="rendHistorialPlantillasToggleBtn" style="padding:4px 10px;font-size:11px;margin-bottom:6px;">Mostrar lista completa</button>
+            <div id="rendHistorialPlantillas" class="card hidden" style="max-height:160px;overflow:auto;padding:6px 10px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn" data-plantilla-tab-rend="lunes" style="padding:6px 14px;font-size:12px;">Lunes</button>
+            <button class="btn secondary" data-plantilla-tab-rend="martes" style="padding:6px 14px;font-size:12px;">Martes</button>
+            <button class="btn secondary" data-plantilla-tab-rend="miercoles" style="padding:6px 14px;font-size:12px;">Miércoles</button>
+            <button class="btn secondary" data-plantilla-tab-rend="jueves" style="padding:6px 14px;font-size:12px;">Jueves</button>
+            <button class="btn secondary" data-plantilla-tab-rend="viernes" style="padding:6px 14px;font-size:12px;">Viernes</button>
+            <button class="btn secondary" data-plantilla-tab-rend="sabado" style="padding:6px 14px;font-size:12px;">Sábado</button>
+            <button class="btn secondary" data-plantilla-tab-rend="domingo" style="padding:6px 14px;font-size:12px;">Domingo</button>
+          </div>
+          <p class="hint" style="margin-bottom:10px;">Cada día de la semana tiene ahora su propia plantilla independiente — si un día concreto no tiene nada guardado todavía, usa de respaldo lo que haya en "Lunes" (el primer día laborable) hasta que lo edites.</p>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="btn secondary" id="rendCopiarLVBtn" style="padding:6px 14px;font-size:12px;display:none;">Copiar desde Lunes (sin guardar)</button>
+            <button class="btn secondary" id="rendCopiarAmbosBtn" style="padding:6px 14px;font-size:12px;">Copiar Lunes → todos los demás días (sin guardar)</button>
+          </div>
+          <table id="tablaBaristas">
+            <thead><tr><th>Franja</th><th>Nº baristas</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+            <button class="btn secondary" id="rendGuardarBtn">Guardar solo esta semana</button>
+            <button class="btn" id="rendAplicarPeriodoBtn">Aplicar esta plantilla a todo el periodo (Desde–Hasta de los gráficos)</button>
+          </div>
+          <p class="hint" id="rendGuardarStatus" style="margin-top:8px;"></p>
         </div>
       </div>
 
@@ -5141,14 +5142,29 @@ function actualizarRendPlantillaSemanaLabel(){
 let rendSemanasSeleccionadas = new Set();
 async function renderHistorialPlantillasRend(){
   const el = document.getElementById('rendHistorialPlantillas');
+  const resumenEl = document.getElementById('rendHistorialPlantillasResumen');
   if(!el) return;
   el.innerHTML = '<p class="hint">Cargando...</p>';
+  if(resumenEl) resumenEl.textContent = 'Cargando...';
   let semanas = [];
   try{
     const rows = await sbList('barista_weeks', 'select=week_start&order=week_start.desc');
     semanas = [...new Set(rows.map(r=>r.week_start))];
-  }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; return; }
-  if(semanas.length===0){ el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>'; rendSemanasSeleccionadas = new Set(); return; }
+  }catch(e){ el.innerHTML = '<p class="hint">Error cargando historial: '+e.message+'</p>'; if(resumenEl) resumenEl.textContent=''; return; }
+  if(semanas.length===0){
+    el.innerHTML = '<p class="hint">Sin plantillas guardadas todavía.</p>';
+    if(resumenEl) resumenEl.textContent = 'Sin plantillas de horarios guardadas todavía.';
+    rendSemanasSeleccionadas = new Set();
+    return;
+  }
+  if(resumenEl){
+    const ordenadasAsc = [...semanas].sort();
+    const primera = ordenadasAsc[0], ultima = ordenadasAsc[ordenadasAsc.length-1];
+    const finUltima = (()=>{ const d=new Date(ultima+'T00:00:00'); d.setDate(d.getDate()+6); return fechaLocalISO(d); })();
+    resumenEl.textContent = semanas.length===1
+      ? 'Hay plantilla guardada para 1 semana (del '+primera+' al '+finUltima+').'
+      : 'Hay plantilla guardada para '+semanas.length+' semanas, desde el '+primera+' hasta el '+finUltima+'.';
+  }
   rendSemanasSeleccionadas = new Set([...rendSemanasSeleccionadas].filter(ws=>semanas.includes(ws)));
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line);">
@@ -5233,6 +5249,12 @@ async function renderHistorialPlantillasRend(){
     });
   });
 }
+document.getElementById('rendHistorialPlantillasToggleBtn').addEventListener('click', ()=>{
+  const lista = document.getElementById('rendHistorialPlantillas');
+  const btn = document.getElementById('rendHistorialPlantillasToggleBtn');
+  const oculto = lista.classList.toggle('hidden');
+  btn.textContent = oculto ? 'Mostrar lista completa' : 'Ocultar lista completa';
+});
 document.getElementById('rendGenerarFranjasBtn').addEventListener('click', ()=>{
   if(!confirm('Esto sustituye las líneas de horario de los 3 patrones (L-V, Sábado, Domingo) por unas nuevas generadas automáticamente, cada una con su propio horario de apertura/cierre — pueden salir con distinto número de franjas. El personal ya guardado para las franjas antiguas dejará de coincidir. ¿Continuar?')) return;
   const pares = {
