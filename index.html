@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.117</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.119</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -958,18 +958,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div id="rendFiltroFranjasMenu" style="display:none;position:absolute;top:100%;right:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;z-index:200;min-width:220px;max-height:280px;overflow-y:auto;padding:8px 0;box-shadow:0 6px 24px rgba(0,0,0,.4);"></div>
           </div>
         </div>
-        <p class="hint" style="margin-bottom:8px;">Afecta a los 6 gráficos de abajo (no a la plantilla de baristas, que sigue mostrando todas las franjas para poder rellenarlas).</p>
-        <div class="grid split">
-          <div class="card"><h3>Bebidas por barista y por hora</h3><p class="hint" style="margin-bottom:8px;">Normalizado a "si esto siguiera una hora entera" — permite comparar franjas de duración distinta entre sí.</p><div class="chart-wrap"><canvas id="chartBebidasBarista"></canvas></div></div>
-          <div class="card"><h3>Bebidas reales por barista</h3><p class="hint" style="margin-bottom:8px;">El número real de bebidas de esa franja, dividido solo por cuántos baristas había — sin extrapolar a una hora completa.</p><div class="chart-wrap"><canvas id="chartBebidasBaristaReal"></canvas></div></div>
-        </div>
-        <div class="grid split" style="margin-top:14px;">
-          <div class="card"><h3>Tickets por barista y por hora (todos)</h3><div class="chart-wrap"><canvas id="chartTicketsBarista"></canvas></div></div>
-          <div class="card"><h3>Tickets reales por barista</h3><p class="hint" style="margin-bottom:8px;">El número real de tickets de esa franja, dividido solo por cuántos baristas había — sin extrapolar a una hora completa.</p><div class="chart-wrap"><canvas id="chartTicketsBaristaReal"></canvas></div></div>
-        </div>
-        <div class="grid split" style="margin-top:14px;">
-          <div class="card"><h3>Tickets de bebidas por barista y por hora</h3><div class="chart-wrap"><canvas id="chartTicketsBebidaBarista"></canvas></div></div>
-          <div class="card"><h3>Tickets de bebidas reales por barista</h3><p class="hint" style="margin-bottom:8px;">El número real de tickets con bebida de esa franja, dividido solo por cuántos baristas había — sin extrapolar a una hora completa.</p><div class="chart-wrap"><canvas id="chartTicketsBebidaBaristaReal"></canvas></div></div>
+        <p class="hint" style="margin-bottom:8px;">Afecta a los 3 gráficos de abajo (no a la plantilla de baristas, que sigue mostrando todas las franjas para poder rellenarlas).</p>
+        <div class="card"><h3>Bebidas reales por barista</h3><p class="hint" style="margin-bottom:8px;">El número real de bebidas de esa franja, dividido solo por cuántos baristas había.</p><div class="chart-wrap"><canvas id="chartBebidasBaristaReal"></canvas></div></div>
+        <div class="card" style="margin-top:14px;"><h3>Tickets reales por barista</h3><p class="hint" style="margin-bottom:8px;">El número real de tickets de esa franja, dividido solo por cuántos baristas había.</p><div class="chart-wrap"><canvas id="chartTicketsBaristaReal"></canvas></div></div>
+        <div class="card" style="margin-top:14px;"><h3>Tickets de bebidas reales por barista</h3><p class="hint" style="margin-bottom:8px;">El número real de tickets con bebida de esa franja, dividido solo por cuántos baristas había.</p><div class="chart-wrap"><canvas id="chartTicketsBebidaBaristaReal"></canvas></div></div>
         </div>
 
 
@@ -1602,7 +1594,9 @@ async function sbUpdate(table, id, patch){
     body: JSON.stringify(patch)
   });
   if(!res.ok) throw new Error('Error actualizando '+table+' ('+res.status+')');
-  return (await res.json())[0];
+  const rows = await res.json();
+  if(!rows || rows.length===0) throw new Error('No se ha encontrado ninguna fila con id='+id+' en "'+table+'" para actualizar — puede ser un problema de permisos, o que ese registro ya no exista.');
+  return rows[0];
 }
 async function sbDelete(table, id){
   const res = await fetchWithRetry(sbUrl()+'/rest/v1/'+table+'?id=eq.'+id, { method:'DELETE', headers: sbHeaders() });
@@ -5481,34 +5475,16 @@ async function renderRendimiento(){
   const ticketsBebidaPorHora = franjaOrder.map(f=>{ const r=resultado[f]; return r.baristaHoras>0 ? r.ticketsBebida/r.baristaHoras : 0; });
   const ticketsBebidaPorBaristaReal = franjaOrder.map(f=>{ const r=resultado[f]; return r.numBaristas>0 ? r.ticketsBebida/r.numBaristas : 0; });
 
-  destroyChart('bebidasBarista');
-  STATE.charts.bebidasBarista = safeNewChart('chartBebidasBarista', {
-    type: trendChartType(),
-    data:{ labels:franjaOrder, datasets:[ trendDataset('Bebidas/barista/h', bebidasPorHora.map(v=>+v.toFixed(1)), c.copper) ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
-  });
   destroyChart('bebidasBaristaReal');
   STATE.charts.bebidasBaristaReal = safeNewChart('chartBebidasBaristaReal', {
     type: trendChartType(),
     data:{ labels:franjaOrder, datasets:[ trendDataset('Bebidas reales/barista', bebidasPorBaristaReal.map(v=>+v.toFixed(1)), '#4C8272') ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
   });
-  destroyChart('ticketsBarista');
-  STATE.charts.ticketsBarista = safeNewChart('chartTicketsBarista', {
-    type: trendChartType(),
-    data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets/barista/h', ticketsPorHora.map(v=>+v.toFixed(1)), c.verdigris) ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
-  });
   destroyChart('ticketsBaristaReal');
   STATE.charts.ticketsBaristaReal = safeNewChart('chartTicketsBaristaReal', {
     type: trendChartType(),
     data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets reales/barista', ticketsPorBaristaReal.map(v=>+v.toFixed(1)), '#A79A85') ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
-  });
-  destroyChart('ticketsBebidaBarista');
-  STATE.charts.ticketsBebidaBarista = safeNewChart('chartTicketsBebidaBarista', {
-    type: trendChartType(),
-    data:{ labels:franjaOrder, datasets:[ trendDataset('Tickets bebida/barista/h', ticketsBebidaPorHora.map(v=>+v.toFixed(1)), '#8B6A46') ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted}, grid:{color:c.grid} } } }
   });
   destroyChart('ticketsBebidaBaristaReal');
