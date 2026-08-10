@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.126</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.132</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1182,7 +1182,6 @@ Bowl de acai,Acai,150,g</pre>
       <div class="tabpanel" id="tab-resumenejecutivo">
         <div style="text-align:center;margin-bottom:16px;padding:14px 0;border-bottom:1px solid var(--line);">
           <h1 style="font-family:'Fraunces',serif;font-size:24px;margin:0;color:var(--text);">The Miners <span style="color:var(--copper);">Plaza de España</span></h1>
-          <p class="hint" style="margin-top:4px;">Resumen Ejecutivo</p>
         </div>
         <div class="topbar" style="margin-bottom:10px;">
           <div class="subfilter" style="margin-bottom:0;">
@@ -1204,6 +1203,10 @@ Bowl de acai,Acai,150,g</pre>
           </div>
         </div>
         <p class="hint" style="margin-bottom:14px;">Todos los gráficos usan el mismo periodo elegido arriba. Arrastra una tarjeta por su cabecera (✥) para reordenarla.</p>
+        <div class="card" style="margin-bottom:16px;">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Resumen ejecutivo (opcional — solo aparece en el PDF si escribes algo aquí)</label>
+          <textarea id="reIntroduccion" placeholder="Añade aquí un párrafo de introducción, contexto o resumen antes de las cifras — por ejemplo, para explicar qué periodo se cubre o destacar algo concreto..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+        </div>
         <div id="reWidgetsContainer" class="grid split"></div>
       </div>
 
@@ -6796,6 +6799,7 @@ const RE_WIDGET_TYPES = {
   franjaVentas:    { label:'Ventas por franja horaria', tipo:'snapshot' },
   diaSemanaVentas: { label:'Ventas por día de la semana', tipo:'snapshot' },
   categorias:      { label:'Categorías por ventas', tipo:'snapshot' },
+  categoriasTendencia: { label:'Tendencia de ventas por categoría', tipo:'trend' },
   ticketsFranja:       { label:'Nº de tickets por franja horaria', tipo:'snapshot' },
   ticketMedioFranja:   { label:'Ticket medio por franja horaria', tipo:'snapshot' },
   rentabilidadFranja:  { label:'Rentabilidad — Resultado por franja (Ventas−COGS−Laboral)', tipo:'snapshot-async' },
@@ -6843,11 +6847,27 @@ function renderReTemplateSelect(){
   document.getElementById('reBorrarPlantillaBtn').style.display = sel.value ? 'inline-flex' : 'none';
 }
 document.getElementById('reGuardarPlantillaBtn').addEventListener('click', ()=>{
-  const nombre = prompt('Nombre para esta plantilla (ej. "Para inversores", "Resumen mensual"):');
-  if(!nombre || !nombre.trim()) return;
+  const sel = document.getElementById('reCargarPlantillaSelect');
+  const idSeleccionada = sel ? sel.value : '';
   const templates = getReTemplates();
+  const seleccionada = idSeleccionada ? templates.find(t=>t.id===idSeleccionada) : null;
+
+  if(seleccionada){
+    const sobrescribir = confirm('Ya tienes cargada la plantilla "'+seleccionada.nombre+'".\n\nPulsa Aceptar para SOBRESCRIBIRLA con los gráficos actuales, o Cancelar para guardar esto como una plantilla nueva en su lugar.');
+    if(sobrescribir){
+      seleccionada.widgets = JSON.parse(JSON.stringify(getReWidgets()));
+      seleccionada.savedAt = new Date().toISOString();
+      setReTemplates(templates);
+      renderReTemplateSelect();
+      toast('Plantilla "'+seleccionada.nombre+'" actualizada.');
+      return;
+    }
+  }
+  const nombre = prompt('Nombre para esta plantilla nueva (ej. "Para inversores", "Resumen mensual"):');
+  if(!nombre || !nombre.trim()) return;
   templates.push({ id:'t'+Date.now(), nombre:nombre.trim(), widgets:JSON.parse(JSON.stringify(getReWidgets())), savedAt:new Date().toISOString() });
   setReTemplates(templates);
+  if(sel) sel.value = templates[templates.length-1].id;
   renderReTemplateSelect();
   toast('Plantilla "'+nombre.trim()+'" guardada.');
 });
@@ -7050,6 +7070,18 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularCogsTotalMensual(buckets);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS total', buckets.map(b=>+porBucket[b.label].toFixed(2)), c.copper)] }, options:reLineOptions(true) });
+  } else if(typeId==='categoriasTendencia'){
+    const buckets = monthBucketsInRange(desde, hasta);
+    const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta);
+    const categorias = [...new Set(allLines.map(l=>displayCategoryFor(l.categoria)))].sort();
+    const porCatBucket = {}; categorias.forEach(cat=>{ porCatBucket[cat]={}; buckets.forEach(b=>porCatBucket[cat][b.label]=0); });
+    allLines.forEach(l=>{
+      const cat = displayCategoryFor(l.categoria);
+      const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+      if(b) porCatBucket[cat][b.label] += l.bruto;
+    });
+    const datasets = categorias.map((cat,i)=>trendDataset(cat, buckets.map(b=>+(porCatBucket[cat][b.label]/100).toFixed(2)), FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length]));
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets }, options:reLineOptionsLegend(true) });
   } else if(typeId==='otrosCostesTotal'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularOtrosCostesTotalMensual(buckets);
@@ -7149,6 +7181,12 @@ async function renderResumenEjecutivo(){
   }
   renderReAddWidgetSelect();
   renderReTemplateSelect();
+  const introEl = document.getElementById('reIntroduccion');
+  if(introEl && !introEl.dataset.wired){
+    introEl.value = localStorage.getItem('miners_re_introduccion') || '';
+    introEl.addEventListener('change', ()=>localStorage.setItem('miners_re_introduccion', introEl.value));
+    introEl.dataset.wired = '1';
+  }
   const buckets = monthBucketsInRange(desde, hasta);
   const resultado = calcularResumenEjecutivo(buckets);
   const labels = buckets.map(b=>b.label);
@@ -7279,7 +7317,7 @@ document.getElementById('reCopyClaudeBtn').addEventListener('click', ()=>{
 document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   if(!window.jspdf){ toast('No se pudo cargar la librería de PDF.', true); return; }
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const margin = 14;
   const desde = document.getElementById('reDesde').value, hasta = document.getElementById('reHasta').value;
@@ -7293,9 +7331,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(16);
     doc.text('The Miners Plaza de España', margin, margin+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
-    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta+'  ·  Generado el '+hoy+'  ·  Página '+pagina, margin, margin+10);
+    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta, margin, margin+10);
     doc.setDrawColor(58,47,36);
     doc.line(margin, margin+14, W-margin, margin+14);
+    doc.setFontSize(8); doc.setTextColor(120,110,95);
+    doc.text('Generado el '+hoy+'  ·  Página '+pagina, margin, H-margin+4);
   };
   const chartW = (W - margin*2 - 8)/2;
   const chartH = chartW*0.72;
@@ -7306,6 +7346,14 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   let y = yInicio;
   let colPendiente = null;
 
+  const introduccion = (document.getElementById('reIntroduccion').value||'').trim();
+  if(introduccion){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(220,210,195);
+    const lineasIntro = doc.splitTextToSize(introduccion, W-margin*2);
+    doc.text(lineasIntro, margin, y+4);
+    y += lineasIntro.length*5.5 + 10;
+  }
+
   function nuevaPagina(){
     paginaActual++;
     doc.addPage();
@@ -7314,14 +7362,24 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     colPendiente = null;
   }
 
-  for(const w of widgets){
+  for(let wi=0; wi<widgets.length; wi++){
+    const w = widgets[wi];
     if(w.typeId==='texto'){
       if(colPendiente){ y += chartH + 16; colPendiente = null; } // cerrar la fila de gráficos a medias antes de meter el texto
-      const textoPlano = (w.contenido||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim() || '(título vacío)';
+      const textoPlano = (w.contenido||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
+      if(!textoPlano) continue; // sección de título vacía: no se muestra en el PDF
       doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(242,234,217);
       const lineas = doc.splitTextToSize(textoPlano, W-margin*2);
       const altoTexto = lineas.length*7 + 6;
-      if(y + altoTexto > yLimite) nuevaPagina();
+      // además de la altura del propio título, se reserva sitio también para lo que
+      // venga justo después (gráfico o PNL) — así el título nunca se queda solo al
+      // final de una página con su contenido empezando en la siguiente.
+      let altoSiguiente = 0;
+      const siguiente = widgets[wi+1];
+      if(siguiente && siguiente.typeId!=='texto'){
+        altoSiguiente = siguiente.typeId==='pnl' ? 60 : (chartH+12);
+      }
+      if(y + altoTexto + altoSiguiente > yLimite) nuevaPagina();
       doc.text(lineas, margin, y+5);
       y += altoTexto;
       continue;
@@ -7392,9 +7450,6 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
     else { colPendiente = null; y += chartH + 16; }
   }
-
-  doc.setFontSize(8); doc.setTextColor(120,110,95);
-  doc.text('Generado automáticamente desde el panel de The Miners Plaza de España.', margin, H-margin+2);
 
   doc.save('the-miners-resumen-ejecutivo-'+fechaLocalISO(new Date())+'.pdf');
 });
