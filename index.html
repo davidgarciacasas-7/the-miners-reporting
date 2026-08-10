@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.132</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.133</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -6995,14 +6995,37 @@ async function calcularCajaSerieMensual(desde, hasta, tipo){
   });
   return { labels, data };
 }
-function reLineOptions(modo){
+/* formatea un número grande de forma compacta, ej. 3000 -> "3k", 1500 -> "1.5k",
+   2400000 -> "2.4M" — para la etiqueta del último dato de un gráfico */
+function formatK(n){
+  if(n===null || n===undefined || isNaN(n)) return '';
+  const signo = n<0 ? '-' : '';
+  const abs = Math.abs(n);
+  if(abs>=1000000) return signo+(abs/1000000).toFixed(abs%1000000===0?0:1).replace(/\.0$/,'')+'M';
+  if(abs>=1000) return signo+(abs/1000).toFixed(abs%1000===0?0:1).replace(/\.0$/,'')+'k';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+function datalabelsUltimoValor(){
+  return {
+    display: (context) => context.dataIndex === context.dataset.data.length - 1,
+    align: 'top', anchor: 'end', clamp: true,
+    color: (context) => context.dataset.borderColor || '#F2EAD9',
+    font: { size: 10.5, weight: '700' },
+    formatter: (value) => formatK(value)
+  };
+}
+function reLineOptions(modo, mostrarUltimoValor){
   const c = chartColors();
   const callback = v => modo==='pct' ? v+'%' : (modo ? v+'€' : v);
-  return { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } };
+  const plugins = {legend:{display:false}};
+  if(mostrarUltimoValor) plugins.datalabels = datalabelsUltimoValor();
+  return { responsive:true, maintainAspectRatio:false, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } };
 }
-function reLineOptionsLegend(esPct){
+function reLineOptionsLegend(esPct, mostrarUltimoValor){
   const c = chartColors();
-  return { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
+  const plugins = {legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}};
+  if(mostrarUltimoValor) plugins.datalabels = datalabelsUltimoValor();
+  return { responsive:true, maintainAspectRatio:false, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
 }
 function calcularTicketsPorFranjaPeriodo(desde, hasta){
   const franjaOrder = franjaOrderNegocioFiltrado();
@@ -7042,15 +7065,16 @@ function calcularMermasTopProductos(desde, hasta, top){
   const entries = Object.entries(porProducto).sort((a,b)=>b[1]-a[1]).slice(0,top||10);
   return { labels:entries.map(e=>e[0]), data:entries.map(e=>+e[1].toFixed(2)) };
 }
-async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, desde, hasta){
+async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, desde, hasta, w){
+  const mostrarUltimoValor = !!(w && w.mostrarUltimoValor);
   const c = chartColors();
   destroyChart(chartKey);
   if(typeId==='ventas'){
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ventas', labels.map(l=>+ (resultado[l].ventas/100).toFixed(2)), c.copper)] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ventas', labels.map(l=>+ (resultado[l].ventas/100).toFixed(2)), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='tickets'){
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Tickets', labels.map(l=>resultado[l].tickets), c.verdigris)] }, options:reLineOptions(false) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Tickets', labels.map(l=>resultado[l].tickets), c.verdigris)] }, options:reLineOptions(false, mostrarUltimoValor) });
   } else if(typeId==='ticketMedio'){
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ticket medio', labels.map(l=>{ const r=resultado[l]; return r.tickets? +((r.ventas/r.tickets)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ticket medio', labels.map(l=>{ const r=resultado[l]; return r.tickets? +((r.ventas/r.tickets)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='clientesTickets'){
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[
       { label:'Nuevo', data:labels.map(l=>resultado[l].segCount.nuevo), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
@@ -7058,50 +7082,52 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
       { label:'Con fidelidad', data:labels.map(l=>resultado[l].segCount.fidelidad), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
       { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 },
       { label:'Total', data:labels.map(l=>{ const s=resultado[l].segCount; return s.nuevo+s.repetido+s.fidelidad+s.noident; }), borderColor:c.text, backgroundColor:c.text, tension:.3 }
-    ]}, options:reLineOptionsLegend(false) });
+    ]}, options:reLineOptionsLegend(false, mostrarUltimoValor) });
   } else if(typeId==='clientesVentas'){
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[
       { label:'Nuevo', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.nuevo/r.ventas*100).toFixed(1):0; }), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
       { label:'Repetido sin fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.repetido/r.ventas*100).toFixed(1):0; }), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
       { label:'Con fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.fidelidad/r.ventas*100).toFixed(1):0; }), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
       { label:'No identificable (efectivo)', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.noident/r.ventas*100).toFixed(1):0; }), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 }
-    ]}, options:reLineOptionsLegend(true) });
+    ]}, options:reLineOptionsLegend(true, mostrarUltimoValor) });
   } else if(typeId==='cogsTotal'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularCogsTotalMensual(buckets);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS total', buckets.map(b=>+porBucket[b.label].toFixed(2)), c.copper)] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS total', buckets.map(b=>+porBucket[b.label].toFixed(2)), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='categoriasTendencia'){
     const buckets = monthBucketsInRange(desde, hasta);
     const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta);
-    const categorias = [...new Set(allLines.map(l=>displayCategoryFor(l.categoria)))].sort();
+    const ocultas = new Set((w && w.categoriasOcultas) || []);
+    const categorias = [...new Set(allLines.map(l=>displayCategoryFor(l.categoria)))].filter(c=>!ocultas.has(c)).sort();
     const porCatBucket = {}; categorias.forEach(cat=>{ porCatBucket[cat]={}; buckets.forEach(b=>porCatBucket[cat][b.label]=0); });
     allLines.forEach(l=>{
       const cat = displayCategoryFor(l.categoria);
+      if(ocultas.has(cat)) return;
       const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
       if(b) porCatBucket[cat][b.label] += l.bruto;
     });
     const datasets = categorias.map((cat,i)=>trendDataset(cat, buckets.map(b=>+(porCatBucket[cat][b.label]/100).toFixed(2)), FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length]));
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets }, options:reLineOptionsLegend(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets }, options:reLineOptionsLegend(true, mostrarUltimoValor) });
   } else if(typeId==='otrosCostesTotal'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularOtrosCostesTotalMensual(buckets);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#8B6A46')] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#8B6A46')] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='cogsPctSquare'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularCogsTotalMensual(buckets);
     const porBucketPct = await calcularPctSobreSquareMensual(buckets, porBucket);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), c.copper)] }, options:reLineOptions('pct') });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), c.copper)] }, options:reLineOptions('pct', mostrarUltimoValor) });
   } else if(typeId==='otrosCostesPctSquare'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularOtrosCostesTotalMensual(buckets);
     const porBucketPct = await calcularPctSobreSquareMensual(buckets, porBucket);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), '#8B6A46')] }, options:reLineOptions('pct') });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), '#8B6A46')] }, options:reLineOptions('pct', mostrarUltimoValor) });
   } else if(typeId==='franjaVentas'){
     const d = calcularVentasPorFranjaPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.copper)] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='diaSemanaVentas'){
     const d = calcularVentasPorDiaSemanaPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.verdigris)] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.verdigris)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='categorias'){
     const d = calcularCategoriasPeriodo(desde, hasta);
     const paleta = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968'];
@@ -7109,27 +7135,27 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'doughnut', data:{ labels:d.labels, datasets:[{ data:d.data, backgroundColor:paleta }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:legendConLeyendaValores('bottom', {color:c.muted, boxWidth:11, font:{size:10}}, valoresPorEtiqueta, v=>eur(Math.round(v*100)))} } });
   } else if(typeId==='ticketsFranja'){
     const { franjaOrder, byFranja } = calcularTicketsPorFranjaPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets', franjaOrder.map(f=>byFranja[f].n), c.verdigris)] }, options:reLineOptions(false) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets', franjaOrder.map(f=>byFranja[f].n), c.verdigris)] }, options:reLineOptions(false, mostrarUltimoValor) });
   } else if(typeId==='ticketMedioFranja'){
     const { franjaOrder, byFranja } = calcularTicketsPorFranjaPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Ticket medio', franjaOrder.map(f=>{ const d=byFranja[f]; return d.n? +((d.bruto/d.n)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Ticket medio', franjaOrder.map(f=>{ const d=byFranja[f]; return d.n? +((d.bruto/d.n)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='rentabilidadFranja'){
     const { franjaOrder, resultado:res } = await calcularRentabilidadPeriodo(desde, hasta);
     const valores = franjaOrder.map(f=>(res[f].ventas-res[f].cogs-res[f].laboral)/100);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType()==='lineas'?'line':'bar', data:{ labels:franjaOrder, datasets:[{ label:'Resultado', data:valores, backgroundColor:valores.map(v=>v>=0?c.verdigris:'#C1613F'), borderColor:'#C1613F', borderRadius:4, tension:.3 }] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType()==='lineas'?'line':'bar', data:{ labels:franjaOrder, datasets:[{ label:'Resultado', data:valores, backgroundColor:valores.map(v=>v>=0?c.verdigris:'#C1613F'), borderColor:'#C1613F', borderRadius:4, tension:.3 }] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='rendBebidasBarista'){
     const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Bebidas/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.bebidas/r.baristaHoras).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Bebidas/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.bebidas/r.baristaHoras).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false, mostrarUltimoValor) });
   } else if(typeId==='rendTicketsBarista'){
     const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.tickets/r.baristaHoras).toFixed(1):0; }), c.verdigris)] }, options:reLineOptions(false) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.tickets/r.baristaHoras).toFixed(1):0; }), c.verdigris)] }, options:reLineOptions(false, mostrarUltimoValor) });
   } else if(typeId==='rendTicketsBebida'){
     const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets bebida/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.ticketsBebida/r.baristaHoras).toFixed(1):0; }), '#8B6A46')] }, options:reLineOptions(false) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets bebida/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.ticketsBebida/r.baristaHoras).toFixed(1):0; }), '#8B6A46')] }, options:reLineOptions(false, mostrarUltimoValor) });
   } else if(typeId==='mermasEvolucion'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularMermasEvolucionMensual(buckets);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Coste de mermas', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#C1613F')] }, options:reLineOptions(true) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Coste de mermas', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#C1613F')] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='mermasTop'){
     const d = calcularMermasTopProductos(desde, hasta, 10);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'bar', data:{ labels:d.labels, datasets:[{ label:'Coste', data:d.data, backgroundColor:'#C1613F', borderRadius:4 }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} }, y:{ ticks:{color:c.muted}, grid:{display:false} } } } });
@@ -7138,7 +7164,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const primera = computeNuevasFidelidad();
     const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
     Object.values(primera).forEach(fecha=>{ const b=buckets.find(bk=>fecha>=bk.dateMin && fecha<=bk.dateMax); if(b) porBucket[b.label]++; });
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Tarjetas nuevas', buckets.map(b=>porBucket[b.label]), c.copper)] }, options:reLineOptions(false) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Tarjetas nuevas', buckets.map(b=>porBucket[b.label]), c.copper)] }, options:reLineOptions(false, mostrarUltimoValor) });
   } else if(typeId.startsWith('perfNoBebida')){
     const esFinde = typeId.includes('SD');
     const esPct = typeId.endsWith('Pct');
@@ -7147,12 +7173,12 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const byFranja = {}; franjaOrder.forEach(f=>byFranja[f]={total:0,noBebida:0});
     tickets.forEach(t=>{ if(!byFranja[t.franja]) return; byFranja[t.franja].total++; if(t.tieneNoBebida) byFranja[t.franja].noBebida++; });
     if(esPct){
-      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('% con algo más', franjaOrder.map(f=>{ const d=byFranja[f]; return d.total? +(d.noBebida/d.total*100).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false) });
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('% con algo más', franjaOrder.map(f=>{ const d=byFranja[f]; return d.total? +(d.noBebida/d.total*100).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false, mostrarUltimoValor) });
     } else {
       STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[
         trendDataset('Total tickets', franjaOrder.map(f=>byFranja[f].total), c.muted),
         trendDataset('Con algo más', franjaOrder.map(f=>byFranja[f].noBebida), c.copper)
-      ]}, options:reLineOptionsLegend(false) });
+      ]}, options:reLineOptionsLegend(false, mostrarUltimoValor) });
     }
   } else if(typeId==='cajaGastos' || typeId==='cajaIngresos' || typeId==='cajaBalance'){
     const tipo = typeId==='cajaGastos'?'gastos':(typeId==='cajaIngresos'?'ingresos':'balance');
@@ -7161,7 +7187,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     if(d.labels.length===0){
       destroyChart(chartKey);
     } else {
-      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(true) });
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(true, mostrarUltimoValor) });
     }
   }
 }
@@ -7229,9 +7255,13 @@ async function renderResumenEjecutivo(){
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!type) return '';
     return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
         <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
-        <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        <div class="no-print" style="display:flex;align-items:center;gap:8px;">
+          ${w.typeId==='categoriasTendencia' ? '<button class="btn secondary" data-re-elegir-categorias="'+w.instanceId+'" style="padding:2px 8px;font-size:11px;">Elegir categorías</button>' : ''}
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);cursor:pointer;"><input type="checkbox" data-re-mostrar-ultimo="${w.instanceId}" ${w.mostrarUltimoValor?'checked':''}> Mostrar último valor</label>
+          <button class="btn danger" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
       </div>
       <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
     </div>`;
@@ -7241,7 +7271,7 @@ async function renderResumenEjecutivo(){
     if(w.typeId==='texto') continue;
     if(w.typeId==='pnl'){ await renderPnlWidgetInstance(w); continue; }
     if(w.typeId==='pnlLinea'){ await renderPnlLineaWidgetInstance(w, buckets); continue; }
-    await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta);
+    await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta, w);
   }
 
   container.querySelectorAll('[data-re-pnl-desde]').forEach(inp=>{
@@ -7282,6 +7312,54 @@ async function renderResumenEjecutivo(){
     btn.addEventListener('click', ()=>{
       setReWidgets(getReWidgets().filter(w=>w.instanceId!==btn.getAttribute('data-re-quitar')));
       renderResumenEjecutivo();
+    });
+  });
+  container.querySelectorAll('[data-re-mostrar-ultimo]').forEach(chk=>{
+    chk.addEventListener('change', ()=>{
+      const id = chk.getAttribute('data-re-mostrar-ultimo');
+      const ws = getReWidgets();
+      const w = ws.find(x=>x.instanceId===id);
+      if(w){ w.mostrarUltimoValor = chk.checked; setReWidgets(ws); renderResumenEjecutivo(); }
+    });
+  });
+  container.querySelectorAll('[data-re-elegir-categorias]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = btn.getAttribute('data-re-elegir-categorias');
+      document.querySelectorAll('.re-categorias-menu').forEach(m=>m.remove());
+      const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta);
+      const todasCategorias = [...new Set(allLines.map(l=>displayCategoryFor(l.categoria)))].sort();
+      const ws = getReWidgets();
+      const w = ws.find(x=>x.instanceId===id);
+      const ocultas = new Set((w && w.categoriasOcultas) || []);
+      const menu = document.createElement('div');
+      menu.className = 're-categorias-menu';
+      menu.style.cssText = 'position:absolute;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 0;z-index:300;min-width:220px;box-shadow:0 6px 24px rgba(0,0,0,.4);';
+      menu.innerHTML = `<div style="padding:6px 14px;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;">Categorías a mostrar:</div>` +
+        todasCategorias.map(cat=>{
+          const on = !ocultas.has(cat);
+          return `<div data-toggle-cat="${cat.replace(/"/g,'&quot;')}" style="padding:6px 14px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;">
+            <span style="width:14px;height:14px;border-radius:3px;border:2px solid ${on?'var(--positive)':'var(--line)'};background:${on?'var(--positive)':'transparent'};display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;">${on?'✓':''}</span>
+            <span style="color:${on?'var(--text)':'var(--text-muted)'};">${cat}</span>
+          </div>`;
+        }).join('');
+      btn.parentElement.style.position = 'relative';
+      btn.parentElement.appendChild(menu);
+      menu.querySelectorAll('[data-toggle-cat]').forEach(div=>{
+        div.addEventListener('click', ()=>{
+          const cat = div.getAttribute('data-toggle-cat');
+          const wsAhora = getReWidgets();
+          const wAhora = wsAhora.find(x=>x.instanceId===id);
+          if(!wAhora) return;
+          const setOcultas = new Set(wAhora.categoriasOcultas||[]);
+          if(setOcultas.has(cat)) setOcultas.delete(cat); else setOcultas.add(cat);
+          wAhora.categoriasOcultas = [...setOcultas];
+          setReWidgets(wsAhora);
+          renderResumenEjecutivo();
+        });
+      });
+      const cerrarFuera = (ev) => { if(!menu.contains(ev.target) && ev.target!==btn){ menu.remove(); document.removeEventListener('click', cerrarFuera); } };
+      setTimeout(()=>document.addEventListener('click', cerrarFuera), 0);
     });
   });
   attachReDragHandlers();
