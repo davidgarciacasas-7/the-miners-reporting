@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.133</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.134</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7007,7 +7007,7 @@ function formatK(n){
 }
 function datalabelsUltimoValor(){
   return {
-    display: (context) => context.dataIndex === context.dataset.data.length - 1,
+    display: (context) => context.dataset.label!=='Tendencia' && context.dataIndex === context.dataset.data.length - 1,
     align: 'top', anchor: 'end', clamp: true,
     color: (context) => context.dataset.borderColor || '#F2EAD9',
     font: { size: 10.5, weight: '700' },
@@ -7107,7 +7107,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
       if(b) porCatBucket[cat][b.label] += l.bruto;
     });
     const datasets = categorias.map((cat,i)=>trendDataset(cat, buckets.map(b=>+(porCatBucket[cat][b.label]/100).toFixed(2)), FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length]));
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets }, options:reLineOptionsLegend(true, mostrarUltimoValor) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets }, options:reLineOptionsLegend(false, mostrarUltimoValor) });
   } else if(typeId==='otrosCostesTotal'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularOtrosCostesTotalMensual(buckets);
