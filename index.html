@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.134</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.135</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7019,13 +7019,13 @@ function reLineOptions(modo, mostrarUltimoValor){
   const callback = v => modo==='pct' ? v+'%' : (modo ? v+'€' : v);
   const plugins = {legend:{display:false}};
   if(mostrarUltimoValor) plugins.datalabels = datalabelsUltimoValor();
-  return { responsive:true, maintainAspectRatio:false, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } };
+  return { responsive:true, maintainAspectRatio:false, layout:{padding:{top:mostrarUltimoValor?18:0}}, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } };
 }
 function reLineOptionsLegend(esPct, mostrarUltimoValor){
   const c = chartColors();
   const plugins = {legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}};
   if(mostrarUltimoValor) plugins.datalabels = datalabelsUltimoValor();
-  return { responsive:true, maintainAspectRatio:false, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
+  return { responsive:true, maintainAspectRatio:false, layout:{padding:{top:mostrarUltimoValor?18:0}}, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
 }
 function calcularTicketsPorFranjaPeriodo(desde, hasta){
   const franjaOrder = franjaOrderNegocioFiltrado();
@@ -7522,7 +7522,15 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     doc.text(type?type.label:'', x, y+4);
     doc.setFont('helvetica','normal');
     const chart = STATE.charts['reW_'+w.instanceId];
-    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+7, chartW, chartH); }
+    if(chart && chart.canvas && chart.canvas.width && chart.canvas.height){
+      // respeta la proporción REAL del gráfico en pantalla, en vez de forzar siempre el
+      // mismo rectángulo — si no, sale comprimido o estirado según el ancho de ventana
+      // que tuviera el navegador al generar el PDF.
+      const ratio = chart.canvas.width / chart.canvas.height;
+      let anchoImg = chartW, altoImg = chartW/ratio;
+      if(altoImg > chartH){ altoImg = chartH; anchoImg = chartH*ratio; }
+      doc.addImage(chart.toBase64Image(), 'PNG', x, y+7, anchoImg, altoImg);
+    }
     else { doc.setDrawColor(58,47,36); doc.rect(x,y+7,chartW,chartH); }
 
     if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
