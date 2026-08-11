@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.136</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.137</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7518,8 +7518,8 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!colPendiente && y + chartH + 12 > yLimite) nuevaPagina();
     const x = colPendiente ? colPendiente.x : margin;
-    doc.setFontSize(10); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
-    doc.text(type?type.label:'', x, y+4);
+    doc.setFontSize(13); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
+    doc.text(type?type.label:'', x, y+5);
     doc.setFont('helvetica','normal');
     const chart = STATE.charts['reW_'+w.instanceId];
     if(chart){
@@ -7531,11 +7531,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const pxPorMm = 3.78;
       chart.resize(Math.round(chartW*pxPorMm), Math.round(chartH*pxPorMm));
       chart.update('none');
-      doc.addImage(chart.toBase64Image(), 'PNG', x, y+7, chartW, chartH);
+      doc.addImage(chart.toBase64Image(), 'PNG', x, y+9, chartW, chartH);
       chart.resize();
       chart.update('none');
     }
-    else { doc.setDrawColor(58,47,36); doc.rect(x,y+7,chartW,chartH); }
+    else { doc.setDrawColor(58,47,36); doc.rect(x,y+9,chartW,chartH); }
 
     if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
     else { colPendiente = null; y += chartH + 16; }
