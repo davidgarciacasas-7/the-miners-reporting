@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.139</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.140</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7450,7 +7450,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       if(colPendiente){ y += chartH + 16; colPendiente = null; } // cerrar la fila de gráficos a medias antes de meter el texto
       const textoPlano = (w.contenido||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
       if(!textoPlano) continue; // sección de título vacía: no se muestra en el PDF
-      doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(242,234,217);
+      doc.setFont('helvetica','bold'); doc.setFontSize(28);
       const lineas = doc.splitTextToSize(textoPlano, W-margin*2);
       const altoTexto = lineas.length*12 + 8;
       // además de la altura del propio título, se reserva sitio también para lo que
@@ -7462,6 +7462,10 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         altoSiguiente = siguiente.typeId==='pnl' ? 60 : (chartH+12);
       }
       if(y + altoTexto + altoSiguiente > yLimite) nuevaPagina();
+      // OJO: nuevaPagina() dibuja la cabecera de la página nueva, que cambia el tamaño y
+      // color de letra activos (los deja en 8pt, del pie de página) — hay que volver a
+      // ponerlos aquí, justo antes de escribir, o el título sale con el tamaño del pie.
+      doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(242,234,217);
       doc.text(lineas, margin, y+9);
       y += altoTexto;
       continue;
