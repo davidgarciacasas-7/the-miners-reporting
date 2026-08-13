@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.142</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.143</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9442,8 +9442,17 @@ async function cajaProcess(){
 
       let category=null;
       if(amount>=0){
-        const src=[c1,c2,String(row['CONCEPTO']||'')].find(s=>s.trim().length>2)||'Otros ingresos';
-        category='💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
+        // se comprueba primero si "aportación socio" aparece en CUALQUIER parte del
+        // texto (sin importar acentos/mayúsculas) — si no, con textos como "David García
+        // Casas · Aportación socio" se cogía el nombre de la persona como categoría, en
+        // vez de reconocer que es una aportación de socio.
+        const normalizado = searchTexts.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        if(normalizado.includes('aportacion socio') || normalizado.includes('aportacion de socio') || normalizado.includes('aportacion socios')){
+          category = '💰 Aportacion socio';
+        } else {
+          const src=[c1,c2,String(row['CONCEPTO']||'')].find(s=>s.trim().length>2)||'Otros ingresos';
+          category='💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
+        }
       } else {
         for(const {prov,cat} of catMap){ if(searchTexts.some(t=>cajaISearch(prov,t))){ category=cat; break; } }
       }
