@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.143</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.145</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9433,7 +9433,12 @@ async function cajaProcess(){
       const pMatch = amount>0 ? null : personalList.find(pe=>{
         if(!pe.prov||pe.prov.length<3) return false;
         if(!searchTexts.some(t=>cajaISearch(pe.prov,t))) return false;
-        if(pe.qty===0) return true;
+        // valor 0 o positivo en el archivo personal: basta con que coincida el proveedor
+        // por nombre, no hace falta que el importe también coincida — un valor positivo
+        // ahí significa "todo lo de este proveedor es gasto personal socio", punto.
+        // Solo un valor NEGATIVO exige que el importe coincida (para detectar adelantos
+        // del socio a la empresa, donde sí importa el importe exacto).
+        if(pe.qty>=0) return true;
         return Math.abs(Math.abs(amount)-Math.abs(pe.qty))<=1;
       });
       if(pMatch&&pMatch.qty>0){ movements.push({id:idx,concept,amount,month,fechaDia,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
@@ -9618,7 +9623,11 @@ async function cajaSaveMonth(){
   const month = `${yr}-${mo.padStart(2,'0')}`;
   const title = `${CAJA_MESES[parseInt(mo,10)]} ${yr}`;
   const sqInc = c.data.movements.filter(m=>{ if(m.amount<0) return false; const tt=[m.rawG,m.concept,m.category].filter(Boolean); return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t)); }).reduce((s,m)=>s+m.amount,0);
-  const entry = { month, title, savedAt:new Date().toISOString(), movements:c.data.movements, catData:c.data.catData, incomeCatData:c.data.incomeCatData, totalExpense:c.data.totalExpense, totalIncome:c.data.totalIncome, rawGastos:c.data.rawGastos, rawIngresos:c.data.rawIngresos, squareIncome:sqInc };
+  const entry = { month, title, savedAt:new Date().toISOString(), movements:c.data.movements, catData:c.data.catData, incomeCatData:c.data.incomeCatData, totalExpense:c.data.totalExpense, totalIncome:c.data.totalIncome, rawGastos:c.data.rawGastos, rawIngresos:c.data.rawIngresos, squareIncome:sqInc, simplificarSocios:c.data.simplificarSocios, categoriaDiferenciaSocios:c.data.categoriaDiferenciaSocios, recategorizacionesSocios:c.data.recategorizacionesSocios };
+  // recalcular aquí mismo los totales de "Gasto personal socio"/"Aportación socio" (y
+  // aplicar la simplificación si estaba activada para este mes) — si no, se quedan a 0
+  // hasta la próxima vez que se recargue toda la página.
+  aplicarSimplificacionSocios(entry);
   const updated = [...c.savedMonths.filter(m=>m.month!==month), entry].sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
   await cajaSet('months', updated);
   c.savedMonths = updated;
@@ -9632,7 +9641,12 @@ async function cajaEditMonth(m){
   if(!entry) return;
   const [y,mo] = entry.month.split('-');
   c.balanceYear=y||''; c.balanceMonth=mo||'';
-  c.data = { ...entry, saved:false }; c.pending={}; c.tab='categorizar';
+  // se edita siempre con los movimientos ORIGINALES (antes de cualquier simplificación
+  // de socios) — si no, si el mes ya tenía la simplificación activada, se editaría la
+  // vista ya simplificada (sin las líneas de Gasto personal socio/Aportación socio por
+  // separado), y al volver a guardar se perdería ese detalle para siempre.
+  c.data = { ...entry, movements: entry.movementsOriginal || entry.movements, saved:false };
+  c.pending={}; c.tab='categorizar';
   renderCaja();
 }
 async function cajaDeleteMonth(month){
