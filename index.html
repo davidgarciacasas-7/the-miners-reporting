@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.145</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.146</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9266,14 +9266,28 @@ async function cajaLoadStorage(){
    totalGasto/totalAportacion/diferencia se recalculan siempre y se guardan en el balance,
    para poder mostrarlos en el desplegable aunque la simplificación esté desactivada. */
 function aplicarSimplificacionSocios(entry){
+  if(!entry.recategorizacionesSocios) entry.recategorizacionesSocios = [];
+  // si la simplificación está DESACTIVADA, los totales se calculan siempre a partir de
+  // entry.movements TAL CUAL está ahora mismo — nunca de una foto guardada de antes, para
+  // que una corrección de categoría se refleje sin depender de nada más. La foto
+  // (movementsOriginal) solo se necesita, y solo se guarda, cuando la simplificación SÍ
+  // está activa (para poder recalcular el reparto sin perder el detalle original).
+  if(!entry.simplificarSocios){
+    entry.movementsOriginal = null;
+    const base = entry.movements;
+    entry.totalGastoPersonalSocio = base.filter(m=>m.category==='👤 Gasto personal socio').reduce((s,m)=>s+Math.abs(m.amount),0);
+    entry.totalAportacionSocio = base.filter(m=>m.category==='💰 Aportacion socio').reduce((s,m)=>s+m.amount,0);
+    entry.diferenciaSocios = entry.totalAportacionSocio - entry.totalGastoPersonalSocio;
+    entry.totalIncome = base.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0);
+    entry.totalExpense = base.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
+    return;
+  }
   if(!entry.movementsOriginal) entry.movementsOriginal = entry.movements;
   const base = entry.movementsOriginal;
   entry.totalGastoPersonalSocio = base.filter(m=>m.category==='👤 Gasto personal socio').reduce((s,m)=>s+Math.abs(m.amount),0);
   entry.totalAportacionSocio = base.filter(m=>m.category==='💰 Aportacion socio').reduce((s,m)=>s+m.amount,0);
   entry.diferenciaSocios = entry.totalAportacionSocio - entry.totalGastoPersonalSocio;
-  if(!entry.recategorizacionesSocios) entry.recategorizacionesSocios = [];
-  if(!entry.simplificarSocios){ entry.movements = base; }
-  else{
+  {
     const otros = base.filter(m=>m.category!=='👤 Gasto personal socio' && m.category!=='💰 Aportacion socio');
     if(Math.abs(entry.diferenciaSocios)<0.005){ entry.movements = otros; }
     else{
