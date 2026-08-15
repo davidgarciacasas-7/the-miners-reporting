@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.146</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.152</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -485,6 +485,13 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <p class="hint">Usa el mismo periodo y granularidad (mensual/semanal) que la tabla de arriba. Por defecto sale "Resultado" — algunos lo llaman EBITDA — pero puedes elegir cualquier línea del PNL, incluidas las de Total ingresos y Total costes.</p>
         </div>
         <div class="card"><div class="chart-wrap"><canvas id="chartPnlLinea"></canvas></div></div>
+
+        <div class="section-title">Evolución del EBITDA (siempre mensual)</div>
+        <p class="hint" style="margin-bottom:10px;">Si tienes una línea llamada exactamente "EBITDA" (por ejemplo, subida a mano con "Importar mi propio PNL"), se usa esa. Si no, se calcula como Total ingresos − Total costes de cada mes (el "Resultado"). El % se calcula sobre la línea "Ventas" del mismo mes. Usa siempre el mismo periodo Desde/Hasta que la tabla de arriba, en mensual, aunque la tabla esté en vista semanal.</p>
+        <div class="grid split" style="margin-bottom:26px;">
+          <div class="card"><h3>EBITDA mensual (€)</h3><div class="chart-wrap"><canvas id="chartEbitdaEuros"></canvas></div></div>
+          <div class="card"><h3>EBITDA mensual (% de Ventas)</h3><div class="chart-wrap"><canvas id="chartEbitdaPct"></canvas></div></div>
+        </div>
       </div>
 
       <!-- COSTES / COGS -->
@@ -2599,7 +2606,11 @@ function legendConLeyendaValores(position, labelsOpts, valoresPorEtiqueta, forma
   };
 }
 
+let STATE_pdfLightMode = false; // true solo mientras se está generando un PDF con fondo blanco
 function chartColors(){
+  if(STATE_pdfLightMode){
+    return { copper:'#B5652A', verdigris:'#2F6B57', muted:'#6B6258', grid:'rgba(90,82,72,.18)', text:'#2A2622' };
+  }
   return { copper:'#C17F3C', verdigris:'#4C8272', muted:'#A79A85', grid:'rgba(167,154,133,.15)', text:'#F2EAD9' };
 }
 
@@ -6808,6 +6819,13 @@ const RE_WIDGET_TYPES = {
   rendTicketsBebida:   { label:'Rendimiento — Tickets de bebidas por barista y hora', tipo:'snapshot-async' },
   mermasEvolucion:     { label:'Mermas — Evolución del coste', tipo:'trend' },
   mermasTop:           { label:'Mermas — Top 10 productos por coste', tipo:'snapshot' },
+  cajaGastosCategoria:    { label:'Caja — Gastos por categoría (tendencia)', tipo:'trend' },
+  cajaGastosSubcategoria: { label:'Caja — Gastos por subcategoría (tendencia)', tipo:'trend' },
+  cajaGastosProveedor:    { label:'Caja — Gastos por proveedor (tendencia)', tipo:'trend' },
+  cajaTartaCategoria:     { label:'Caja — Reparto de gastos por categoría (mes)', tipo:'snapshot' },
+  cajaTartaSubcategoria:  { label:'Caja — Reparto de gastos por subcategoría (mes)', tipo:'snapshot' },
+  ebitdaEuros: { label:'EBITDA mensual (€)', tipo:'trend' },
+  ebitdaPct:   { label:'EBITDA mensual (% de Ventas)', tipo:'trend' },
   perfFidelidadNueva:  { label:'Performance — Tarjetas de fidelidad nuevas', tipo:'trend' },
   perfNoBebidaLVAbs:   { label:'Performance — Tickets con algo más, L-V (nº)', tipo:'snapshot' },
   perfNoBebidaLVPct:   { label:'Performance — Tickets con algo más, L-V (%)', tipo:'snapshot' },
@@ -7159,6 +7177,70 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
   } else if(typeId==='mermasTop'){
     const d = calcularMermasTopProductos(desde, hasta, 10);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'bar', data:{ labels:d.labels, datasets:[{ label:'Coste', data:d.data, backgroundColor:'#C1613F', borderRadius:4 }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} }, y:{ ticks:{color:c.muted}, grid:{display:false} } } } });
+  } else if(typeId==='cajaGastosCategoria' || typeId==='cajaGastosSubcategoria' || typeId==='cajaGastosProveedor'){
+    const cc = STATE.caja;
+    const enPct = !!(w && w.verEnPct);
+    const mesesEnRango = cc.savedMonths.filter(m=>m.month>=desde.slice(0,7) && m.month<=hasta.slice(0,7));
+    const labelsRango = mesesEnRango.map(m=>m.title||m.month);
+    const sqByMonth = {}; mesesEnRango.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+    const fuente = typeId==='cajaGastosCategoria' ? cajaDetalleCatData() : (typeId==='cajaGastosSubcategoria' ? cajaDetalleSubcatData() : cajaDetalleProvData());
+    const claves = typeId==='cajaGastosCategoria' ? fuente.cats : (typeId==='cajaGastosSubcategoria' ? fuente.subcats : fuente.providers);
+    const seleccionadas = claves.filter(k=>labelsRango.some(mes=>(fuente.table[k]?.[mes]?.euros||0)>0));
+    const getVal = (k,mes) => {
+      const euros = fuente.table[k]?.[mes]?.euros||0;
+      if(enPct){ const sq=sqByMonth[mes]||0; return sq>0 ? +(euros/sq*100).toFixed(1) : 0; }
+      return euros;
+    };
+    const datasets = seleccionadas.map((k,i)=>trendDataset(k, labelsRango.map(mes=>getVal(k,mes)), FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length]));
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:labelsRango, datasets }, options:reLineOptionsLegend(enPct, mostrarUltimoValor) });
+  } else if(typeId==='cajaTartaCategoria' || typeId==='cajaTartaSubcategoria'){
+    const cc = STATE.caja;
+    const mesesEnRango = cc.savedMonths.filter(m=>m.month>=desde.slice(0,7) && m.month<=hasta.slice(0,7));
+    const entry = mesesEnRango[mesesEnRango.length-1] || cc.savedMonths[cc.savedMonths.length-1];
+    if(!entry){ destroyChart(chartKey); return; }
+    const gastos = (entry.movements||[]).filter(m=>m.amount<0);
+    const porClave = {};
+    if(typeId==='cajaTartaCategoria'){ gastos.forEach(m=>{ const k=m.category||CAJA_UNCATEGORIZED; porClave[k]=(porClave[k]||0)+Math.abs(m.amount); }); }
+    else{ gastos.forEach(m=>{ const k=m.subcategory||m.category||CAJA_UNCATEGORIZED; porClave[k]=(porClave[k]||0)+Math.abs(m.amount); }); }
+    const claves = Object.keys(porClave).sort((a,b)=>porClave[b]-porClave[a]);
+    const valores = claves.map(k=>porClave[k]);
+    const total = valores.reduce((s,v)=>s+v,0)||1;
+    STATE.charts[chartKey] = safeNewChart(canvasId, {
+      type:'doughnut',
+      data:{ labels:claves, datasets:[{ data:valores, backgroundColor:claves.map((_,i)=>FRANJA_COLOR_PALETTE[i%FRANJA_COLOR_PALETTE.length]) }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:c.muted, boxWidth:10, font:{size:10}}},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+eur(Math.round(ctx.parsed*100))+' ('+(ctx.parsed/total*100).toFixed(1)+'%)' } },
+        datalabels:{ display:false } } }
+    });
+  } else if(typeId==='ebitdaEuros' || typeId==='ebitdaPct'){
+    await ensureDefaultPnlLines();
+    const lines = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+    const costHistory = buildCostHistoryMap();
+    const otherCostHistory = buildOtherCostHistoryMap();
+    const allSalesLinesPnl = getAllSalesLinesRaw();
+    const bucketsMes = monthBucketsInRange(desde, hasta);
+    const lineaEbitda = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
+    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Ventas');
+    let ebitdaPorMes;
+    if(lineaEbitda){
+      ebitdaPorMes = bucketsMes.map(b=>pnlLineValueForBucket(lineaEbitda, b, allSalesLinesPnl, costHistory, otherCostHistory));
+    } else {
+      ebitdaPorMes = bucketsMes.map(b=>{
+        let ti=0, tc=0;
+        lines.filter(l=>!l.esTitulo).forEach(l=>{
+          const v = pnlLineValueForBucket(l, b, allSalesLinesPnl, costHistory, otherCostHistory);
+          if(l.tipo==='ingreso') ti+=v; else tc+=v;
+        });
+        return ti-tc;
+      });
+    }
+    if(typeId==='ebitdaEuros'){
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:bucketsMes.map(b=>b.label), datasets:[trendDataset('EBITDA', ebitdaPorMes.map(v=>+v.toFixed(2)), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
+    } else {
+      const ventasPorMes = bucketsMes.map(b=> lineaVentas ? pnlLineValueForBucket(lineaVentas, b, allSalesLinesPnl, costHistory, otherCostHistory) : 0);
+      const pctPorMes = ebitdaPorMes.map((v,i)=> ventasPorMes[i]>0 ? +(v/ventasPorMes[i]*100).toFixed(1) : 0);
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:bucketsMes.map(b=>b.label), datasets:[trendDataset('EBITDA (% de Ventas)', pctPorMes, '#4C8272')] }, options:reLineOptions('pct', mostrarUltimoValor) });
+    }
   } else if(typeId==='perfFidelidadNueva'){
     const buckets = monthBucketsInRange(desde, hasta);
     const primera = computeNuevasFidelidad();
@@ -7263,6 +7345,7 @@ async function renderResumenEjecutivo(){
         <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
         <div class="no-print" style="display:flex;align-items:center;gap:8px;">
           ${w.typeId==='categoriasTendencia' ? '<button class="btn secondary" data-re-elegir-categorias="'+w.instanceId+'" style="padding:2px 8px;font-size:11px;">Elegir categorías</button>' : ''}
+          ${['cajaGastosCategoria','cajaGastosSubcategoria','cajaGastosProveedor'].includes(w.typeId) ? '<button class="btn secondary" data-re-toggle-pct="'+w.instanceId+'" style="padding:2px 8px;font-size:11px;">'+(w.verEnPct?'% Square':'€')+'</button>' : ''}
           <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);cursor:pointer;"><input type="checkbox" data-re-mostrar-ultimo="${w.instanceId}" ${w.mostrarUltimoValor?'checked':''}> Mostrar último valor</label>
           <button class="btn danger" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
@@ -7324,6 +7407,14 @@ async function renderResumenEjecutivo(){
       const ws = getReWidgets();
       const w = ws.find(x=>x.instanceId===id);
       if(w){ w.mostrarUltimoValor = chk.checked; setReWidgets(ws); renderResumenEjecutivo(); }
+    });
+  });
+  container.querySelectorAll('[data-re-toggle-pct]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-re-toggle-pct');
+      const ws = getReWidgets();
+      const w = ws.find(x=>x.instanceId===id);
+      if(w){ w.verEnPct = !w.verEnPct; setReWidgets(ws); renderResumenEjecutivo(); }
     });
   });
   container.querySelectorAll('[data-re-elegir-categorias]').forEach(btn=>{
@@ -7407,30 +7498,87 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const widgets = getReWidgets();
   let paginaActual = 1;
 
+  // paleta "informe profesional": fondo blanco, texto oscuro/gris, acento en cobre.
+  // 'times' (con serifa) para títulos, 'helvetica' para el resto — para diferenciar
+  // visualmente cabeceras de cuerpo de texto, un recurso habitual en informes editoriales.
+  const NEGRO = [30,26,22], GRIS = [110,102,92], GRIS_CLARO = [165,157,147], LINEA = [222,214,202], COBRE = [181,101,42], VERDE = [46,125,80], ROJO = [178,58,46];
+
+  toast('Generando PDF...');
+  STATE_pdfLightMode = true;
+  await renderResumenEjecutivo(); // redibuja todos los gráficos con colores claros, para capturarlos
+
   const cabecera = (pagina) => {
-    doc.setFillColor(23,19,15);
+    doc.setFillColor(255,255,255);
     doc.rect(0,0,W,H,'F');
-    doc.setTextColor(242,234,217); doc.setFont('helvetica','bold'); doc.setFontSize(16);
-    doc.text('The Miners Plaza de España', margin, margin+4);
-    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(167,154,133);
-    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta, margin, margin+10);
-    doc.setDrawColor(58,47,36);
-    doc.line(margin, margin+14, W-margin, margin+14);
-    doc.setFontSize(8); doc.setTextColor(120,110,95);
-    doc.text('Generado el '+hoy+'  ·  Página '+pagina, margin, H-margin+4);
+    doc.setFillColor(...COBRE);
+    doc.rect(0,0,W,2.2,'F'); // banda de acento arriba del todo
+    doc.setTextColor(...NEGRO); doc.setFont('times','bold'); doc.setFontSize(18);
+    doc.text('The Miners', margin, margin+6);
+    doc.setTextColor(...COBRE);
+    doc.text('Plaza de España', margin+doc.getTextWidth('The Miners ')+0, margin+6);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...GRIS);
+    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta, margin, margin+12.5);
+    doc.setDrawColor(...LINEA); doc.setLineWidth(0.4);
+    doc.line(margin, margin+16.5, W-margin, margin+16.5);
+    doc.setFontSize(8); doc.setTextColor(...GRIS_CLARO); doc.setFont('helvetica','normal');
+    doc.text('Generado el '+hoy+'  ·  Página '+pagina+' de {total_pages_count_string}', margin, H-margin+4);
+    doc.text('The Miners Plaza de España', W-margin, H-margin+4, {align:'right'});
   };
   const chartW = (W - margin*2 - 8)/2;
   const chartH = chartW*0.72;
-  const yInicio = margin+22;
+  const yInicio = margin+24;
   const yLimite = H-margin-10;
 
   cabecera(paginaActual);
   let y = yInicio;
   let colPendiente = null;
 
+  // --- Resumen de cifras clave del periodo (KPIs), antes de cualquier gráfico ---
+  const bucketsKpi = monthBucketsInRange(desde, hasta);
+  const resumenKpi = calcularResumenEjecutivo(bucketsKpi);
+  let ventasTotales=0, ticketsTotales=0;
+  bucketsKpi.forEach(b=>{ const r=resumenKpi[b.label]; ventasTotales+=r.ventas; ticketsTotales+=r.tickets; });
+  ventasTotales = ventasTotales/100;
+  const ticketMedioKpi = ticketsTotales>0 ? ventasTotales/ticketsTotales : 0;
+  let ebitdaTotal = 0;
+  try{
+    await ensureDefaultPnlLines();
+    const linesKpi = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
+    const allSalesLinesKpi = getAllSalesLinesRaw();
+    const costHistoryKpi = buildCostHistoryMap();
+    const otherCostHistoryKpi = buildOtherCostHistoryMap();
+    const lineaEbitdaKpi = linesKpi.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
+    bucketsKpi.forEach(b=>{
+      if(lineaEbitdaKpi){ ebitdaTotal += pnlLineValueForBucket(lineaEbitdaKpi, b, allSalesLinesKpi, costHistoryKpi, otherCostHistoryKpi); }
+      else{
+        let ti=0, tc=0;
+        linesKpi.filter(l=>!l.esTitulo).forEach(l=>{ const v=pnlLineValueForBucket(l, b, allSalesLinesKpi, costHistoryKpi, otherCostHistoryKpi); if(l.tipo==='ingreso') ti+=v; else tc+=v; });
+        ebitdaTotal += ti-tc;
+      }
+    });
+  }catch(e){ /* si el PNL no está listo por lo que sea, se omite el EBITDA del resumen sin romper el resto */ }
+
+  const kpis = [
+    { etiqueta:'Ventas totales', valor:eur(Math.round(ventasTotales*100)) },
+    { etiqueta:'Nº de tickets', valor:String(ticketsTotales) },
+    { etiqueta:'Ticket medio', valor:eur(Math.round(ticketMedioKpi*100)) },
+    { etiqueta:'Resultado (EBITDA)', valor:eur(Math.round(ebitdaTotal*100)), color: ebitdaTotal>=0?VERDE:ROJO },
+  ];
+  const kpiW = (W-margin*2-3*6)/4;
+  kpis.forEach((k,i)=>{
+    const kx = margin + i*(kpiW+6);
+    doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
+    doc.roundedRect(kx, y, kpiW, 20, 1.5, 1.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRIS);
+    doc.text(k.etiqueta.toUpperCase(), kx+5, y+7);
+    doc.setFont('times','bold'); doc.setFontSize(15); doc.setTextColor(...(k.color||NEGRO));
+    doc.text(k.valor, kx+5, y+16);
+  });
+  y += 28;
+
   const introduccion = (document.getElementById('reIntroduccion').value||'').trim();
   if(introduccion){
-    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(220,210,195);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...NEGRO);
     const lineasIntro = doc.splitTextToSize(introduccion, W-margin*2);
     doc.text(lineasIntro, margin, y+4);
     y += lineasIntro.length*5.5 + 10;
@@ -7450,9 +7598,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       if(colPendiente){ y += chartH + 16; colPendiente = null; } // cerrar la fila de gráficos a medias antes de meter el texto
       const textoPlano = (w.contenido||'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ').trim();
       if(!textoPlano) continue; // sección de título vacía: no se muestra en el PDF
-      doc.setFont('helvetica','bold'); doc.setFontSize(28);
+      doc.setFont('times','bold'); doc.setFontSize(20);
       const lineas = doc.splitTextToSize(textoPlano, W-margin*2);
-      const altoTexto = lineas.length*12 + 8;
+      const altoTexto = lineas.length*9 + 10;
       // además de la altura del propio título, se reserva sitio también para lo que
       // venga justo después (gráfico o PNL) — así el título nunca se queda solo al
       // final de una página con su contenido empezando en la siguiente.
@@ -7463,10 +7611,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       }
       if(y + altoTexto + altoSiguiente > yLimite) nuevaPagina();
       // OJO: nuevaPagina() dibuja la cabecera de la página nueva, que cambia el tamaño y
-      // color de letra activos (los deja en 8pt, del pie de página) — hay que volver a
-      // ponerlos aquí, justo antes de escribir, o el título sale con el tamaño del pie.
-      doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(242,234,217);
-      doc.text(lineas, margin, y+9);
+      // color de letra activos — hay que volver a ponerlos aquí, justo antes de escribir.
+      doc.setFont('times','bold'); doc.setFontSize(20); doc.setTextColor(...NEGRO);
+      doc.text(lineas, margin, y+8);
+      doc.setDrawColor(...COBRE); doc.setLineWidth(0.8);
+      doc.line(margin, y+altoTexto-4, margin+26, y+altoTexto-4);
       y += altoTexto;
       continue;
     }
@@ -7498,44 +7647,52 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const alturaTotal = 13 + (filasW.length+2)*filaAlto + 8;
       if(y + alturaTotal > yLimite) nuevaPagina();
 
-      doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(242,234,217);
+      doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
       doc.text('PNL — '+desdeW+' a '+hastaW, margin, y+5);
       y += 9;
 
-      doc.setFontSize(7); doc.setTextColor(167,154,133); doc.setFont('helvetica','normal');
+      doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
       doc.text('Línea', margin, y+3.5);
       bucketsW.forEach((b,i)=>{ doc.text(b.label, margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
       y += filaAlto;
-      doc.setDrawColor(58,47,36); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
+      doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
       y += 3;
 
-      doc.setFontSize(7); doc.setTextColor(220,210,195);
-      filasW.forEach(f=>{
+      doc.setFontSize(7);
+      filasW.forEach((f,fi)=>{
+        if(fi%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAncho+numCols*colAncho+4, filaAlto, 'F'); }
+        doc.setTextColor(...NEGRO);
         doc.text(f.nombre, margin+f.indent*3, y+3.5, { maxWidth: colNombreAncho-2 });
         f.values.forEach((v,i)=>{ doc.text(eur(Math.round(v*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
         y += filaAlto;
       });
-      doc.setDrawColor(58,47,36); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
+      doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
       y += 3;
-      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(242,234,217);
+      doc.setFont('times','bold'); doc.setFontSize(8);
+      doc.setTextColor(...COBRE);
       doc.text('Resultado', margin, y+3.5);
-      bucketsW.forEach((b,i)=>{ doc.text(eur(Math.round((totIng[i]-totCos[i])*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
+      bucketsW.forEach((b,i)=>{
+        const v = totIng[i]-totCos[i];
+        doc.setTextColor(...(v>=0?VERDE:ROJO));
+        doc.text(eur(Math.round(v*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'});
+      });
       y += filaAlto + 10;
       continue;
     }
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!colPendiente && y + chartH + 12 > yLimite) nuevaPagina();
     const x = colPendiente ? colPendiente.x : margin;
-    doc.setFontSize(13); doc.setTextColor(242,234,217); doc.setFont('helvetica','bold');
+    // tarjeta clara con un borde sutil, para que el gráfico quede "enmarcado"
+    doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
+    doc.roundedRect(x-3, y-2, chartW+6, chartH+15, 2, 2);
+    doc.setFontSize(11); doc.setTextColor(...NEGRO); doc.setFont('helvetica','bold');
     doc.text(type?type.label:'', x, y+5);
     doc.setFont('helvetica','normal');
     const chart = STATE.charts['reW_'+w.instanceId];
     if(chart){
       // se redimensiona el propio gráfico EXPLÍCITAMENTE al ancho apaisado que le toca en
       // el PDF justo antes de capturarlo (si no, sale con la proporción que tuviera en
-      // pantalla en ese momento, que depende del ancho de la ventana del navegador — a
-      // veces más estrecha, y entonces se ve comprimido) — y se devuelve a su tamaño
-      // normal justo después, para no dejar la pantalla descuadrada.
+      // pantalla en ese momento) — y se devuelve a su tamaño normal justo después.
       const pxPorMm = 3.78;
       chart.resize(Math.round(chartW*pxPorMm), Math.round(chartH*pxPorMm));
       chart.update('none');
@@ -7543,13 +7700,18 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       chart.resize();
       chart.update('none');
     }
-    else { doc.setDrawColor(58,47,36); doc.rect(x,y+9,chartW,chartH); }
+    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartW,chartH); }
 
     if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
     else { colPendiente = null; y += chartH + 16; }
   }
 
+  doc.putTotalPages('{total_pages_count_string}');
   doc.save('the-miners-resumen-ejecutivo-'+fechaLocalISO(new Date())+'.pdf');
+
+  STATE_pdfLightMode = false;
+  await renderResumenEjecutivo(); // devuelve los gráficos en pantalla a su tema oscuro normal
+  toast('PDF descargado ✓');
 });
 
 /* coste laboral total en un bucket (semana o mes): para cada semana con horas registradas,
@@ -7968,6 +8130,47 @@ async function renderPnl(){
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:cChart.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:cChart.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:cChart.grid} } } }
     });
     if(!selLinea.dataset.wired){ selLinea.addEventListener('change', renderPnl); selLinea.dataset.wired = '1'; }
+  }
+
+  // --- Evolución del EBITDA: siempre mensual, aunque la tabla esté en vista semanal ---
+  const ebitdaCanvas = document.getElementById('chartEbitdaEuros');
+  if(ebitdaCanvas){
+    const bucketsMes = monthBucketsInRange(desde, hasta);
+    const lineaEbitda = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
+    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Ventas');
+    let ebitdaPorMes;
+    if(lineaEbitda){
+      // hay una línea llamada exactamente "EBITDA" (ej. subida a mano con "Importar mi
+      // propio PNL") — se usa directamente, en vez de calcularla.
+      ebitdaPorMes = bucketsMes.map(b=>pnlLineValueForBucket(lineaEbitda, b, allSalesLines, costHistory, otherCostHistory));
+    } else {
+      // si no, se calcula como el Resultado de cada mes (todos los ingresos menos todos
+      // los costes), recalculado en mensual aunque la tabla esté en semanal.
+      ebitdaPorMes = bucketsMes.map(b=>{
+        let ti=0, tc=0;
+        lines.filter(l=>!l.esTitulo).forEach(l=>{
+          const v = pnlLineValueForBucket(l, b, allSalesLines, costHistory, otherCostHistory);
+          if(l.tipo==='ingreso') ti+=v; else tc+=v;
+        });
+        return ti-tc;
+      });
+    }
+    const ventasPorMes = bucketsMes.map(b=> lineaVentas ? pnlLineValueForBucket(lineaVentas, b, allSalesLines, costHistory, otherCostHistory) : 0);
+    const pctPorMes = ebitdaPorMes.map((v,i)=> ventasPorMes[i]>0 ? +(v/ventasPorMes[i]*100).toFixed(1) : 0);
+
+    const cEbitda = chartColors();
+    destroyChart('ebitdaEuros');
+    STATE.charts.ebitdaEuros = safeNewChart('chartEbitdaEuros', {
+      type: trendChartType(),
+      data:{ labels:bucketsMes.map(b=>b.label), datasets:[ trendDataset('EBITDA', ebitdaPorMes.map(v=>+v.toFixed(2)), cEbitda.copper) ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:cEbitda.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:cEbitda.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:cEbitda.grid} } } }
+    });
+    destroyChart('ebitdaPct');
+    STATE.charts.ebitdaPct = safeNewChart('chartEbitdaPct', {
+      type: trendChartType(),
+      data:{ labels:bucketsMes.map(b=>b.label), datasets:[ trendDataset('EBITDA (% de Ventas)', pctPorMes, '#4C8272') ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:cEbitda.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:cEbitda.muted, callback:v=>v+'%'}, grid:{color:cEbitda.grid} } } }
+    });
   }
 }
 
@@ -9196,6 +9399,46 @@ STATE.caja = {
 function cajaFmt(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n??0); }
 function cajaParseAmt(val){ if(typeof val==='number') return val; return parseFloat(String(val).replace(/\./g,'').replace(',','.'))||0; }
 function cajaISearch(needle, haystack){ if(!needle||!haystack) return false; return String(haystack).toLowerCase().includes(String(needle).toLowerCase()); }
+/* Decide la categoría automática de un movimiento (gasto o ingreso), con las mismas
+   reglas tanto si se acaba de subir un extracto nuevo como si se está revisando uno ya
+   guardado. "movement" solo necesita concept, amount y rawG (el campo de
+   beneficiario/ordenante, si se tiene). */
+function cajaCategorizarMovimiento(movement, personalList, catMap){
+  const searchTexts = [movement.concept, movement.rawG].filter(Boolean).map(String);
+  const amount = movement.amount;
+  const pMatch = amount>0 ? null : personalList.find(pe=>{
+    if(!pe.prov||pe.prov.length<3) return false;
+    if(!searchTexts.some(t=>cajaISearch(pe.prov,t))) return false;
+    // qty=0 (proveedores marcados como "siempre personal", sin importe concreto):
+    // basta con que coincida el nombre. Para cualquier otro valor (positivo o
+    // negativo), se exige ADEMÁS que el importe coincida (±1€) — así, un proveedor
+    // que a veces es gasto de negocio y a veces personal (ej. Amazon) no se marca
+    // entero como personal solo por el nombre.
+    if(pe.qty===0) return true;
+    return Math.abs(Math.abs(amount)-Math.abs(pe.qty))<=1;
+  });
+  if(pMatch&&pMatch.qty>0) return { category:'👤 Gasto personal socio', autoCat:true, isPersonalSocio:true };
+  if(pMatch&&pMatch.qty<0) return { category:CAJA_UNCATEGORIZED, autoCat:false, isAdelanto:true };
+  if(pMatch&&pMatch.qty===0) return { category:'👤 Gasto personal socio', autoCat:true, isPersonalSocio:true };
+
+  let category=null;
+  if(amount>=0){
+    // se comprueba primero si "aportación socio" aparece en CUALQUIER parte del texto
+    // (sin importar acentos/mayúsculas) — si no, con textos como "David García Casas ·
+    // Aportación socio" se cogía el nombre de la persona como categoría, en vez de
+    // reconocer que es una aportación de socio.
+    const normalizado = searchTexts.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(normalizado.includes('aportacion socio') || normalizado.includes('aportacion de socio') || normalizado.includes('aportacion socios')){
+      category = '💰 Aportacion socio';
+    } else {
+      const src = searchTexts.find(s=>s.trim().length>2) || 'Otros ingresos';
+      category = '💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
+    }
+  } else {
+    for(const {prov,cat} of catMap){ if(searchTexts.some(t=>cajaISearch(prov,t))){ category=cat; break; } }
+  }
+  return category ? { category, autoCat:true } : null;
+}
 function cajaRecompute(movements){
   const catT={}, incT={}, provT={};
   let exp=0, inc=0;
@@ -9444,37 +9687,12 @@ async function cajaProcess(){
       const fechaDia=dateObj?`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`:'';
       if(amount<0) rawGastos+=Math.abs(amount); else rawIngresos+=amount;
 
-      const pMatch = amount>0 ? null : personalList.find(pe=>{
-        if(!pe.prov||pe.prov.length<3) return false;
-        if(!searchTexts.some(t=>cajaISearch(pe.prov,t))) return false;
-        // valor 0 o positivo en el archivo personal: basta con que coincida el proveedor
-        // por nombre, no hace falta que el importe también coincida — un valor positivo
-        // ahí significa "todo lo de este proveedor es gasto personal socio", punto.
-        // Solo un valor NEGATIVO exige que el importe coincida (para detectar adelantos
-        // del socio a la empresa, donde sí importa el importe exacto).
-        if(pe.qty>=0) return true;
-        return Math.abs(Math.abs(amount)-Math.abs(pe.qty))<=1;
-      });
-      if(pMatch&&pMatch.qty>0){ movements.push({id:idx,concept,amount,month,fechaDia,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
-      if(pMatch&&pMatch.qty<0){ movements.push({id:idx,concept,amount,month,fechaDia,category:CAJA_UNCATEGORIZED,autoCat:false,isAdelanto:true,rawG:c1}); return; }
-      if(pMatch&&pMatch.qty===0){ movements.push({id:idx,concept,amount,month,fechaDia,category:'👤 Gasto personal socio',autoCat:true,isPersonalSocio:true,rawG:c1}); return; }
-
-      let category=null;
-      if(amount>=0){
-        // se comprueba primero si "aportación socio" aparece en CUALQUIER parte del
-        // texto (sin importar acentos/mayúsculas) — si no, con textos como "David García
-        // Casas · Aportación socio" se cogía el nombre de la persona como categoría, en
-        // vez de reconocer que es una aportación de socio.
-        const normalizado = searchTexts.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        if(normalizado.includes('aportacion socio') || normalizado.includes('aportacion de socio') || normalizado.includes('aportacion socios')){
-          category = '💰 Aportacion socio';
-        } else {
-          const src=[c1,c2,String(row['CONCEPTO']||'')].find(s=>s.trim().length>2)||'Otros ingresos';
-          category='💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
-        }
-      } else {
-        for(const {prov,cat} of catMap){ if(searchTexts.some(t=>cajaISearch(prov,t))){ category=cat; break; } }
+      const pCat = cajaCategorizarMovimiento({ concept, amount, rawG:c1 }, personalList, catMap);
+      if(pCat && (pCat.isPersonalSocio || pCat.isAdelanto)){
+        movements.push({id:idx,concept,amount,month,fechaDia,category:pCat.category,autoCat:pCat.autoCat,isPersonalSocio:pCat.isPersonalSocio,isAdelanto:pCat.isAdelanto,rawG:c1});
+        return;
       }
+      const category = pCat ? pCat.category : null;
       const needsManualCat=category===null&&amount<0;
       let subcategory='';
       for(const {prov,subcat} of c.savedSubcats){ if(subcat && searchTexts.some(t=>cajaISearch(prov,t))){ subcategory=subcat; break; } }
@@ -9901,7 +10119,18 @@ function renderCajaBalancesTab(el){
   const c = STATE.caja;
   if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
   if(c.savedMonths.length===0){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">No hay balances guardados.</p>'; return; }
-  el.innerHTML = [...c.savedMonths].reverse().map(m=>{
+  const revisionHtml = `
+    <div class="card" style="margin-bottom:20px;border:1px solid var(--copper);">
+      <h3>Revisar categorización de balances ya guardados</h3>
+      <p class="hint" style="margin-bottom:10px;">Vuelve a comprobar, con las reglas actuales, si algún movimiento de tus balances ya guardados debería ser "Gasto personal socio" o "Aportación socio" y no lo está — por ejemplo, si estas reglas se han mejorado después de guardar ese balance. No toca ninguna otra categoría.</p>
+      <p class="hint" style="margin-bottom:10px;">Si quieres que también revise proveedores personales con un importe concreto (no solo los marcados como "siempre personal"), sube aquí ese mismo archivo — opcional, la revisión de "Aportación socio" funciona igual sin él.</p>
+      <div class="subfilter" style="margin-bottom:10px;">
+        <input type="file" id="cajaRevisionPersonalFile" accept=".csv,.xlsx,.xls">
+        <button class="btn secondary" id="cajaRevisarBtn">Revisar todos los balances</button>
+      </div>
+      <div id="cajaRevisionResultado"></div>
+    </div>`;
+  el.innerHTML = revisionHtml + [...c.savedMonths].reverse().map(m=>{
     const bal = m.totalIncome + m.totalExpense;
     const hayDiferencia = Math.abs(m.diferenciaSocios||0)>=0.005;
     return `<div class="card" style="margin-bottom:12px;">
@@ -10001,6 +10230,78 @@ function renderCajaBalancesTab(el){
       renderCajaTabContent();
     });
   });
+  document.getElementById('cajaRevisarBtn').addEventListener('click', cajaRevisarCategorizacion);
+}
+let cajaRevisionCambios = [];
+async function cajaRevisarCategorizacion(){
+  const c = STATE.caja;
+  const resEl = document.getElementById('cajaRevisionResultado');
+  resEl.innerHTML = '<p class="hint">Revisando...</p>';
+  const catMap = c.savedProviders;
+  const alwaysPersonal = c.savedPersonalProvs.map(prov=>({prov,qty:0}));
+  let personalFromFile = [];
+  const fileInput = document.getElementById('cajaRevisionPersonalFile');
+  if(fileInput && fileInput.files[0]){
+    try{
+      const rows = await cajaParseSheet(fileInput.files[0], 1);
+      personalFromFile = rows.map(r=>{
+        const k=Object.keys(r);
+        const prov=String(r['Proveedor']||r['proveedor']||r[k[0]]||'').replace(/[\r\n\t]/g,' ').replace(/\s+/g,' ').trim();
+        const qty=cajaParseAmt(r['Cantidad']||r['cantidad']||r['Importe']||r['importe']||r[k[1]]||0);
+        return {prov,qty};
+      }).filter(p=>p.prov);
+    }catch(e){ toast('No se pudo leer el archivo de proveedores personales: '+e.message, true); }
+  }
+  const personalList = [...personalFromFile, ...alwaysPersonal.filter(ap=>!personalFromFile.some(p=>p.prov.toLowerCase()===ap.prov.toLowerCase()))];
+
+  cajaRevisionCambios = [];
+  c.savedMonths.forEach(entry=>{
+    (entry.movements||[]).forEach(m=>{
+      if(m.isRecategorizacionSocio) return; // no revisar las lineas sinteticas que genera la propia simplificacion
+      const sugerido = cajaCategorizarMovimiento(m, personalList, catMap);
+      if(!sugerido) return;
+      const esCambioRelevante = (sugerido.category==='💰 Aportacion socio' || sugerido.category==='👤 Gasto personal socio') && sugerido.category!==m.category;
+      if(esCambioRelevante){
+        cajaRevisionCambios.push({ month:entry.month, title:entry.title, movementId:m.id, concept:m.concept, amount:m.amount, categoriaActual:m.category, categoriaSugerida:sugerido.category });
+      }
+    });
+  });
+
+  if(cajaRevisionCambios.length===0){
+    resEl.innerHTML = '<p class="hint" style="color:var(--positive);">Revisado — no se ha encontrado ningún movimiento que debiera cambiar de categoría.</p>';
+    return;
+  }
+  resEl.innerHTML = `<p class="hint" style="margin-bottom:8px;">Se han encontrado ${cajaRevisionCambios.length} movimiento(s) que, con las reglas actuales, deberían cambiar de categoría:</p>
+    <div style="max-height:300px;overflow:auto;margin-bottom:10px;">
+      <table><thead><tr><th>Mes</th><th>Concepto</th><th>Importe</th><th>Categoría actual</th><th>Categoría sugerida</th></tr></thead>
+      <tbody>${cajaRevisionCambios.map(ch=>`<tr><td>${ch.title||ch.month}</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ch.concept}</td><td class="num">${cajaFmt(ch.amount)}</td><td class="hint">${ch.categoriaActual}</td><td style="color:var(--positive);">${ch.categoriaSugerida}</td></tr>`).join('')}</tbody></table>
+    </div>
+    <button class="btn" id="cajaAplicarRevisionBtn">Aplicar estas ${cajaRevisionCambios.length} correcciones</button>`;
+  document.getElementById('cajaAplicarRevisionBtn').addEventListener('click', cajaAplicarRevisionCategorizacion);
+}
+async function cajaAplicarRevisionCategorizacion(){
+  const c = STATE.caja;
+  const resEl = document.getElementById('cajaRevisionResultado');
+  const porMes = {};
+  cajaRevisionCambios.forEach(ch=>{ (porMes[ch.month]=porMes[ch.month]||[]).push(ch); });
+  Object.keys(porMes).forEach(month=>{
+    const entry = c.savedMonths.find(x=>x.month===month);
+    if(!entry) return;
+    porMes[month].forEach(ch=>{
+      const mov = (entry.movements||[]).find(m=>m.id===ch.movementId);
+      if(mov) mov.category = ch.categoriaSugerida;
+      if(entry.movementsOriginal){
+        const movOrig = entry.movementsOriginal.find(m=>m.id===ch.movementId);
+        if(movOrig) movOrig.category = ch.categoriaSugerida;
+      }
+    });
+    aplicarSimplificacionSocios(entry);
+  });
+  await cajaSet('months', c.savedMonths);
+  cajaRevisionCambios = [];
+  resEl.innerHTML = '<p class="hint" style="color:var(--positive);">Correcciones aplicadas ✓</p>';
+  toast('Categorías corregidas en '+Object.keys(porMes).length+' balance(s).');
+  renderCajaTabContent();
 }
 
 function renderCajaProveedoresTab(el){
@@ -10215,15 +10516,14 @@ function cajaDetalleCatData(){
   if(!c.savedMonths.length) return {months:[], cats:[], table:{}};
   const months = c.savedMonths.map(m=>m.title||m.month);
   const catSet = new Set();
-  c.savedMonths.forEach(m=>(m.catData||[]).forEach(x=>catSet.add(x.name)));
+  c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
   const cats = [...catSet].sort();
   const table = {};
   cats.forEach(cat=>{
     table[cat] = {};
     c.savedMonths.forEach(m=>{
       const totalGasto = Math.abs(m.totalExpense)||1;
-      const found = (m.catData||[]).find(x=>x.name===cat);
-      const euros = found?.value||0;
+      const euros = (m.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
       table[cat][m.title||m.month] = { euros, pct: +(euros/totalGasto*100).toFixed(1) };
     });
   });
