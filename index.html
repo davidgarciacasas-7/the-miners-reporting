@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.152</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.155</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9516,8 +9516,13 @@ function aplicarSimplificacionSocios(entry){
   // (movementsOriginal) solo se necesita, y solo se guarda, cuando la simplificación SÍ
   // está activa (para poder recalcular el reparto sin perder el detalle original).
   if(!entry.simplificarSocios){
+    // OJO: si hubo una simplificación activa antes, entry.movements podría ser YA la
+    // versión transformada (sin las categorías por separado) — hay que restaurar desde
+    // movementsOriginal PRIMERO, y solo si no existe (nunca se activó) usar
+    // entry.movements directamente, que en ese caso sí es la versión de verdad.
+    const base = entry.movementsOriginal || entry.movements;
     entry.movementsOriginal = null;
-    const base = entry.movements;
+    entry.movements = base;
     entry.totalGastoPersonalSocio = base.filter(m=>m.category==='👤 Gasto personal socio').reduce((s,m)=>s+Math.abs(m.amount),0);
     entry.totalAportacionSocio = base.filter(m=>m.category==='💰 Aportacion socio').reduce((s,m)=>s+m.amount,0);
     entry.diferenciaSocios = entry.totalAportacionSocio - entry.totalGastoPersonalSocio;
@@ -10066,6 +10071,9 @@ function renderCajaMovimientosTab(el){
   else if(c.sortMovimientos==='asc') filtered = [...filtered].sort((a,b)=>a.amount-b.amount);
   const pendingCount = Object.keys(c.pending).length;
   const flechaOrden = c.sortMovimientos==='desc' ? ' ▼' : (c.sortMovimientos==='asc' ? ' ▲' : '');
+  const totalFiltrado = filtered.reduce((s,m)=>s+m.amount,0);
+  const totalIngresosFiltrado = filtered.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0);
+  const totalGastosFiltrado = filtered.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
   el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="text" id="cajaBuscarInput" placeholder="Buscar…" value="${c.search}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;width:100%;max-width:340px;">
@@ -10083,6 +10091,11 @@ function renderCajaMovimientosTab(el){
         <input type="number" step="0.01" min="0" id="cajaImporteMax" placeholder="Importe máx. €" value="${c.importeMax}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;width:120px;">
       </div>
       ${pendingCount>0?`<button class="btn" id="cajaAplicarBtn2">Aplicar ${pendingCount} cambio${pendingCount>1?'s':''}</button>`:''}
+    </div>
+    <div class="card" style="padding:10px 16px;margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+      <span class="hint">${filtered.length} movimiento${filtered.length!==1?'s':''} en pantalla ${c.categoriaFiltro?'· "'+c.categoriaFiltro+'"':''}</span>
+      ${totalIngresosFiltrado>0 && totalGastosFiltrado<0 ? `<span style="color:var(--positive);font-weight:700;font-family:monospace;">↑ ${cajaFmt(totalIngresosFiltrado)}</span><span style="color:var(--negative);font-weight:700;font-family:monospace;">↓ ${cajaFmt(Math.abs(totalGastosFiltrado))}</span>` : ''}
+      <span style="font-weight:700;font-family:monospace;color:${totalFiltrado>=0?'var(--positive)':'var(--negative)'};">Total: ${cajaFmt(totalFiltrado)}</span>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
       <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th></tr></thead>
@@ -10129,6 +10142,11 @@ function renderCajaBalancesTab(el){
         <button class="btn secondary" id="cajaRevisarBtn">Revisar todos los balances</button>
       </div>
       <div id="cajaRevisionResultado"></div>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <h3>Descargar historial de "Gasto personal socio" y "Aportación socio"</h3>
+      <p class="hint" style="margin-bottom:10px;">No es posible descargar los archivos originales que subiste (la app no los guarda, solo el resultado ya procesado) — pero aquí tienes un Excel con todos los movimientos de estas dos categorías, de todos los meses guardados, en una sola hoja.</p>
+      <button class="btn secondary" id="cajaExportarSociosBtn">Descargar Excel</button>
     </div>`;
   el.innerHTML = revisionHtml + [...c.savedMonths].reverse().map(m=>{
     const bal = m.totalIncome + m.totalExpense;
@@ -10231,6 +10249,24 @@ function renderCajaBalancesTab(el){
     });
   });
   document.getElementById('cajaRevisarBtn').addEventListener('click', cajaRevisarCategorizacion);
+  document.getElementById('cajaExportarSociosBtn').addEventListener('click', cajaExportarSocios);
+}
+function cajaExportarSocios(){
+  const c = STATE.caja;
+  const filas = [];
+  c.savedMonths.forEach(entry=>{
+    (entry.movements||[]).forEach(m=>{
+      if(m.category==='👤 Gasto personal socio' || m.category==='💰 Aportacion socio'){
+        filas.push({ Mes: entry.title||entry.month, Fecha: m.fechaDia||'', Concepto: m.concept, Categoría: m.category, Importe: m.amount });
+      }
+    });
+  });
+  if(filas.length===0){ toast('No hay ningún movimiento de estas categorías en tus balances guardados.', true); return; }
+  filas.sort((a,b)=> a.Mes.localeCompare(b.Mes) || (a.Fecha||'').localeCompare(b.Fecha||''));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Gasto y Aportación socio');
+  XLSX.writeFile(wb, 'the-miners-gasto-aportacion-socio.xlsx');
+  toast('Excel descargado ✓');
 }
 let cajaRevisionCambios = [];
 async function cajaRevisarCategorizacion(){
