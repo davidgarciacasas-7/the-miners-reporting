@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.155</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.157</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9404,7 +9404,7 @@ function cajaISearch(needle, haystack){ if(!needle||!haystack) return false; ret
    guardado. "movement" solo necesita concept, amount y rawG (el campo de
    beneficiario/ordenante, si se tiene). */
 function cajaCategorizarMovimiento(movement, personalList, catMap){
-  const searchTexts = [movement.concept, movement.rawG].filter(Boolean).map(String);
+  const searchTexts = [movement.concept, movement.rawG, movement.rawConcepto].filter(Boolean).map(String);
   const amount = movement.amount;
   const pMatch = amount>0 ? null : personalList.find(pe=>{
     if(!pe.prov||pe.prov.length<3) return false;
@@ -9692,7 +9692,7 @@ async function cajaProcess(){
       const fechaDia=dateObj?`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`:'';
       if(amount<0) rawGastos+=Math.abs(amount); else rawIngresos+=amount;
 
-      const pCat = cajaCategorizarMovimiento({ concept, amount, rawG:c1 }, personalList, catMap);
+      const pCat = cajaCategorizarMovimiento({ concept, amount, rawG:c1, rawConcepto:String(row['CONCEPTO']||'') }, personalList, catMap);
       if(pCat && (pCat.isPersonalSocio || pCat.isAdelanto)){
         movements.push({id:idx,concept,amount,month,fechaDia,category:pCat.category,autoCat:pCat.autoCat,isPersonalSocio:pCat.isPersonalSocio,isAdelanto:pCat.isAdelanto,rawG:c1});
         return;
@@ -9829,7 +9829,7 @@ function attachCajaCatSelectHandlers(container){
   });
 }
 
-function cajaApplyPending(){
+async function cajaApplyPending(){
   const c = STATE.caja;
   if(!c.data || !Object.keys(c.pending).length) return;
   const updated = c.data.movements.map(m=> c.pending[m.id] ? {...m, category:c.pending[m.id], autoCat:false, needsManualCat:false} : m);
@@ -9839,7 +9839,20 @@ function cajaApplyPending(){
   c.savedCats = sc; cajaSet('cats', sc);
   c.pending = {};
   c.data = { ...c.data, movements:updated, ...cajaRecompute(updated) };
-  renderCaja();
+  // si este mes ya estaba guardado de antes (lo estás editando, no creándolo desde cero),
+  // "Aplicar cambios" también lo guarda directamente en la base de datos — si no, el
+  // cambio solo se quedaba en memoria hasta pulsar un "Guardar" aparte que no era
+  // evidente, y se perdía si se salía de la pantalla sin pulsarlo.
+  const mo = c.balanceMonth || String(new Date().getMonth()+1).padStart(2,'0');
+  const yr = c.balanceYear || String(new Date().getFullYear());
+  const monthKey = `${yr}-${mo.padStart(2,'0')}`;
+  const yaGuardado = c.savedMonths.some(m=>m.month===monthKey);
+  if(yaGuardado){
+    await cajaSaveMonth();
+    toast('Cambios aplicados y guardados ✓');
+  } else {
+    renderCaja();
+  }
 }
 function cajaAddManualCost(){
   const c = STATE.caja;
