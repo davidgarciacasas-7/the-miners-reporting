@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.157</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.158</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -10125,7 +10125,13 @@ function renderCajaMovimientosTab(el){
       ${filtered.length===0?`<p class="hint" style="padding:40px 0;text-align:center;">Sin resultados</p>`:''}
     </div>`;
   attachCajaCatSelectHandlers(el);
-  document.getElementById('cajaBuscarInput').addEventListener('input', (e)=>{ c.search=e.target.value; renderCajaTabContent(); });
+  document.getElementById('cajaBuscarInput').addEventListener('input', (e)=>{
+    c.search=e.target.value;
+    const cursorPos = e.target.selectionStart;
+    renderCajaTabContent();
+    const newInput = document.getElementById('cajaBuscarInput');
+    if(newInput){ newInput.focus(); newInput.setSelectionRange(cursorPos, cursorPos); }
+  });
   document.getElementById('cajaTipoFiltro').addEventListener('change', (e)=>{ c.tipoFiltro=e.target.value; renderCajaTabContent(); });
   document.getElementById('cajaCategoriaFiltro').addEventListener('change', (e)=>{ c.categoriaFiltro=e.target.value; renderCajaTabContent(); });
   document.getElementById('cajaImporteMin').addEventListener('change', (e)=>{ c.importeMin=e.target.value; renderCajaTabContent(); });
@@ -10380,7 +10386,11 @@ function renderCajaProveedoresTab(el){
         <td><button class="btn danger" data-del-prov="${i}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
       `).join('')}</tbody></table>
     </div>`}
+    <div class="section-title" style="margin-top:26px;">Gestionar categorías</div>
+    <p class="hint" style="margin-bottom:10px;">Todas las categorías que existen (usadas en algún movimiento, o simplemente guardadas en la lista). Borrar una categoría de aquí también recategoriza como "Sin categorizar" cualquier movimiento que la tuviera, en todos tus balances guardados.</p>
+    <div id="cajaGestionarCategorias" class="card"></div>
   `;
+  renderCajaGestionarCategorias();
   document.getElementById('cajaAddPersonalProvBtn').addEventListener('click', ()=>{
     const v = document.getElementById('cajaNuevoPersonalProv').value.trim().toLowerCase();
     if(v && !c.savedPersonalProvs.includes(v)){ c.savedPersonalProvs=[...c.savedPersonalProvs,v]; cajaSet('personal_provs', c.savedPersonalProvs); renderCajaTabContent(); }
@@ -10402,6 +10412,47 @@ function renderCajaProveedoresTab(el){
     c.savedProviders = c.savedProviders.filter((_,j)=>j!==i);
     cajaSet('providers', c.savedProviders); renderCajaTabContent();
   }));
+}
+function renderCajaGestionarCategorias(){
+  const c = STATE.caja;
+  const cont = document.getElementById('cajaGestionarCategorias');
+  if(!cont) return;
+  // se listan todas las categorías conocidas: las guardadas en la lista, y también
+  // cualquiera que esté en uso en algún movimiento de algún balance guardado, aunque no
+  // esté en la lista guardada (por si acaso).
+  const usoPorCategoria = {};
+  c.savedMonths.forEach(m=>(m.movements||[]).forEach(mv=>{
+    if(!mv.category || mv.category===CAJA_UNCATEGORIZED) return;
+    usoPorCategoria[mv.category] = (usoPorCategoria[mv.category]||0)+1;
+  }));
+  const todas = [...new Set([...c.savedCats.ingresos, ...c.savedCats.gastos, ...Object.keys(usoPorCategoria)])].sort((a,b)=>a.localeCompare(b,'es'));
+  if(todas.length===0){ cont.innerHTML = '<p class="hint">Sin categorías todavía.</p>'; return; }
+  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
+    ${todas.map(cat=>`<span class="pill noident" style="display:inline-flex;align-items:center;gap:6px;">${cat} <span class="hint">(${usoPorCategoria[cat]||0})</span> <button class="btn danger" data-del-categoria="${cat.replace(/"/g,'&quot;')}" style="padding:1px 6px;font-size:10px;">✕</button></span>`).join('')}
+  </div>`;
+  cont.querySelectorAll('[data-del-categoria]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const cat = btn.getAttribute('data-del-categoria');
+      const usos = usoPorCategoria[cat]||0;
+      const confirmMsg = usos>0
+        ? '¿Eliminar la categoría "'+cat+'"? Se usa en '+usos+' movimiento(s) en tus balances guardados — pasarán a "Sin categorizar". No se puede deshacer.'
+        : '¿Eliminar la categoría "'+cat+'" de la lista? No se usa en ningún movimiento guardado ahora mismo.';
+      if(!confirm(confirmMsg)) return;
+      c.savedCats = { gastos: c.savedCats.gastos.filter(x=>x!==cat), ingresos: c.savedCats.ingresos.filter(x=>x!==cat) };
+      await cajaSet('cats', c.savedCats);
+      if(usos>0){
+        c.savedMonths.forEach(m=>{
+          let cambio = false;
+          (m.movements||[]).forEach(mv=>{ if(mv.category===cat){ mv.category = CAJA_UNCATEGORIZED; cambio=true; } });
+          if(m.movementsOriginal){ m.movementsOriginal.forEach(mv=>{ if(mv.category===cat) mv.category = CAJA_UNCATEGORIZED; }); }
+          if(cambio) aplicarSimplificacionSocios(m);
+        });
+        await cajaSet('months', c.savedMonths);
+      }
+      toast('Categoría "'+cat+'" eliminada'+(usos>0?' — '+usos+' movimiento(s) recategorizados como "Sin categorizar".':'.'));
+      renderCajaTabContent();
+    });
+  });
 }
 
 function cajaPeriodoFiltrado(grafPeriod, grafFrom, grafTo){
