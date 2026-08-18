@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.163</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.165</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9887,9 +9887,14 @@ async function cajaSaveMonth(){
   // (campo .month, desde la fecha valor) — aquí se agrupan y cada uno va a su balance
   // correspondiente, en vez de forzarlos todos al mes elegido arriba.
   const porMes = {};
-  c.data.movements.forEach(m=>{ (porMes[m.month||monthPrincipal] = porMes[m.month||monthPrincipal]||[]).push(m); });
-  const mesesEncontrados = Object.keys(porMes).filter(k=>k!=='Sin fecha').sort();
-  const otrosMeses = mesesEncontrados.filter(k=>k!==monthPrincipal);
+  c.data.movements.forEach(m=>{
+    // si no se ha podido reconocer la fecha de un movimiento ('Sin fecha'), se queda en
+    // el mes que has elegido arriba — antes se agrupaba bajo la clave "Sin fecha" y
+    // se descartaba sin guardarse en ningún sitio, perdiéndose en silencio.
+    const clave = (!m.month || m.month==='Sin fecha') ? monthPrincipal : m.month;
+    (porMes[clave] = porMes[clave]||[]).push(m);
+  });
+  const otrosMeses = Object.keys(porMes).filter(k=>k!==monthPrincipal).sort();
 
   function guardarComoPrincipal(mesesMovs, month, esElPrincipal){
     const title = `${CAJA_MESES[parseInt(month.split('-')[1],10)]} ${month.split('-')[0]}`;
@@ -10021,7 +10026,7 @@ function renderCajaCheckBarsKpis(){
     ['Gasto Total', cajaFmt(Math.abs(c.data.totalExpense)), 'var(--copper)'],
     ['Ingresos', cajaFmt(c.data.totalIncome), 'var(--positive)'],
     ['Balance', cajaFmt(bal), bal>=0?'var(--positive)':'var(--negative)'],
-    ['Movimientos', c.data.movements.length, 'var(--text)'],
+    ['Movimientos', c.data.movements.length, '#241B12'],
     ['A categorizar', toCatCount, toCatCount>0?'var(--copper)':'var(--positive)'],
   ];
   kpiEl.innerHTML = kpis.map(([l,v,col])=>`<div class="stub"><div class="label">${l}</div><div class="value" style="color:${col};">${v}</div></div>`).join('');
@@ -10351,8 +10356,11 @@ async function cajaCorregirReparto(month){
   // ningún archivo, porque cada movimiento ya lleva grabado su propio mes real.
   const base = entry.movementsOriginal || entry.movements;
   const porMes = {};
-  base.forEach(mv=>{ (porMes[mv.month||month] = porMes[mv.month||month]||[]).push(mv); });
-  const otrosMeses = Object.keys(porMes).filter(k=>k!==month && k!=='Sin fecha');
+  base.forEach(mv=>{
+    const clave = (!mv.month || mv.month==='Sin fecha') ? month : mv.month;
+    (porMes[clave] = porMes[clave]||[]).push(mv);
+  });
+  const otrosMeses = Object.keys(porMes).filter(k=>k!==month);
   if(otrosMeses.length===0){ toast('Este balance no tiene movimientos de otro mes.'); return; }
 
   function construirEntry(movs, mesEntry, plantilla){
