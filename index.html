@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.162</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.163</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -10007,7 +10007,14 @@ function renderCajaCheckBarsKpis(){
       <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;"><span class="hint">Extracto: <b style="color:var(--text);">${cajaFmt(total)}</b></span><span class="hint">Contabilizado: <b style="color:var(--text);">${cajaFmt(accounted)}</b></span></div>
     </div>`;
   };
-  checkEl.innerHTML = barra('Gastos', c.data.rawGastos, cajaAccG()) + barra('Ingresos', c.data.rawIngresos, cajaAccI());
+  // rawGastos/rawIngresos solo existen durante la sesión de subida de un archivo nuevo
+  // (son los totales que el propio extracto va acumulando mientras se procesa) — si no
+  // están (por ejemplo, viendo o editando un balance ya guardado), esta barra de "cuánto
+  // llevas categorizado" no tiene sentido y no debe mostrarse, para no salir con "NaN €".
+  // Los KPIs de abajo sí se calculan siempre, vengan o no de una sesión de subida.
+  checkEl.innerHTML = (c.data.rawGastos!==undefined && c.data.rawIngresos!==undefined)
+    ? barra('Gastos', c.data.rawGastos, cajaAccG()) + barra('Ingresos', c.data.rawIngresos, cajaAccI())
+    : '';
   const toCatCount = cajaToCat().gastos.length + cajaToCat().ingresos.length;
   const bal = c.data.totalIncome + c.data.totalExpense;
   const kpis = [
