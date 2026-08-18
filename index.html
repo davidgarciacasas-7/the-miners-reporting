@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.158</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.162</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9357,6 +9357,10 @@ const CAJA_UNCATEGORIZED = '❓ A categorizar';
 const CAJA_SQUARE_KEYWORD = 'SQUAREUP INTERNATIONAL LIMITED';
 const CAJA_CHART_PALETTE = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968','#6B7A63','#8C5E3C','#4A7062','#C99A6B','#5A5548'];
 const CAJA_MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function cajaNombreMes(ym){
+  const [y,m] = String(ym).split('-');
+  return CAJA_MESES[parseInt(m,10)]+' '+y;
+}
 
 STATE.caja = {
   files: { bank:null, personal:null, providers:null },
@@ -9733,9 +9737,14 @@ function cajaIncCatOpts(){
 }
 
 function cajaCatSelectHtml(id, currentValue, options, placeholder){
+  // si el valor actual (por ejemplo, una categoría recién creada a mano) no está todavía
+  // en la lista de opciones conocidas, se añade aquí — si no, el <select> no tiene
+  // ninguna opción que coincida y el navegador la muestra vacía, aunque por dentro sí
+  // esté guardada correctamente. Parece confuso, como si no hubiera pasado nada.
+  const opcionesFinal = currentValue && !options.includes(currentValue) ? [...options, currentValue] : options;
   return `<select data-cat-select="${id}" style="background:var(--bg);border:1px solid ${currentValue?'var(--positive)':'var(--line)'};border-radius:6px;color:${currentValue?'var(--text)':'var(--text-muted)'};font-size:12px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px;">
     <option value="">${placeholder||'— seleccionar —'}</option>
-    ${options.map(o=>`<option value="${o}" ${o===currentValue?'selected':''}>${o}</option>`).join('')}
+    ${opcionesFinal.map(o=>`<option value="${o}" ${o===currentValue?'selected':''}>${o}</option>`).join('')}
     <option value="__new__">+ Nueva categoría…</option>
   </select>`;
 }
@@ -9870,20 +9879,60 @@ async function cajaSaveMonth(){
   if(!c.data) return;
   const mo = c.balanceMonth || String(new Date().getMonth()+1).padStart(2,'0');
   const yr = c.balanceYear || String(new Date().getFullYear());
-  const month = `${yr}-${mo.padStart(2,'0')}`;
-  const title = `${CAJA_MESES[parseInt(mo,10)]} ${yr}`;
-  const sqInc = c.data.movements.filter(m=>{ if(m.amount<0) return false; const tt=[m.rawG,m.concept,m.category].filter(Boolean); return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t)); }).reduce((s,m)=>s+m.amount,0);
-  const entry = { month, title, savedAt:new Date().toISOString(), movements:c.data.movements, catData:c.data.catData, incomeCatData:c.data.incomeCatData, totalExpense:c.data.totalExpense, totalIncome:c.data.totalIncome, rawGastos:c.data.rawGastos, rawIngresos:c.data.rawIngresos, squareIncome:sqInc, simplificarSocios:c.data.simplificarSocios, categoriaDiferenciaSocios:c.data.categoriaDiferenciaSocios, recategorizacionesSocios:c.data.recategorizacionesSocios };
-  // recalcular aquí mismo los totales de "Gasto personal socio"/"Aportación socio" (y
-  // aplicar la simplificación si estaba activada para este mes) — si no, se quedan a 0
-  // hasta la próxima vez que se recargue toda la página.
-  aplicarSimplificacionSocios(entry);
-  const updated = [...c.savedMonths.filter(m=>m.month!==month), entry].sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
+  const monthPrincipal = `${yr}-${mo.padStart(2,'0')}`;
+
+  // los movimientos de un extracto no siempre pertenecen todos al mismo mes: el propio
+  // banco a veces incluye, al principio o al final, algún movimiento cuya fecha valor cae
+  // en el mes anterior o siguiente. Cada movimiento ya lleva su propio mes calculado
+  // (campo .month, desde la fecha valor) — aquí se agrupan y cada uno va a su balance
+  // correspondiente, en vez de forzarlos todos al mes elegido arriba.
+  const porMes = {};
+  c.data.movements.forEach(m=>{ (porMes[m.month||monthPrincipal] = porMes[m.month||monthPrincipal]||[]).push(m); });
+  const mesesEncontrados = Object.keys(porMes).filter(k=>k!=='Sin fecha').sort();
+  const otrosMeses = mesesEncontrados.filter(k=>k!==monthPrincipal);
+
+  function guardarComoPrincipal(mesesMovs, month, esElPrincipal){
+    const title = `${CAJA_MESES[parseInt(month.split('-')[1],10)]} ${month.split('-')[0]}`;
+    const sqInc = mesesMovs.filter(m=>{ if(m.amount<0) return false; const tt=[m.rawG,m.concept,m.category].filter(Boolean); return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t)); }).reduce((s,m)=>s+m.amount,0);
+    const recomputado = cajaRecompute(mesesMovs);
+    const entry = { month, title, savedAt:new Date().toISOString(), movements:mesesMovs, catData:recomputado.catData, incomeCatData:recomputado.incomeCatData, totalExpense:recomputado.totalExpense, totalIncome:recomputado.totalIncome, squareIncome:sqInc };
+    if(esElPrincipal){ entry.simplificarSocios=c.data.simplificarSocios; entry.categoriaDiferenciaSocios=c.data.categoriaDiferenciaSocios; entry.recategorizacionesSocios=c.data.recategorizacionesSocios; }
+    aplicarSimplificacionSocios(entry);
+    return entry;
+  }
+
+  // el mes principal (el que se eligió arriba) siempre SUSTITUYE lo que hubiera antes —
+  // igual que hacía ya, para poder volver a subir y corregir un mes sin duplicar nada.
+  const entryPrincipal = guardarComoPrincipal(porMes[monthPrincipal]||[], monthPrincipal, true);
+  let updated = [...c.savedMonths.filter(m=>m.month!==monthPrincipal), entryPrincipal];
+
+  // los meses "sueltos" que aparecen dentro del mismo archivo (ej. algún día de febrero
+  // dentro del extracto de marzo) se FUSIONAN con el balance de ese mes si ya existe, o
+  // se crean como balance nuevo si no — evitando duplicar movimientos que ya estuvieran
+  // ahí (mismo día + concepto + importe).
+  let totalAñadidosOtrosMeses = 0;
+  otrosMeses.forEach(mesSuelto=>{
+    const existente = updated.find(x=>x.month===mesSuelto);
+    const yaVistos = new Set((existente?.movements||[]).map(m=>(m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
+    const nuevos = (porMes[mesSuelto]||[]).filter(m=>!yaVistos.has((m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
+    if(nuevos.length===0) return;
+    totalAñadidosOtrosMeses += nuevos.length;
+    const movimientosFusionados = [...(existente?.movements||[]), ...nuevos];
+    const entryFusionado = guardarComoPrincipal(movimientosFusionados, mesSuelto, false);
+    if(existente){ entryFusionado.simplificarSocios=existente.simplificarSocios; entryFusionado.categoriaDiferenciaSocios=existente.categoriaDiferenciaSocios; entryFusionado.recategorizacionesSocios=existente.recategorizacionesSocios; aplicarSimplificacionSocios(entryFusionado); }
+    updated = [...updated.filter(x=>x.month!==mesSuelto), entryFusionado];
+  });
+
+  updated = updated.sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
   await cajaSet('months', updated);
   c.savedMonths = updated;
-  c.data = { ...c.data, saved:true, savedMonth:month };
+  c.data = { ...c.data, saved:true, savedMonth:monthPrincipal };
   renderCaja();
-  toast('Balance guardado.');
+  if(totalAñadidosOtrosMeses>0){
+    toast('Balance guardado — además, '+totalAñadidosOtrosMeses+' movimiento(s) de otro(s) mes(es) se han añadido a su balance correspondiente.');
+  } else {
+    toast('Balance guardado.');
+  }
 }
 async function cajaEditMonth(m){
   const c = STATE.caja;
@@ -10170,6 +10219,17 @@ function renderCajaBalancesTab(el){
   el.innerHTML = revisionHtml + [...c.savedMonths].reverse().map(m=>{
     const bal = m.totalIncome + m.totalExpense;
     const hayDiferencia = Math.abs(m.diferenciaSocios||0)>=0.005;
+    // movimientos cuya fecha valor real (campo .month, por fila) no coincide con el mes
+    // de este balance — restos de extractos donde el banco incluyó algún día de otro mes.
+    // Se agrupan por a qué mes pertenecen de verdad, con cuántos son y su importe total.
+    const otrosMesesMap = {};
+    (m.movements||[]).forEach(mv=>{
+      if(!mv.month || mv.month===m.month || mv.month==='Sin fecha') return;
+      if(!otrosMesesMap[mv.month]) otrosMesesMap[mv.month] = { count:0, total:0 };
+      otrosMesesMap[mv.month].count++;
+      otrosMesesMap[mv.month].total += mv.amount;
+    });
+    const otrosMesesLista = Object.entries(otrosMesesMap).sort((a,b)=>a[0].localeCompare(b[0]));
     return `<div class="card" style="margin-bottom:12px;">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div><div style="color:var(--copper);font-weight:700;font-size:17px;">${m.title||m.month}</div><p class="hint" style="margin-top:2px;">Guardado: ${new Date(m.savedAt).toLocaleDateString('es-ES')}</p></div>
@@ -10183,6 +10243,7 @@ function renderCajaBalancesTab(el){
             : `<button class="btn danger" data-caja-borrar="${m.month}" style="padding:6px 12px;font-size:12px;">Borrar</button>`}
         </div>
       </div>
+      ${otrosMesesLista.length>0 ? `<p class="hint" style="margin-top:8px;color:var(--copper);">⚠ ${otrosMesesLista.map(([mes,d])=>d.count+' movimiento'+(d.count!==1?'s':'')+' ('+cajaFmt(d.total)+') pertenece'+(d.count!==1?'n':'')+' a '+cajaNombreMes(mes)).join(' · ')} <button class="btn secondary" data-caja-corregir-reparto="${m.month}" style="padding:2px 10px;font-size:11px;margin-left:6px;">Corregir automáticamente</button></p>` : ''}
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
           <input type="checkbox" data-caja-simplificar-socios="${m.month}" ${m.simplificarSocios?'checked':''}>
@@ -10269,6 +10330,51 @@ function renderCajaBalancesTab(el){
   });
   document.getElementById('cajaRevisarBtn').addEventListener('click', cajaRevisarCategorizacion);
   document.getElementById('cajaExportarSociosBtn').addEventListener('click', cajaExportarSocios);
+  el.querySelectorAll('[data-caja-corregir-reparto]').forEach(btn=>{
+    btn.addEventListener('click', ()=>cajaCorregirReparto(btn.getAttribute('data-caja-corregir-reparto')));
+  });
+}
+async function cajaCorregirReparto(month){
+  const c = STATE.caja;
+  const entry = c.savedMonths.find(x=>x.month===month);
+  if(!entry) return;
+  // se parte siempre de los movimientos de verdad (sin ninguna simplificación aplicada),
+  // igual que al guardar — y se reparte cada uno a su mes real, exactamente con la misma
+  // lógica que ya usa cajaSaveMonth() al subir un archivo nuevo — pero sin necesitar
+  // ningún archivo, porque cada movimiento ya lleva grabado su propio mes real.
+  const base = entry.movementsOriginal || entry.movements;
+  const porMes = {};
+  base.forEach(mv=>{ (porMes[mv.month||month] = porMes[mv.month||month]||[]).push(mv); });
+  const otrosMeses = Object.keys(porMes).filter(k=>k!==month && k!=='Sin fecha');
+  if(otrosMeses.length===0){ toast('Este balance no tiene movimientos de otro mes.'); return; }
+
+  function construirEntry(movs, mesEntry, plantilla){
+    const recomputado = cajaRecompute(movs);
+    const sqInc = movs.filter(m=>{ if(m.amount<0) return false; const tt=[m.rawG,m.concept,m.category].filter(Boolean); return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t)); }).reduce((s,m)=>s+m.amount,0);
+    const e = { month:mesEntry, title:cajaNombreMes(mesEntry), savedAt:new Date().toISOString(), movements:movs, catData:recomputado.catData, incomeCatData:recomputado.incomeCatData, totalExpense:recomputado.totalExpense, totalIncome:recomputado.totalIncome, squareIncome:sqInc };
+    if(plantilla){ e.simplificarSocios=plantilla.simplificarSocios; e.categoriaDiferenciaSocios=plantilla.categoriaDiferenciaSocios; e.recategorizacionesSocios=plantilla.recategorizacionesSocios; }
+    aplicarSimplificacionSocios(e);
+    return e;
+  }
+
+  let updated = c.savedMonths.filter(x=>x.month!==month);
+  updated.push(construirEntry(porMes[month]||[], month, entry));
+
+  let totalMovidos = 0;
+  otrosMeses.forEach(mesSuelto=>{
+    const existente = updated.find(x=>x.month===mesSuelto);
+    const yaVistos = new Set((existente?.movements||[]).map(m=>(m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
+    const nuevos = porMes[mesSuelto].filter(m=>!yaVistos.has((m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
+    totalMovidos += nuevos.length;
+    const fusionados = [...(existente?.movements||[]), ...nuevos];
+    updated = [...updated.filter(x=>x.month!==mesSuelto), construirEntry(fusionados, mesSuelto, existente)];
+  });
+
+  updated = updated.sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
+  await cajaSet('months', updated);
+  c.savedMonths = updated;
+  toast('Corregido — '+totalMovidos+' movimiento(s) trasladado(s) a su mes correspondiente.');
+  renderCajaTabContent();
 }
 function cajaExportarSocios(){
   const c = STATE.caja;
