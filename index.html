@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.165</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.167</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9710,7 +9710,14 @@ async function cajaProcess(){
 
     if(movements.length===0){ c.error='No se encontraron movimientos válidos.'; c.loading=false; renderCajaUploadScreen(); return; }
     const agg=cajaRecompute(movements);
-    const mo=String(movements.find(m=>m.month!=='Sin fecha')?.month||'').split('-');
+    // se adivina el mes/año del balance como el MÁS FRECUENTE entre todos los
+    // movimientos (no solo el primero con fecha válida) — así, si el archivo no viene
+    // ordenado cronológicamente y empieza por algún movimiento "colado" de otro mes, no
+    // se adivina mal el mes principal del archivo.
+    const conteoMeses = {};
+    movements.forEach(m=>{ if(m.month && m.month!=='Sin fecha') conteoMeses[m.month]=(conteoMeses[m.month]||0)+1; });
+    const mesMasFrecuente = Object.entries(conteoMeses).sort((a,b)=>b[1]-a[1])[0]?.[0] || '';
+    const mo=mesMasFrecuente.split('-');
     if(mo[0]) c.balanceYear=mo[0];
     if(mo[1]) c.balanceMonth=mo[1];
     c.data={movements,...agg,rawGastos,rawIngresos,saved:false};
@@ -9848,20 +9855,17 @@ async function cajaApplyPending(){
   c.savedCats = sc; cajaSet('cats', sc);
   c.pending = {};
   c.data = { ...c.data, movements:updated, ...cajaRecompute(updated) };
-  // si este mes ya estaba guardado de antes (lo estás editando, no creándolo desde cero),
-  // "Aplicar cambios" también lo guarda directamente en la base de datos — si no, el
-  // cambio solo se quedaba en memoria hasta pulsar un "Guardar" aparte que no era
-  // evidente, y se perdía si se salía de la pantalla sin pulsarlo.
-  const mo = c.balanceMonth || String(new Date().getMonth()+1).padStart(2,'0');
-  const yr = c.balanceYear || String(new Date().getFullYear());
-  const monthKey = `${yr}-${mo.padStart(2,'0')}`;
-  const yaGuardado = c.savedMonths.some(m=>m.month===monthKey);
-  if(yaGuardado){
+  // "Aplicar cambios" solo autoguarda directamente en la base de datos cuando se está
+  // EDITANDO un balance ya guardado (venir de "Editar" en Balances) — NO cuando se está
+  // subiendo un archivo NUEVO para un mes que da la casualidad de que ya existía: en ese
+  // caso hay que esperar al botón "Guardar" explícito, para no guardar a mitad de
+  // categorizar (antes de terminar de revisar todos los movimientos del archivo nuevo).
+  if(c.data.esEdicionExistente){
     await cajaSaveMonth();
     toast('Cambios aplicados y guardados ✓');
-  } else {
-    renderCaja();
+    return;
   }
+  renderCaja();
 }
 function cajaAddManualCost(){
   const c = STATE.caja;
@@ -9949,7 +9953,7 @@ async function cajaEditMonth(m){
   // de socios) — si no, si el mes ya tenía la simplificación activada, se editaría la
   // vista ya simplificada (sin las líneas de Gasto personal socio/Aportación socio por
   // separado), y al volver a guardar se perdería ese detalle para siempre.
-  c.data = { ...entry, movements: entry.movementsOriginal || entry.movements, saved:false };
+  c.data = { ...entry, movements: entry.movementsOriginal || entry.movements, saved:false, esEdicionExistente:true };
   c.pending={}; c.tab='categorizar';
   renderCaja();
 }
