@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.169</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.170</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9915,8 +9915,12 @@ async function cajaSaveMonth(){
   // un mes sin duplicar nada. Pero cualquier movimiento que hubiera llegado FUSIONADO
   // desde el archivo de OTRO mes (marcado con .origenFusion) se conserva siempre, porque
   // no viene de esta subida y se perdería si se sustituyera todo sin más.
+  // OJO: esto solo hace falta cuando se está guardando una SUBIDA NUEVA de archivo — si
+  // se está editando lo ya guardado (esEdicionExistente), c.data.movements YA incluye
+  // todo, fusionados inclusive; volver a añadirlos aquí "resucitaría" cualquiera que se
+  // hubiera borrado a mano durante la edición.
   const entryAnteriorPrincipal = c.savedMonths.find(m=>m.month===monthPrincipal);
-  const fusionadosPreexistentes = (entryAnteriorPrincipal?.movements||[]).filter(m=>m.origenFusion);
+  const fusionadosPreexistentes = c.data.esEdicionExistente ? [] : (entryAnteriorPrincipal?.movements||[]).filter(m=>m.origenFusion);
   const entryPrincipal = guardarComoPrincipal([...(porMes[monthPrincipal]||[]), ...fusionadosPreexistentes], monthPrincipal, true);
   let updated = [...c.savedMonths.filter(m=>m.month!==monthPrincipal), entryPrincipal];
 
@@ -10186,14 +10190,15 @@ function renderCajaMovimientosTab(el){
       <span style="font-weight:700;font-family:monospace;color:${totalFiltrado>=0?'var(--positive)':'var(--negative)'};">Total: ${cajaFmt(totalFiltrado)}</span>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
-      <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th></tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th><th></th></tr></thead>
       <tbody>${filtered.slice(0,400).map(m=>`
         <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">${m.fechaDia || m.month}</td>
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.concept}</td>
         <td>${cajaCatSelectHtml(m.id, c.pending[m.id]||'', m.amount<0?cajaGasCatOpts():cajaIncCatOpts(), m.category)}</td>
         <td><input type="text" list="cajaSubcatDatalist" data-subcat-input="${m.id}" value="${(m.subcategory||'').replace(/"/g,'&quot;')}" placeholder="—" style="background:var(--bg);border:1px solid ${m.subcategory?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:130px;"></td>
         <td class="num" style="font-family:monospace;font-weight:700;color:${m.amount<0?'var(--negative)':'var(--positive)'};white-space:nowrap;">${cajaFmt(m.amount)}</td>
-        <td style="text-align:center;font-size:11px;">${m.isManual?'✍️':m.autoCat?'🤖':'✋'}</td></tr>
+        <td style="text-align:center;font-size:11px;">${m.isManual?'✍️':m.autoCat?'🤖':'✋'}</td>
+        <td><button class="btn danger" data-caja-borrar-mov="${m.id}" title="Borrar este movimiento" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
       `).join('')}</tbody></table>
       <datalist id="cajaSubcatDatalist">${subcatsConocidas.map(s=>'<option value="'+s.replace(/"/g,'&quot;')+'">').join('')}</datalist>
       ${filtered.length>400?`<p class="hint" style="padding:10px;text-align:center;">Mostrando 400 de ${filtered.length}</p>`:''}
@@ -10220,6 +10225,27 @@ function renderCajaMovimientosTab(el){
     inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
   });
   const aplicarBtn2 = document.getElementById('cajaAplicarBtn2'); if(aplicarBtn2) aplicarBtn2.addEventListener('click', cajaApplyPending);
+  el.querySelectorAll('[data-caja-borrar-mov]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-caja-borrar-mov');
+      const mov = c.data.movements.find(m=>String(m.id)===String(id));
+      if(!mov) return;
+      if(!confirm('¿Borrar este movimiento?\n\n"'+mov.concept+'" — '+cajaFmt(mov.amount)+'\n\nNo se puede deshacer.')) return;
+      const updated = c.data.movements.filter(m=>String(m.id)!==String(id));
+      c.data = { ...c.data, movements:updated, ...cajaRecompute(updated) };
+      // igual que "Aplicar cambios": solo autoguarda directamente si se está EDITANDO un
+      // balance ya guardado (venir de "Editar" en Balances) — así se refleja ya mismo en
+      // todas las cifras y gráficos sin necesitar un paso de guardar aparte. Si es una
+      // subida nueva de archivo, espera al "Guardar" explícito, como el resto de cambios.
+      if(c.data.esEdicionExistente){
+        await cajaSaveMonth();
+        toast('Movimiento borrado y guardado ✓');
+        return;
+      }
+      toast('Movimiento borrado.');
+      renderCaja();
+    });
+  });
 }
 
 function renderCajaBalancesTab(el){
