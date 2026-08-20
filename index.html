@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.168</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.169</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9910,20 +9910,26 @@ async function cajaSaveMonth(){
     return entry;
   }
 
-  // el mes principal (el que se eligió arriba) siempre SUSTITUYE lo que hubiera antes —
-  // igual que hacía ya, para poder volver a subir y corregir un mes sin duplicar nada.
-  const entryPrincipal = guardarComoPrincipal(porMes[monthPrincipal]||[], monthPrincipal, true);
+  // el mes principal (el que se eligió arriba) sustituye lo que hubiera antes SOLO en la
+  // parte que viene de subidas propias de ese mes — para poder volver a subir y corregir
+  // un mes sin duplicar nada. Pero cualquier movimiento que hubiera llegado FUSIONADO
+  // desde el archivo de OTRO mes (marcado con .origenFusion) se conserva siempre, porque
+  // no viene de esta subida y se perdería si se sustituyera todo sin más.
+  const entryAnteriorPrincipal = c.savedMonths.find(m=>m.month===monthPrincipal);
+  const fusionadosPreexistentes = (entryAnteriorPrincipal?.movements||[]).filter(m=>m.origenFusion);
+  const entryPrincipal = guardarComoPrincipal([...(porMes[monthPrincipal]||[]), ...fusionadosPreexistentes], monthPrincipal, true);
   let updated = [...c.savedMonths.filter(m=>m.month!==monthPrincipal), entryPrincipal];
 
   // los meses "sueltos" que aparecen dentro del mismo archivo (ej. algún día de febrero
   // dentro del extracto de marzo) se FUSIONAN con el balance de ese mes si ya existe, o
   // se crean como balance nuevo si no — evitando duplicar movimientos que ya estuvieran
-  // ahí (mismo día + concepto + importe).
+  // ahí (mismo día + concepto + importe). Se marcan con .origenFusion para que, si más
+  // adelante se sube el archivo propio de ese mes, no se pierdan al sustituir.
   let totalAñadidosOtrosMeses = 0;
   otrosMeses.forEach(mesSuelto=>{
     const existente = updated.find(x=>x.month===mesSuelto);
     const yaVistos = new Set((existente?.movements||[]).map(m=>(m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
-    const nuevos = (porMes[mesSuelto]||[]).filter(m=>!yaVistos.has((m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
+    const nuevos = (porMes[mesSuelto]||[]).filter(m=>!yaVistos.has((m.fechaDia||'')+'|'+m.concept+'|'+m.amount)).map(m=>({...m, origenFusion:true}));
     if(nuevos.length===0) return;
     totalAñadidosOtrosMeses += nuevos.length;
     const movimientosFusionados = [...(existente?.movements||[]), ...nuevos];
@@ -10387,7 +10393,7 @@ async function cajaCorregirReparto(month){
   otrosMeses.forEach(mesSuelto=>{
     const existente = updated.find(x=>x.month===mesSuelto);
     const yaVistos = new Set((existente?.movements||[]).map(m=>(m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
-    const nuevos = porMes[mesSuelto].filter(m=>!yaVistos.has((m.fechaDia||'')+'|'+m.concept+'|'+m.amount));
+    const nuevos = porMes[mesSuelto].filter(m=>!yaVistos.has((m.fechaDia||'')+'|'+m.concept+'|'+m.amount)).map(m=>({...m, origenFusion:true}));
     totalMovidos += nuevos.length;
     const fusionados = [...(existente?.movements||[]), ...nuevos];
     updated = [...updated.filter(x=>x.month!==mesSuelto), construirEntry(fusionados, mesSuelto, existente)];
