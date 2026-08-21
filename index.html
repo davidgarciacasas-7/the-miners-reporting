@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.174</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.177</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -456,6 +456,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <p class="hint" id="pnlStatus"></p>
         <div id="pnlHiddenRowsInfo" style="margin-bottom:8px;"></div>
         <div id="pnlHiddenBucketsInfo" style="margin-bottom:8px;"></div>
+        <div id="productosVendidosSinCosteAlertPnl"></div>
 
         <div class="card" style="margin-bottom:14px;border:1px solid var(--line);">
           <p class="hint" style="margin-bottom:8px;">Si necesitas volver a la estructura fija del PNL (Revenue, COGS, Wages, Overheads, EBITDA...), esto borra las líneas actuales y las vuelve a crear en el orden y sangría de la plantilla — los importes ya guardados se quedan en la base de datos, pero dejan de estar vinculados a ninguna fila visible.</p>
@@ -487,6 +488,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <!-- COSTES / COGS -->
       <div class="tabpanel" id="tab-costes">
         <div id="mermasSinCosteAlert"></div>
+        <div id="productosVendidosSinCosteAlertCostes"></div>
         <h3 style="margin-bottom:10px;">1. COGS (coste de producto)</h3>
         <div class="card" style="margin-bottom:14px;">
           <p class="hint">CSV o Excel — columna 1: nombre del producto (debe coincidir con el "Artículo" de Square), columna 2: coste. Con o sin cabecera.</p>
@@ -8021,6 +8023,7 @@ async function renderPnl(){
   const table = document.getElementById('tablaPnl');
   if(!table || !STATE.config.url || !STATE.config.anonKey) return;
   await ensureDefaultPnlLines();
+  renderProductosVendidosSinCoste('productosVendidosSinCosteAlertPnl');
   const restablecerBtn = document.getElementById('pnlRestablecerPlantillaBtn');
   if(restablecerBtn && !restablecerBtn.dataset.wired){
     restablecerBtn.dataset.wired = '1';
@@ -8077,12 +8080,20 @@ async function renderPnl(){
     // recurrentes (que se editan en Costes → Otros costes) y los subtotales calculados
     // siguen siendo de solo lectura aquí.
     const soloLectura = line.esRecurrente || esSubtotal;
+    // los subtotales "acumulados" (Gross Profit, Operating Profit, EBITDA) ya traen su
+    // propio signo real (positivo = beneficio, negativo = pérdida) — el resto de líneas
+    // se muestran en positivo/verde si son ingreso, negativo/rojo si son coste, aunque el
+    // valor de por sí se guarde siempre en positivo internamente.
+    const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+    const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
     const cells = values.map((v,bi)=>{
-      if(soloLectura) return '<td class="num">'+eur(Math.round(v*100))+'</td>';
+      const vSigno = conSigno(v);
+      const colorTexto = vSigno<0 ? 'var(--negative)' : 'var(--positive)';
+      if(soloLectura) return '<td class="num" style="color:'+colorTexto+';font-weight:600;">'+eur(Math.round(vSigno*100))+'</td>';
       const esOverrideManual = line.esAuto && pnlValorManualGuardado(line, buckets[bi])!==null;
       const colorBorde = line.esAuto ? (esOverrideManual?'var(--copper)':'var(--positive)') : 'var(--line)';
       const revertirBtn = esOverrideManual ? '<button data-revertir-auto="'+line.id+'|'+bi+'" title="Borrar la corrección manual y volver al valor automático" style="padding:0 4px;font-size:10px;background:none;border:none;color:var(--copper);cursor:pointer;">🔄</button>' : '';
-      return '<td class="num" style="white-space:nowrap;"><input type="number" step="0.01" value="'+v.toFixed(2)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:80px;background:var(--bg);border:1px solid '+colorBorde+';color:var(--text);border-radius:4px;padding:3px 6px;text-align:right;">'+revertirBtn+'</td>';
+      return '<td class="num" style="white-space:nowrap;"><input type="number" step="0.01" value="'+vSigno.toFixed(2)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:80px;background:var(--bg);border:1px solid '+colorBorde+';color:'+colorTexto+';font-weight:600;border-radius:4px;padding:3px 6px;text-align:right;">'+revertirBtn+'</td>';
     }).join('');
     let tag = '';
     if(esSubtotal) tag = '<span class="hint">calculado</span>';
@@ -8095,7 +8106,7 @@ async function renderPnl(){
     const hideBtn = `<button class="btn secondary" data-hide-line="${line.id}" title="Ocultar esta fila (no sale ni en pantalla ni al imprimir)" style="padding:2px 6px;font-size:10px;">🙈</button>`;
     const indent = line.indent||0;
     const indentBtns = `<button class="btn secondary" data-indent-out="${line.id}" title="Quitar sangría" style="padding:2px 6px;font-size:10px;" ${indent<=0?'disabled':''}>←</button> <button class="btn secondary" data-indent-in="${line.id}" title="Sangrar (mover hacia la derecha)" style="padding:2px 6px;font-size:10px;">→</button>`;
-    const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-flex;align-items:center;gap:6px;"><span class="no-print" style="color:var(--text-muted);cursor:grab;">✥</span><span class="pill ${line.tipo==='ingreso'?'nuevo':'noident'}">${line.tipo}</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
+    const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-flex;align-items:center;gap:6px;"><span class="no-print" style="color:var(--text-muted);cursor:grab;">✥</span><span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
     const filaStyle = esSubtotal ? 'cursor:grab;background:var(--surface-2);font-weight:700;' : 'cursor:grab;';
     return `<tr draggable="true" data-pnl-line-id="${line.id}" style="${filaStyle}"><td>${nombreCelda}</td>${cells}<td style="white-space:nowrap;">${indentBtns} ${accionesBase} ${hideBtn}</td></tr>`;
   }).filter(Boolean).join('');
@@ -8139,35 +8150,11 @@ async function renderPnl(){
     });
   });
   attachPnlDragHandlers();
-
-  const resultado = totalIngresos.map((v,i)=>v-totalCostes[i]);
-  const etiquetaTI = pnlEtiquetaTotal('totalIngresos','Total ingresos'), etiquetaTC = pnlEtiquetaTotal('totalCostes','Total costes'), etiquetaR = pnlEtiquetaTotal('resultado','Resultado');
-  const celdaEditableTotal = (clave, etiqueta) => `<span style="display:inline-flex;align-items:center;gap:6px;"><b data-nombre-total="${clave}">${etiqueta}</b> <button class="btn secondary no-print" data-editar-nombre-total="${clave}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
-  document.querySelector('#tablaPnl tfoot').innerHTML = `
-    <tr style="border-top:2px solid var(--line);"><td>${celdaEditableTotal('totalIngresos',etiquetaTI)}</td>${totalIngresos.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('')}<td></td></tr>
-    <tr><td>${celdaEditableTotal('totalCostes',etiquetaTC)}</td>${totalCostes.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('')}<td></td></tr>
-    <tr style="border-top:1px solid var(--line);"><td>${celdaEditableTotal('resultado',etiquetaR)}</td>${resultado.map(v=>'<td class="num" style="color:'+(v>=0?'var(--positive)':'var(--negative)')+'"><b>'+eur(Math.round(v*100))+'</b></td>').join('')}<td></td></tr>
-  `;
-  document.querySelectorAll('[data-editar-nombre-total]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const clave = btn.getAttribute('data-editar-nombre-total');
-      const span = document.querySelector('[data-nombre-total="'+clave+'"]');
-      if(!span) return;
-      const nombreActual = span.textContent;
-      const input = document.createElement('input');
-      input.type = 'text'; input.value = nombreActual;
-      input.style.cssText = 'background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:4px;padding:3px 6px;font-size:13px;width:140px;';
-      span.replaceWith(input); btn.style.display = 'none';
-      input.focus(); input.select();
-      const guardar = () => {
-        const nuevo = input.value.trim();
-        if(nuevo){ const et = getPnlEtiquetasTotales(); et[clave] = nuevo; setPnlEtiquetasTotales(et); }
-        renderPnl();
-      };
-      input.addEventListener('blur', guardar);
-      input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') input.blur(); });
-    });
-  });
+  // las filas de "Total ingresos / Total costes / Resultado" ya no se muestran al final:
+  // con la plantilla fija, la propia línea "EBITDA" (o cualquier subtotal acumulado)
+  // cumple esa misma función dentro de la tabla, y tenerlas las dos duplicaba la
+  // información.
+  document.querySelector('#tablaPnl tfoot').innerHTML = '';
 
   async function guardarValorPnlCelda(lineId, bucket, amount){
     const solapados = STATE.pnlValues.filter(v=>v.lineId===lineId && !(bucket.dateMax<v.dateMin || bucket.dateMin>v.dateMax));
@@ -8181,7 +8168,9 @@ async function renderPnl(){
     inp.addEventListener('change', async ()=>{
       const lineId = inp.getAttribute('data-line');
       const bucket = buckets[parseInt(inp.getAttribute('data-bucket'),10)];
-      await guardarValorPnlCelda(lineId, bucket, parseFloat(inp.value)||0);
+      // el signo que se ve en pantalla (negativo para costes) es solo visual — por dentro
+      // siempre se guarda en magnitud positiva, el signo real lo pone el tipo de línea.
+      await guardarValorPnlCelda(lineId, bucket, Math.abs(parseFloat(inp.value)||0));
       renderPnl();
     });
   });
@@ -8202,7 +8191,7 @@ async function renderPnl(){
       const fila = btn.closest('tr');
       const inputs = [...fila.querySelectorAll('[data-pnl-cell]')];
       if(inputs.length<2) return;
-      const valorAcopiar = parseFloat(inputs[0].value)||0;
+      const valorAcopiar = Math.abs(parseFloat(inputs[0].value)||0);
       if(!confirm('¿Copiar '+eur(Math.round(valorAcopiar*100))+' (primera columna visible) al resto de columnas de esta fila? Sustituye lo que hubiera en ellas.')) return;
       for(let i=1; i<inputs.length; i++){
         const bucket = buckets[parseInt(inputs[i].getAttribute('data-bucket'),10)];
@@ -8218,7 +8207,7 @@ async function renderPnl(){
       const fila = btn.closest('tr');
       const primerInput = fila.querySelector('[data-pnl-cell]');
       if(!line || !primerInput) return;
-      const amount = parseFloat(primerInput.value)||0;
+      const amount = Math.abs(parseFloat(primerInput.value)||0);
       if(!confirm('¿Convertir "'+line.name+'" en un coste recurrente de '+eur(Math.round(amount*100))+' al mes, a partir de '+buckets[0].dateMin+'? A partir de ahora se rellenará solo cada mes con este importe, hasta que lo cambies en Costes → Otros costes.')) return;
       // se marca la línea como recurrente ANTES de guardar la entrada de Otros Costes:
       // saveOtroCosteEntry busca una línea con este nombre que YA sea recurrente, así
@@ -8427,6 +8416,48 @@ document.getElementById('cogsDesde').addEventListener('change', renderCogsTenden
 document.getElementById('cogsHasta').addEventListener('change', renderCogsTendencia);
 document.getElementById('cogsChartTypeSelect').addEventListener('change', (e)=>onChartTypeChange(e.target.value));
 
+/* productos que se han VENDIDO de verdad (según los datos de Square cargados) pero no
+   tienen ningún coste guardado con ese nombre EXACTO — coincide con la misma comparación
+   que usa costAtDate() para calcular el COGS, así que esta lista es exactamente "lo que
+   está contando como 0€ de coste en el PNL sin que se note". */
+function productosVendidosSinCosteInfo(){
+  const costHistory = buildCostHistoryMap();
+  const vistos = new Map();
+  getAllSalesLinesRaw().forEach(l=>{
+    if(!l.articulo || !(l.cant>0)) return;
+    if(costHistory[l.articulo]) return; // ya tiene coste, no hace falta avisar
+    const actual = vistos.get(l.articulo) || { producto:l.articulo, unidades:0, ultimaFecha:'' };
+    actual.unidades += l.cant;
+    if(l.fecha > actual.ultimaFecha) actual.ultimaFecha = l.fecha;
+    vistos.set(l.articulo, actual);
+  });
+  return [...vistos.values()].sort((a,b)=>b.unidades-a.unidades);
+}
+function renderProductosVendidosSinCoste(containerId){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const sinCoste = productosVendidosSinCosteInfo();
+  if(sinCoste.length===0){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <div class="card" style="border-color:var(--negative);margin-bottom:14px;">
+      <h3 style="color:var(--negative);">⚠ Productos vendidos sin coste asociado (${sinCoste.length})</h3>
+      <p class="hint">Se han vendido de verdad (según Square) pero no tienen ningún coste guardado con ese nombre — cuentan como 0€ de coste en "Production Costs" del PNL, sin ningún aviso hasta ahora. Pulsa uno para rellenarlo rápido.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        ${sinCoste.map(p=>`<button class="btn secondary" data-quick-add-cost-vendido="${p.producto.replace(/"/g,'&quot;')}" title="${p.unidades} unidades vendidas · última vez el ${p.ultimaFecha}" style="padding:6px 12px;font-size:12px;">+ ${p.producto} <span class="hint">(${p.unidades}ud)</span></button>`).join('')}
+      </div>
+    </div>`;
+  el.querySelectorAll('[data-quick-add-cost-vendido]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nombre = btn.getAttribute('data-quick-add-cost-vendido');
+      const navCostes = document.querySelector('.nav-item[data-tab="costes"]');
+      if(navCostes) navCostes.click();
+      setTimeout(()=>{
+        const inp = document.getElementById('costProdNombre');
+        if(inp){ inp.value = nombre; inp.scrollIntoView({behavior:'smooth', block:'center'}); document.getElementById('costProdValor').focus(); }
+      }, 150);
+    });
+  });
+}
 function renderMermasSinCoste(){
   const el = document.getElementById('mermasSinCosteAlert');
   if(!el) return;
@@ -8453,6 +8484,7 @@ function renderMermasSinCoste(){
 }
 function renderCostes(){
   renderMermasSinCoste();
+  renderProductosVendidosSinCoste('productosVendidosSinCosteAlertCostes');
   renderCogsTendencia();
   const tbodyCost = document.querySelector('#tablaCosteProducto tbody');
   if(!tbodyCost) return;
