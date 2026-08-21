@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.170</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.174</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -457,19 +457,9 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div id="pnlHiddenRowsInfo" style="margin-bottom:8px;"></div>
         <div id="pnlHiddenBucketsInfo" style="margin-bottom:8px;"></div>
 
-        <div class="section-title">Plantillas guardadas</div>
-        <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Cada plantilla recuerda qué filas y qué columnas tienes ocultas, y cómo has llamado a las filas de totales — así puedes tener, por ejemplo, una plantilla "Para inversores" (con menos detalle) y otra "Para mí" (con todo), y cambiar entre ellas al momento.</p>
-          <div class="subfilter" style="margin-bottom:10px;">
-            <select id="pnlPlantillaSelect" style="flex:1;"><option value="">Elegir plantilla guardada...</option></select>
-            <button class="btn secondary" id="pnlPlantillaCargarBtn" style="padding:6px 12px;font-size:12px;">Cargar</button>
-            <button class="btn danger" id="pnlPlantillaBorrarBtn" style="padding:6px 12px;font-size:12px;">Borrar</button>
-          </div>
-          <div class="subfilter" style="margin-bottom:0;">
-            <input type="text" id="pnlPlantillaNombreInput" placeholder="Nombre para guardar la vista actual (ej. 'Para inversores')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font-size:12px;">
-            <button class="btn" id="pnlPlantillaGuardarBtn" style="padding:6px 12px;font-size:12px;">Guardar vista actual como plantilla</button>
-          </div>
-          <p class="hint" id="pnlPlantillaStatus" style="margin-top:8px;"></p>
+        <div class="card" style="margin-bottom:14px;border:1px solid var(--line);">
+          <p class="hint" style="margin-bottom:8px;">Si necesitas volver a la estructura fija del PNL (Revenue, COGS, Wages, Overheads, EBITDA...), esto borra las líneas actuales y las vuelve a crear en el orden y sangría de la plantilla — los importes ya guardados se quedan en la base de datos, pero dejan de estar vinculados a ninguna fila visible.</p>
+          <button class="btn secondary" id="pnlRestablecerPlantillaBtn">Restablecer a la plantilla fija</button>
         </div>
 
         <div class="card" style="overflow-x:auto;">
@@ -1691,7 +1681,7 @@ async function loadAllData(){
   }
   STATE.ticketsClassified = null; // invalidar cache
   try{
-    STATE.pnlLines = (await sbList('pnl_lines', 'select=*&order=orden.asc')).map(r=>({ id:r.id, name:r.name, tipo:r.tipo, orden:r.orden, esAuto:r.es_auto, esRecurrente:r.es_recurrente, indent:r.indent||0, esTitulo:!!r.es_titulo }));
+    STATE.pnlLines = (await sbList('pnl_lines', 'select=*&order=orden.asc')).map(r=>({ id:r.id, name:r.name, tipo:r.tipo, orden:r.orden, esAuto:r.es_auto, esRecurrente:r.es_recurrente, indent:r.indent||0, esTitulo:!!r.es_titulo, tipoEspecial:r.tipo_especial||null }));
     STATE.pnlValues = (await sbList('pnl_values', 'select=*')).map(r=>({ id:r.id, lineId:r.line_id, dateMin:r.date_min, dateMax:r.date_max, amount:parseFloat(r.amount) }));
     STATE.productCosts = (await sbList('product_costs', 'select=*&order=product_name.asc,effective_from.asc')).map(r=>({ id:r.id, productName:r.product_name, unitCost:parseFloat(r.unit_cost), effectiveFrom:r.effective_from, source:r.source }));
     STATE.otherCosts = (await sbList('other_costs', 'select=*&order=effective_from.asc')).map(r=>({ id:r.id, lineId:r.line_id, amount:parseFloat(r.amount), effectiveFrom:r.effective_from, source:r.source, tipo:r.tipo||'fijo' }));
@@ -2631,62 +2621,6 @@ function getPnlEtiquetasTotales(){
 function setPnlEtiquetasTotales(obj){ localStorage.setItem('miners_pnl_etiquetas_totales', JSON.stringify(obj)); }
 function pnlEtiquetaTotal(clave, porDefecto){ return getPnlEtiquetasTotales()[clave] || porDefecto; }
 
-/* =========================================================
-   PLANTILLAS DE PNL — guardan la combinación de filas ocultas, columnas
-   ocultas y etiquetas de totales bajo un nombre, para poder cambiar entre
-   "vistas" (ej. Para inversores / Para mí) sin rehacer los ajustes cada vez.
-   ========================================================= */
-async function renderPnlPlantillasSelect(){
-  const sel = document.getElementById('pnlPlantillaSelect');
-  if(!sel) return;
-  try{
-    const rows = await sbList('pnl_plantillas', 'select=*&order=nombre.asc');
-    sel.innerHTML = '<option value="">Elegir plantilla guardada...</option>' + rows.map(r=>'<option value="'+r.id+'">'+r.nombre.replace(/</g,'&lt;')+'</option>').join('');
-    sel.dataset.plantillas = JSON.stringify(rows);
-  }catch(e){
-    sel.innerHTML = '<option value="">(error cargando plantillas)</option>';
-  }
-}
-document.getElementById('pnlPlantillaCargarBtn').addEventListener('click', ()=>{
-  const sel = document.getElementById('pnlPlantillaSelect');
-  const statusEl = document.getElementById('pnlPlantillaStatus');
-  if(!sel.value){ statusEl.innerHTML = '<span style="color:var(--negative)">Elige una plantilla de la lista primero.</span>'; return; }
-  const plantillas = JSON.parse(sel.dataset.plantillas || '[]');
-  const p = plantillas.find(x=>x.id===sel.value);
-  if(!p){ statusEl.innerHTML = '<span style="color:var(--negative)">No se encontró esa plantilla.</span>'; return; }
-  setPnlHiddenRows(new Set(p.filas_ocultas || []));
-  setPnlHiddenBuckets(new Set(p.columnas_ocultas || []));
-  setPnlEtiquetasTotales(p.etiquetas_totales || {});
-  statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla "'+p.nombre+'" cargada ✓</span>';
-  renderPnl();
-});
-document.getElementById('pnlPlantillaGuardarBtn').addEventListener('click', async ()=>{
-  const nombre = document.getElementById('pnlPlantillaNombreInput').value.trim();
-  const statusEl = document.getElementById('pnlPlantillaStatus');
-  if(!nombre){ statusEl.innerHTML = '<span style="color:var(--negative)">Ponle un nombre a la plantilla antes de guardar.</span>'; return; }
-  try{
-    await sbInsert('pnl_plantillas', {
-      nombre,
-      filas_ocultas: [...getPnlHiddenRows()],
-      columnas_ocultas: [...getPnlHiddenBuckets()],
-      etiquetas_totales: getPnlEtiquetasTotales()
-    });
-    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla "'+nombre+'" guardada ✓</span>';
-    document.getElementById('pnlPlantillaNombreInput').value = '';
-    await renderPnlPlantillasSelect();
-  }catch(e){ statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>'; }
-});
-document.getElementById('pnlPlantillaBorrarBtn').addEventListener('click', async ()=>{
-  const sel = document.getElementById('pnlPlantillaSelect');
-  const statusEl = document.getElementById('pnlPlantillaStatus');
-  if(!sel.value){ statusEl.innerHTML = '<span style="color:var(--negative)">Elige una plantilla de la lista primero.</span>'; return; }
-  if(!confirm('¿Borrar esta plantilla guardada? No se puede deshacer.')) return;
-  try{
-    await sbDelete('pnl_plantillas', sel.value);
-    statusEl.innerHTML = '<span style="color:var(--positive)">Plantilla borrada ✓</span>';
-    await renderPnlPlantillasSelect();
-  }catch(e){ statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+e.message+'</span>'; }
-});
 function renderPnlHiddenRowsInfo(){
   const el = document.getElementById('pnlHiddenRowsInfo');
   if(!el) return;
@@ -7220,7 +7154,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const allSalesLinesPnl = getAllSalesLinesRaw();
     const bucketsMes = monthBucketsInRange(desde, hasta);
     const lineaEbitda = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
-    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Ventas');
+    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Gross Sales');
     let ebitdaPorMes;
     if(lineaEbitda){
       ebitdaPorMes = bucketsMes.map(b=>pnlLineValueForBucket(lineaEbitda, b, allSalesLinesPnl, costHistory, otherCostHistory));
@@ -7737,15 +7671,60 @@ function costeLaboralParaBucket(bucket){
   });
   return sum;
 }
-function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCostHistory){
+/* Calcula el valor "primario" de una línea (auto, recurrente, o manual) — sin tener en
+   cuenta subtotales, que se calculan aparte con el resto de líneas ya conocidas. */
+/* Categorías de gasto en Caja que cuentan como COGS (coste de alimentos y bebidas). */
+const PNL_COGS_CATEGORIAS_CAJA = ['bebidas', 'alimentos'];
+function cogsDesdeCaja(bucket){
+  let suma = 0;
+  (STATE.caja?.savedMonths||[]).forEach(entry=>{
+    (entry.movements||[]).forEach(m=>{
+      if(m.amount>=0) return; // solo gastos
+      const cat = String(m.category||'').trim().toLowerCase();
+      if(!PNL_COGS_CATEGORIAS_CAJA.includes(cat)) return;
+      if(m.fechaDia){
+        if(m.fechaDia>=bucket.dateMin && m.fechaDia<=bucket.dateMax) suma += Math.abs(m.amount);
+      } else if(m.month && m.month!=='Sin fecha'){
+        // sin fecha exacta dentro del mes: se usa el mes completo como aproximación
+        const mesInicio = m.month+'-01', mesFin = m.month+'-31';
+        if(!(mesFin<bucket.dateMin || mesInicio>bucket.dateMax)) suma += Math.abs(m.amount);
+      }
+    });
+  });
+  return suma;
+}
+/* Para las líneas automáticas (esAuto), si el usuario ha introducido a mano un valor
+   para ese bucket concreto (mismo mecanismo que las líneas manuales normales), ESE valor
+   manda sobre el cálculo automático — así se puede corregir un mes suelto sin perder el
+   cálculo automático para el resto. */
+function pnlValorManualGuardado(line, bucket){
+  const solapados = STATE.pnlValues.filter(v=>v.lineId===line.id && !(bucket.dateMax<v.dateMin || bucket.dateMin>v.dateMax));
+  if(solapados.length===0) return null;
+  let sum = 0;
+  solapados.forEach(v=>{ sum += allocateToBucket(v.dateMin, v.dateMax, bucket.dateMin, bucket.dateMax, v.amount); });
+  return sum;
+}
+function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCostHistory){
   let valor;
-  if(line.esAuto && line.name==='Ventas'){
+  const manual = line.esAuto ? pnlValorManualGuardado(line, bucket) : null;
+  if(manual!==null){
+    valor = manual;
+  } else if(line.esAuto && line.name==='Gross Sales'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum+=l.bruto; });
     valor = sum/100;
+  } else if(line.esAuto && line.name==='Net Sales'){
+    let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum+=l.neto; });
+    valor = sum/100;
+  } else if(line.esAuto && line.name==='Expected VAT'){
+    let sumBruto=0, sumNeto=0;
+    allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax){ sumBruto+=l.bruto; sumNeto+=l.neto; } });
+    valor = (sumBruto-sumNeto)/100;
   } else if(line.esAuto && line.name==='COGS'){
+    valor = cogsDesdeCaja(bucket);
+  } else if(line.esAuto && line.name==='Production Costs'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
-  } else if(line.esAuto && line.name==='Coste laboral'){
+  } else if(line.esAuto && line.name==='Wages'){
     valor = costeLaboralParaBucket(bucket);
   } else if(line.esRecurrente){
     valor = otherCostValueForBucket(line.id, bucket, otherCostHistory, allSalesLines);
@@ -7759,24 +7738,137 @@ function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCo
   }
   return valor;
 }
+/* Calcula los valores de TODAS las líneas para un bucket a la vez (hace falta así, no
+   línea a línea, porque los subtotales necesitan conocer el valor de otras líneas):
+   - subtotal_outline: suma de sus hijos DIRECTOS (solo un nivel de sangría más — si un
+     hijo es a su vez un subtotal, ya lleva sumados los suyos, y sumarlos aparte
+     duplicaría el importe).
+   - subtotal_acumulado: ingresos menos costes de TODO lo anterior en la lista (line
+     informativa incluida, no incluida) — así "Gross Profit", "Operating Profit" y
+     "EBITDA" son el beneficio acumulado hasta ese punto exacto.
+   - informativo: se calcula igual que una línea normal, pero no cuenta para ningún
+     subtotal (ej. "Gross Sales" y "Expected VAT", que son solo de referencia).
+*/
+function computePnlBucketValues(bucket, lines, allSalesLines, costHistory, otherCostHistory){
+  const valores = {};
+  // PASADA 1: todas las líneas de datos "primarias" (auto, recurrentes, manuales)
+  lines.forEach(line=>{
+    if(line.esTitulo || line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado') return;
+    valores[line.id] = pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCostHistory);
+  });
+  // PASADA 2: subtotales "suma de hijas directas" — de ATRÁS hacia ADELANTE. Hace falta
+  // en este orden porque puede haber subtotales anidados (ej. "Other operational costs"
+  // suma "Rent & Licences", que es a su vez OTRO subtotal que suma sus propias hijas) —
+  // yendo de atrás hacia adelante, cuando se calcula el subtotal "padre" ya se conoce el
+  // valor de sus hijos "subtotal", que aparecen más abajo en la lista.
+  for(let idx=lines.length-1; idx>=0; idx--){
+    const line = lines[idx];
+    if(line.esTitulo || line.tipoEspecial!=='subtotal_outline') continue;
+    let suma = 0;
+    for(let j=idx+1; j<lines.length; j++){
+      const sig = lines[j];
+      if((sig.indent||0) <= (line.indent||0)) break;
+      if((sig.indent||0) === (line.indent||0)+1 && !sig.esTitulo) suma += (valores[sig.id]||0);
+    }
+    valores[line.id] = suma;
+  }
+  // PASADA 3: subtotales "beneficio acumulado hasta aquí" — de ADELANTE hacia ATRÁS, en
+  // el orden normal de lectura de la tabla.
+  let ingresosAcum = 0, costesAcum = 0;
+  lines.forEach(line=>{
+    if(line.esTitulo || line.tipoEspecial==='subtotal_outline') return;
+    if(line.tipoEspecial==='subtotal_acumulado'){
+      valores[line.id] = ingresosAcum - costesAcum;
+    } else if(line.tipoEspecial!=='informativo'){
+      if(line.tipo==='ingreso') ingresosAcum += (valores[line.id]||0); else costesAcum += (valores[line.id]||0);
+    }
+  });
+  return valores;
+}
+/* compatibilidad: calcula el valor de UNA sola línea para un bucket, recalculando todas
+   las demás por debajo (necesario para subtotales) — más lento que computePnlBucketValues
+   si se necesitan varias líneas del mismo bucket, pero mantiene la firma original para
+   los sitios que solo piden una línea suelta (widgets, PDF, etc.) */
+function pnlLineValueForBucket(line, bucket, allSalesLines, costHistory, otherCostHistory){
+  if(line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado'){
+    const todas = computePnlBucketValues(bucket, [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden), allSalesLines, costHistory, otherCostHistory);
+    return todas[line.id]||0;
+  }
+  return pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCostHistory);
+}
+/* Plantilla fija del PNL — estructura, sangría y qué se calcula solo. Las líneas con
+   tipoEspecial 'subtotal_outline' o 'subtotal_acumulado' se calculan siempre solas (ver
+   computePnlBucketValues) y no se pueden editar a mano. 'Royalties' se marca como
+   recurrente y se crea a la vez una entrada de "Otros costes" al 7% de ventas netas (el
+   usuario puede cambiar el porcentaje después en Costes → Otros costes).
+   NOTA: 'informativo' = se calcula, se muestra, pero no cuenta para ningún subtotal (ej.
+   "Gross Sales" es solo de referencia frente a IVA, no se debe sumar dos veces con "Net
+   Sales" en el beneficio). */
+const PNL_PLANTILLA_FIJA = [
+  { name:'Gross Sales',            tipo:'ingreso', indent:0, esAuto:true,  tipoEspecial:'informativo' },
+  { name:'Net Sales',              tipo:'ingreso', indent:0, esAuto:true },
+  { name:'Expected VAT',           tipo:'ingreso', indent:1, esAuto:true,  tipoEspecial:'informativo' },
+  { name:'COGS',                   tipo:'coste',   indent:0, esAuto:true },
+  { name:'Production Costs',       tipo:'coste',   indent:1, esAuto:true, tipoEspecial:'informativo' },
+  { name:'Inventory stock up',     tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Write-off Total',        tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Missing stock',          tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Gross Profit',           tipo:'ingreso', indent:0, tipoEspecial:'subtotal_acumulado' },
+  { name:'Wages',                  tipo:'coste',   indent:0, esAuto:true },
+  { name:'Barista',                tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Kitchen',                tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'End of contract payment',tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Cleaning',               tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Holidays paid',          tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Operating Profit',       tipo:'ingreso', indent:0, tipoEspecial:'subtotal_acumulado' },
+  { name:'Other operational costs',tipo:'coste',   indent:0, tipoEspecial:'subtotal_outline' },
+  { name:'Rent & Licences',        tipo:'coste',   indent:1, tipoEspecial:'subtotal_outline' },
+  { name:'Rent',                   tipo:'coste',   indent:2 },
+  { name:'Terrace Licence',        tipo:'coste',   indent:2 },
+  { name:'Other costs',            tipo:'coste',   indent:1, tipoEspecial:'subtotal_outline' },
+  { name:'Asset Insurance',        tipo:'coste',   indent:2 },
+  { name:'Card payment rates',     tipo:'coste',   indent:2 },
+  { name:'Electricity',            tipo:'coste',   indent:2 },
+  { name:'Gas',                    tipo:'coste',   indent:2 },
+  { name:'Water',                  tipo:'coste',   indent:2 },
+  { name:'Internet',               tipo:'coste',   indent:2 },
+  { name:'Alarm',                  tipo:'coste',   indent:2 },
+  { name:'Events',                 tipo:'coste',   indent:2 },
+  { name:'Square',                 tipo:'coste',   indent:2 },
+  { name:'Accountant',             tipo:'coste',   indent:2 },
+  { name:'Delivery service fees',  tipo:'coste',   indent:2 },
+  { name:'Overheads',              tipo:'coste',   indent:0, tipoEspecial:'subtotal_outline' },
+  { name:'Royalties',              tipo:'coste',   indent:1, esRecurrente:true },
+  { name:'Cleaning Supplies',      tipo:'coste',   indent:1 },
+  { name:'Operating Supplies',     tipo:'coste',   indent:1 },
+  { name:'Maintenance',            tipo:'coste',   indent:1 },
+  { name:'EBITDA',                 tipo:'ingreso', indent:0, tipoEspecial:'subtotal_acumulado' },
+];
+async function crearLineasPlantillaPnl(){
+  // se borran las líneas actuales (los valores manuales ya introducidos se quedan
+  // guardados en la base de datos por si hicieran falta, pero dejan de estar vinculados
+  // a ninguna línea visible) y se crean las 38 de la plantilla fija, en orden.
+  for(const l of [...STATE.pnlLines]){ try{ await sbDelete('pnl_lines', l.id); }catch(e){} }
+  STATE.pnlLines = [];
+  let orden = 0;
+  for(const def of PNL_PLANTILLA_FIJA){
+    const saved = await sbInsert('pnl_lines', { name:def.name, tipo:def.tipo, orden:orden++, es_auto:!!def.esAuto, es_recurrente:!!def.esRecurrente, indent:def.indent||0, tipo_especial:def.tipoEspecial||null });
+    STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:!!def.esAuto, esRecurrente:!!def.esRecurrente, indent:def.indent||0, esTitulo:false, tipoEspecial:def.tipoEspecial||null });
+  }
+  // Royalties: se crea también su entrada recurrente en Otros Costes, al 7% de ventas
+  // netas por defecto — el usuario puede ajustar el porcentaje luego en Costes.
+  const royaltiesLine = STATE.pnlLines.find(l=>l.name==='Royalties');
+  if(royaltiesLine){
+    await saveOtroCosteEntry('Royalties', 7, '2020-01-01', 'Plantilla PNL', 'pct_neto');
+  }
+}
 async function ensureDefaultPnlLines(){
-  let changed=false;
-  if(!STATE.pnlLines.find(l=>l.name==='Ventas' && l.esAuto)){
-    const saved = await sbInsert('pnl_lines', { name:'Ventas', tipo:'ingreso', orden:-2, es_auto:true });
-    STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:true }); changed=true;
+  // solo se crea la plantilla automáticamente si no hay NINGUNA línea todavía (instalación
+  // nueva) — si ya había líneas de antes, hace falta pulsar "Restablecer a la plantilla
+  // fija" a propósito, para no borrar nada sin que el usuario lo pida explícitamente.
+  if(STATE.pnlLines.length===0){
+    await crearLineasPlantillaPnl();
   }
-  if(!STATE.pnlLines.find(l=>l.name==='COGS' && l.esAuto)){
-    const saved = await sbInsert('pnl_lines', { name:'COGS', tipo:'coste', orden:-1, es_auto:true });
-    STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:true }); changed=true;
-  }
-  // "Coste laboral" solo se crea automáticamente una vez el usuario empieza a usar esta
-  // función (ha guardado al menos un tipo de empleado con su coste/hora) — así no aparece
-  // una línea siempre a 0 para quien no la usa.
-  if(STATE.employeeTypeCosts.length>0 && !STATE.pnlLines.find(l=>l.name==='Coste laboral' && l.esAuto)){
-    const saved = await sbInsert('pnl_lines', { name:'Coste laboral', tipo:'coste', orden:0, es_auto:true });
-    STATE.pnlLines.push({ id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:true }); changed=true;
-  }
-  if(changed) STATE.pnlLines.sort((a,b)=>a.orden-b.orden);
 }
 /* tabla de PNL para un widget de Resumen Ejecutivo — usa el MISMO cálculo que la pestaña
    PNL (mensual siempre, para que quepa bien en una página), pero con el periodo propio de
@@ -7929,8 +8021,16 @@ async function renderPnl(){
   const table = document.getElementById('tablaPnl');
   if(!table || !STATE.config.url || !STATE.config.anonKey) return;
   await ensureDefaultPnlLines();
-  const plantillaSel = document.getElementById('pnlPlantillaSelect');
-  if(plantillaSel && !plantillaSel.dataset.cargado){ plantillaSel.dataset.cargado = '1'; renderPnlPlantillasSelect(); }
+  const restablecerBtn = document.getElementById('pnlRestablecerPlantillaBtn');
+  if(restablecerBtn && !restablecerBtn.dataset.wired){
+    restablecerBtn.dataset.wired = '1';
+    restablecerBtn.addEventListener('click', async ()=>{
+      if(!confirm('¿Restablecer el PNL a la plantilla fija (Revenue, COGS, Wages, Overheads, EBITDA...)? Se borran las líneas actuales de la lista — los importes que ya tenías guardados se quedan en la base de datos, pero dejan de estar vinculados a ninguna fila visible. No se puede deshacer desde aquí.')) return;
+      await crearLineasPlantillaPnl();
+      toast('PNL restablecido a la plantilla fija ✓');
+      renderPnl();
+    });
+  }
   const gran = document.getElementById('pnlGranularidad').value;
   const { desde, hasta } = pnlRango();
   const todosLosBuckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
@@ -7949,6 +8049,10 @@ async function renderPnl(){
   document.querySelector('#tablaPnl thead tr').innerHTML = '<th>Línea</th>'+buckets.map(b=>'<th class="num">'+b.label+' <button class="btn secondary" data-hide-bucket="'+b.dateMin+'" title="Quitar esta columna de la vista" style="padding:0 5px;font-size:10px;">✕</button></th>').join('')+'<th></th>';
   renderPnlHiddenBucketsInfo(todosLosBuckets);
 
+  // se calculan TODOS los valores de una vez, bucket a bucket (los subtotales necesitan
+  // conocer el valor de las demás líneas, así que es más eficiente calcular todo el
+  // bucket junto que línea a línea).
+  const valoresPorBucket = buckets.map(b=>computePnlBucketValues(b, lines, allSalesLines, costHistory, otherCostHistory));
   let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
   const hiddenRows = getPnlHiddenRows();
   const rows = lines.map(line=>{
@@ -7962,22 +8066,38 @@ async function renderPnl(){
         <span class="no-print" style="color:var(--text-muted);">✥</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button>
       </td><td style="white-space:nowrap;">${indentBtns} ${moveBtns} <button class="btn danger" data-del-line="${line.id}" style="padding:2px 6px;font-size:10px;">✕</button> ${hideBtn}</td></tr>`;
     }
-    const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
-    values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
+    const esSubtotal = line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado';
+    const values = valoresPorBucket.map(vb=>vb[line.id]||0);
+    if(!esSubtotal && line.tipoEspecial!=='informativo'){
+      values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
+    }
     if(hiddenRows.has(line.id)) return ''; // no se renderiza, pero ya ha sumado a los totales
-    const soloLectura = line.esAuto || line.esRecurrente;
+    // las líneas automáticas (esAuto) YA NO son de solo lectura: se pueden corregir a
+    // mano para un mes suelto sin perder el cálculo automático para el resto — solo las
+    // recurrentes (que se editan en Costes → Otros costes) y los subtotales calculados
+    // siguen siendo de solo lectura aquí.
+    const soloLectura = line.esRecurrente || esSubtotal;
     const cells = values.map((v,bi)=>{
       if(soloLectura) return '<td class="num">'+eur(Math.round(v*100))+'</td>';
-      return '<td class="num"><input type="number" step="0.01" value="'+v.toFixed(2)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;text-align:right;"></td>';
+      const esOverrideManual = line.esAuto && pnlValorManualGuardado(line, buckets[bi])!==null;
+      const colorBorde = line.esAuto ? (esOverrideManual?'var(--copper)':'var(--positive)') : 'var(--line)';
+      const revertirBtn = esOverrideManual ? '<button data-revertir-auto="'+line.id+'|'+bi+'" title="Borrar la corrección manual y volver al valor automático" style="padding:0 4px;font-size:10px;background:none;border:none;color:var(--copper);cursor:pointer;">🔄</button>' : '';
+      return '<td class="num" style="white-space:nowrap;"><input type="number" step="0.01" value="'+v.toFixed(2)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:80px;background:var(--bg);border:1px solid '+colorBorde+';color:var(--text);border-radius:4px;padding:3px 6px;text-align:right;">'+revertirBtn+'</td>';
     }).join('');
-    const tag = line.esAuto ? 'auto' : (line.esRecurrente ? '<a href="#" data-goto-otroscoste="'+line.id+'" style="color:var(--copper);text-decoration:underline;">recurrente · editar</a>' : '');
+    let tag = '';
+    if(esSubtotal) tag = '<span class="hint">calculado</span>';
+    else if(line.esAuto) tag = '<span class="hint" title="Se calcula solo, pero puedes corregir cualquier celda a mano (borde naranja = corregido a mano; borde verde = automático)">auto · editable</span>';
+    else if(line.esRecurrente) tag = '<a href="#" data-goto-otroscoste="'+line.id+'" style="color:var(--copper);text-decoration:underline;">recurrente · editar</a>';
     const moveBtns = `<button class="btn secondary" data-move-up="${line.id}" title="Mover arriba" style="padding:2px 6px;font-size:10px;">↑</button> <button class="btn secondary" data-move-down="${line.id}" title="Mover abajo" style="padding:2px 6px;font-size:10px;">↓</button>`;
-    const accionesBase = soloLectura ? moveBtns+' <span class="hint">'+tag+'</span>' : moveBtns+` <button class="btn danger" data-del-line="${line.id}" style="padding:2px 6px;font-size:10px;">✕</button>`;
+    const copiarBtn = (!soloLectura && buckets.length>1) ? `<button class="btn secondary" data-copiar-fila="${line.id}" title="Copiar el valor de la primera columna visible al resto de esta fila" style="padding:2px 6px;font-size:10px;">→ copiar a toda la fila</button>` : '';
+    const recurrenteBtn = (!soloLectura && !line.esAuto) ? `<button class="btn secondary" data-hacer-recurrente="${line.id}" title="Convertir en un coste recurrente (mismo importe todos los meses en adelante, editable luego en Costes → Otros costes)" style="padding:2px 6px;font-size:10px;">🔁 hacer recurrente</button>` : '';
+    const accionesBase = soloLectura ? moveBtns+' <span class="hint">'+tag+'</span>' : moveBtns+` ${copiarBtn} ${recurrenteBtn} ${tag?'<span class="hint">'+tag+'</span>':'<button class=\"btn danger\" data-del-line=\"'+line.id+'\" style=\"padding:2px 6px;font-size:10px;\">✕</button>'}`;
     const hideBtn = `<button class="btn secondary" data-hide-line="${line.id}" title="Ocultar esta fila (no sale ni en pantalla ni al imprimir)" style="padding:2px 6px;font-size:10px;">🙈</button>`;
     const indent = line.indent||0;
     const indentBtns = `<button class="btn secondary" data-indent-out="${line.id}" title="Quitar sangría" style="padding:2px 6px;font-size:10px;" ${indent<=0?'disabled':''}>←</button> <button class="btn secondary" data-indent-in="${line.id}" title="Sangrar (mover hacia la derecha)" style="padding:2px 6px;font-size:10px;">→</button>`;
     const nombreCelda = `<span style="padding-left:${indent*20}px;display:inline-flex;align-items:center;gap:6px;"><span class="no-print" style="color:var(--text-muted);cursor:grab;">✥</span><span class="pill ${line.tipo==='ingreso'?'nuevo':'noident'}">${line.tipo}</span> <span data-nombre-linea="${line.id}">${line.name}</span> <button class="btn secondary" data-editar-nombre="${line.id}" title="Renombrar" style="padding:1px 6px;font-size:10px;">✏️</button></span>`;
-    return `<tr draggable="true" data-pnl-line-id="${line.id}" style="cursor:grab;"><td>${nombreCelda}</td>${cells}<td style="white-space:nowrap;">${indentBtns} ${accionesBase} ${hideBtn}</td></tr>`;
+    const filaStyle = esSubtotal ? 'cursor:grab;background:var(--surface-2);font-weight:700;' : 'cursor:grab;';
+    return `<tr draggable="true" data-pnl-line-id="${line.id}" style="${filaStyle}"><td>${nombreCelda}</td>${cells}<td style="white-space:nowrap;">${indentBtns} ${accionesBase} ${hideBtn}</td></tr>`;
   }).filter(Boolean).join('');
   document.querySelector('#tablaPnl tbody').innerHTML = rows || '<tr><td class="hint">Sin líneas todavía (o todas están ocultas).</td></tr>';
   renderPnlHiddenRowsInfo();
@@ -8049,17 +8169,64 @@ async function renderPnl(){
     });
   });
 
+  async function guardarValorPnlCelda(lineId, bucket, amount){
+    const solapados = STATE.pnlValues.filter(v=>v.lineId===lineId && !(bucket.dateMax<v.dateMin || bucket.dateMin>v.dateMax));
+    for(const v of solapados){ await sbDelete('pnl_values', v.id); STATE.pnlValues = STATE.pnlValues.filter(x=>x.id!==v.id); }
+    if(amount!==0){
+      const saved = await sbInsert('pnl_values', { line_id:lineId, date_min:bucket.dateMin, date_max:bucket.dateMax, amount });
+      STATE.pnlValues.push({ id:saved.id, lineId:saved.line_id, dateMin:saved.date_min, dateMax:saved.date_max, amount:parseFloat(saved.amount) });
+    }
+  }
   document.querySelectorAll('[data-pnl-cell]').forEach(inp=>{
     inp.addEventListener('change', async ()=>{
       const lineId = inp.getAttribute('data-line');
       const bucket = buckets[parseInt(inp.getAttribute('data-bucket'),10)];
-      const amount = parseFloat(inp.value)||0;
+      await guardarValorPnlCelda(lineId, bucket, parseFloat(inp.value)||0);
+      renderPnl();
+    });
+  });
+  document.querySelectorAll('[data-revertir-auto]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      const [lineId, bi] = btn.getAttribute('data-revertir-auto').split('|');
+      const bucket = buckets[parseInt(bi,10)];
       const solapados = STATE.pnlValues.filter(v=>v.lineId===lineId && !(bucket.dateMax<v.dateMin || bucket.dateMin>v.dateMax));
       for(const v of solapados){ await sbDelete('pnl_values', v.id); STATE.pnlValues = STATE.pnlValues.filter(x=>x.id!==v.id); }
-      if(amount!==0){
-        const saved = await sbInsert('pnl_values', { line_id:lineId, date_min:bucket.dateMin, date_max:bucket.dateMax, amount });
-        STATE.pnlValues.push({ id:saved.id, lineId:saved.line_id, dateMin:saved.date_min, dateMax:saved.date_max, amount:parseFloat(saved.amount) });
+      toast('Vuelto al valor automático.');
+      renderPnl();
+    });
+  });
+  document.querySelectorAll('[data-copiar-fila]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lineId = btn.getAttribute('data-copiar-fila');
+      const fila = btn.closest('tr');
+      const inputs = [...fila.querySelectorAll('[data-pnl-cell]')];
+      if(inputs.length<2) return;
+      const valorAcopiar = parseFloat(inputs[0].value)||0;
+      if(!confirm('¿Copiar '+eur(Math.round(valorAcopiar*100))+' (primera columna visible) al resto de columnas de esta fila? Sustituye lo que hubiera en ellas.')) return;
+      for(let i=1; i<inputs.length; i++){
+        const bucket = buckets[parseInt(inputs[i].getAttribute('data-bucket'),10)];
+        await guardarValorPnlCelda(lineId, bucket, valorAcopiar);
       }
+      renderPnl();
+    });
+  });
+  document.querySelectorAll('[data-hacer-recurrente]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const lineId = btn.getAttribute('data-hacer-recurrente');
+      const line = STATE.pnlLines.find(l=>l.id===lineId);
+      const fila = btn.closest('tr');
+      const primerInput = fila.querySelector('[data-pnl-cell]');
+      if(!line || !primerInput) return;
+      const amount = parseFloat(primerInput.value)||0;
+      if(!confirm('¿Convertir "'+line.name+'" en un coste recurrente de '+eur(Math.round(amount*100))+' al mes, a partir de '+buckets[0].dateMin+'? A partir de ahora se rellenará solo cada mes con este importe, hasta que lo cambies en Costes → Otros costes.')) return;
+      // se marca la línea como recurrente ANTES de guardar la entrada de Otros Costes:
+      // saveOtroCosteEntry busca una línea con este nombre que YA sea recurrente, así
+      // reutiliza esta misma línea en vez de crear una nueva con el mismo nombre.
+      await sbUpdate('pnl_lines', line.id, { es_recurrente:true });
+      line.esRecurrente = true;
+      await saveOtroCosteEntry(line.name, amount, buckets[0].dateMin, 'Hecho recurrente desde PNL', 'fijo');
+      toast('"'+line.name+'" ya es una línea recurrente.');
       renderPnl();
     });
   });
@@ -8137,7 +8304,7 @@ async function renderPnl(){
   if(ebitdaCanvas){
     const bucketsMes = monthBucketsInRange(desde, hasta);
     const lineaEbitda = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
-    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Ventas');
+    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Gross Sales');
     let ebitdaPorMes;
     if(lineaEbitda){
       // hay una línea llamada exactamente "EBITDA" (ej. subida a mano con "Importar mi
@@ -9500,6 +9667,21 @@ async function cajaLoadStorage(){
     const b = await cajaGet('cats'); if(b) STATE.caja.savedCats = b;
     const g = await cajaGet('groups'); if(g) STATE.caja.savedGroups = g;
     STATE.caja.savedMonths.forEach(aplicarSimplificacionSocios);
+    // reconciliar: cualquier categoría que ya exista de verdad en los movimientos
+    // guardados (por ejemplo, guardada hace tiempo o por otra vía) se añade a la lista
+    // general si le faltaba — así siempre está disponible como opción en cualquier fila,
+    // no solo en las que ya la tuvieran puesta.
+    const catsGastoReales = new Set(), catsIngresoReales = new Set();
+    STATE.caja.savedMonths.forEach(m=>(m.movements||[]).forEach(mv=>{
+      if(!mv.category || mv.category===CAJA_UNCATEGORIZED) return;
+      if(mv.amount<0) catsGastoReales.add(mv.category); else catsIngresoReales.add(mv.category);
+    }));
+    const faltanGasto = [...catsGastoReales].filter(c=>!STATE.caja.savedCats.gastos.includes(c));
+    const faltanIngreso = [...catsIngresoReales].filter(c=>!STATE.caja.savedCats.ingresos.includes(c));
+    if(faltanGasto.length>0 || faltanIngreso.length>0){
+      STATE.caja.savedCats = { gastos:[...STATE.caja.savedCats.gastos, ...faltanGasto], ingresos:[...STATE.caja.savedCats.ingresos, ...faltanIngreso] };
+      cajaSet('cats', STATE.caja.savedCats);
+    }
   }catch(e){ console.error('Caja load error:', e); }
   STATE.caja.storageLoaded = true;
 }
@@ -9580,13 +9762,16 @@ function aplicarSimplificacionSocios(entry){
 }
 
 function cajaUploadZoneHtml(id, label, sublabel, icon, file){
-  return `<label for="cajaFile_${id}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 14px;border-radius:12px;cursor:pointer;border:2px dashed ${file?'var(--copper)':'var(--line)'};background:${file?'var(--copper)11':'var(--surface-2)'};min-height:110px;transition:all .2s;">
-    <span style="font-size:24px;">${icon}</span>
-    <span style="color:var(--text);font-weight:600;font-size:12px;text-align:center;">${label}</span>
-    <span style="color:var(--text-muted);font-size:11px;text-align:center;">${sublabel}</span>
-    ${file ? `<span style="color:var(--copper);font-size:10px;font-family:monospace;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✓ ${file.name}</span>` : `<span style="color:var(--text-muted);font-size:11px;">Haz clic para elegir</span>`}
-    <input type="file" id="cajaFile_${id}" accept=".xlsx,.xls,.csv" style="display:none;">
-  </label>`;
+  return `<div style="position:relative;">
+    ${file ? `<button type="button" data-caja-cancelar-archivo="${id}" title="Quitar este archivo y elegir otro" style="position:absolute;top:6px;right:6px;z-index:2;background:var(--surface-2);border:1px solid var(--line);color:var(--text-muted);border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;line-height:1;">✕</button>` : ''}
+    <label for="cajaFile_${id}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px 14px;border-radius:12px;cursor:pointer;border:2px dashed ${file?'var(--copper)':'var(--line)'};background:${file?'var(--copper)11':'var(--surface-2)'};min-height:110px;transition:all .2s;">
+      <span style="font-size:24px;">${icon}</span>
+      <span style="color:var(--text);font-weight:600;font-size:12px;text-align:center;">${label}</span>
+      <span style="color:var(--text-muted);font-size:11px;text-align:center;">${sublabel}</span>
+      ${file ? `<span style="color:var(--copper);font-size:10px;font-family:monospace;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">✓ ${file.name}</span>` : `<span style="color:var(--text-muted);font-size:11px;">Haz clic para elegir</span>`}
+      <input type="file" id="cajaFile_${id}" accept=".xlsx,.xls,.csv" style="display:none;">
+    </label>
+  </div>`;
 }
 function renderCajaUploadScreen(){
   const c = STATE.caja;
@@ -9597,6 +9782,15 @@ function renderCajaUploadScreen(){
     document.getElementById('cajaFile_'+id).addEventListener('change', (e)=>{
       if(e.target.files[0]){ c.files[id] = e.target.files[0]; renderCajaUploadScreen(); }
     });
+    const cancelarBtn = document.getElementById('cajaUpload_'+id).querySelector('[data-caja-cancelar-archivo]');
+    if(cancelarBtn){
+      cancelarBtn.addEventListener('click', (e)=>{
+        e.preventDefault(); e.stopPropagation();
+        c.files[id] = null;
+        document.getElementById('cajaFile_'+id).value = '';
+        renderCajaUploadScreen();
+      });
+    }
   });
   document.getElementById('cajaProcesarBtn').disabled = !c.files.bank || c.loading;
   document.getElementById('cajaProcesarBtn').textContent = c.loading ? 'Procesando...' : 'Generar balance del mes';
@@ -9748,7 +9942,14 @@ function cajaCatSelectHtml(id, currentValue, options, placeholder){
   // en la lista de opciones conocidas, se añade aquí — si no, el <select> no tiene
   // ninguna opción que coincida y el navegador la muestra vacía, aunque por dentro sí
   // esté guardada correctamente. Parece confuso, como si no hubiera pasado nada.
-  const opcionesFinal = currentValue && !options.includes(currentValue) ? [...options, currentValue] : options;
+  // Igualmente, la categoría YA GUARDADA de este movimiento (placeholder) también se
+  // añade si falta — si no, un movimiento con una categoría que no está en la lista
+  // general (por ejemplo, guardada hace tiempo o desde otro sitio) no la puede volver a
+  // elegir explícitamente en el desplegable, aunque la vea de fondo como texto.
+  let opcionesFinal = currentValue && !options.includes(currentValue) ? [...options, currentValue] : options;
+  if(placeholder && placeholder!==CAJA_UNCATEGORIZED && !opcionesFinal.includes(placeholder)){
+    opcionesFinal = [...opcionesFinal, placeholder];
+  }
   return `<select data-cat-select="${id}" style="background:var(--bg);border:1px solid ${currentValue?'var(--positive)':'var(--line)'};border-radius:6px;color:${currentValue?'var(--text)':'var(--text-muted)'};font-size:12px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px;">
     <option value="">${placeholder||'— seleccionar —'}</option>
     ${opcionesFinal.map(o=>`<option value="${o}" ${o===currentValue?'selected':''}>${o}</option>`).join('')}
@@ -10004,7 +10205,8 @@ function renderCajaHeaderExtra(){
       <option value="">— Mes —</option>${mesesOpt.map(m=>`<option value="${m}" ${m===c.balanceMonth?'selected':''}>${CAJA_MESES[parseInt(m,10)]}</option>`).join('')}</select>
     <select id="cajaAnioSelect" style="background:var(--surface-2);border:2px solid var(--positive);border-radius:7px;color:var(--text);font-size:13px;padding:6px 10px;">
       <option value="">— Año —</option>${aniosOpt.map(y=>`<option value="${y}" ${y===c.balanceYear?'selected':''}>${y}</option>`).join('')}</select>
-    <button class="btn" id="cajaGuardarBtn" style="padding:8px 16px;" ${(!c.balanceMonth||!c.balanceYear)?'disabled title="Elige mes y año primero"':''}>Guardar${toCatCount>0?' ('+toCatCount+' sin categorizar)':''}</button>`;
+    <button class="btn" id="cajaGuardarBtn" style="padding:8px 16px;" ${(!c.balanceMonth||!c.balanceYear)?'disabled title="Elige mes y año primero"':''}>Guardar${toCatCount>0?' ('+toCatCount+' sin categorizar)':''}</button>
+    <button class="btn secondary" id="cajaCancelarSubidaBtn" title="Descartar esta subida y volver a elegir archivo">✕ Cancelar</button>`;
   }
   if(c.data && c.data.saved && !c.data.quickView){
     html += `<button class="btn secondary" id="cajaEditarBalanceBtn">Editar balance</button>`;
@@ -10014,6 +10216,17 @@ function renderCajaHeaderExtra(){
   const msel = document.getElementById('cajaMesSelect'); if(msel) msel.addEventListener('change', e=>{ c.balanceMonth=e.target.value; });
   const ysel = document.getElementById('cajaAnioSelect'); if(ysel) ysel.addEventListener('change', e=>{ c.balanceYear=e.target.value; });
   const gbtn = document.getElementById('cajaGuardarBtn'); if(gbtn) gbtn.addEventListener('click', cajaSaveMonth);
+  const cancelarSubidaBtn = document.getElementById('cajaCancelarSubidaBtn');
+  if(cancelarSubidaBtn){
+    cancelarSubidaBtn.addEventListener('click', ()=>{
+      if(!confirm('¿Descartar esta subida sin guardar y volver a elegir archivo? Se perderá cualquier categorización que hayas hecho en esta pantalla.')) return;
+      STATE.caja.data = null;
+      STATE.caja.files = { bank:null, personal:null, providers:null };
+      STATE.caja.pending = {};
+      STATE.caja.tab = 'categorizar';
+      renderCaja();
+    });
+  }
   const ebtn = document.getElementById('cajaEditarBalanceBtn'); if(ebtn) ebtn.addEventListener('click', ()=>cajaEditMonth(c.data.savedMonth));
 }
 function renderCajaCheckBarsKpis(){
