@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.179</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.184</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7677,13 +7677,14 @@ function costeLaboralParaBucket(bucket){
    cuenta subtotales, que se calculan aparte con el resto de líneas ya conocidas. */
 /* Categorías de gasto en Caja que cuentan como COGS (coste de alimentos y bebidas). */
 const PNL_COGS_CATEGORIAS_CAJA = ['bebidas', 'alimentos'];
-function cogsDesdeCaja(bucket){
+const PNL_WAGES_CATEGORIAS_CAJA = ['nominas'];
+function sumaCajaCategorias(bucket, categoriasNormalizadas){
   let suma = 0;
   (STATE.caja?.savedMonths||[]).forEach(entry=>{
     (entry.movements||[]).forEach(m=>{
       if(m.amount>=0) return; // solo gastos
       const cat = String(m.category||'').trim().toLowerCase();
-      if(!PNL_COGS_CATEGORIAS_CAJA.includes(cat)) return;
+      if(!categoriasNormalizadas.includes(cat)) return;
       if(m.fechaDia){
         if(m.fechaDia>=bucket.dateMin && m.fechaDia<=bucket.dateMax) suma += Math.abs(m.amount);
       } else if(m.month && m.month!=='Sin fecha'){
@@ -7694,6 +7695,9 @@ function cogsDesdeCaja(bucket){
     });
   });
   return suma;
+}
+function cogsDesdeCaja(bucket){ return sumaCajaCategorias(bucket, PNL_COGS_CATEGORIAS_CAJA); }
+function wagesDesdeCaja(bucket){ return sumaCajaCategorias(bucket, PNL_WAGES_CATEGORIAS_CAJA);
 }
 /* Para las líneas automáticas (esAuto), si el usuario ha introducido a mano un valor
    para ese bucket concreto (mismo mecanismo que las líneas manuales normales), ESE valor
@@ -7727,7 +7731,7 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
   } else if(line.esAuto && line.name==='Wages'){
-    valor = costeLaboralParaBucket(bucket);
+    valor = wagesDesdeCaja(bucket);
   } else if(line.esRecurrente){
     valor = otherCostValueForBucket(line.id, bucket, otherCostHistory, allSalesLines);
   } else {
@@ -7893,24 +7897,33 @@ async function renderPnlWidgetInstance(w){
   const lines = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
   const hiddenRows = getPnlHiddenRows(); // mismas filas ocultas que en la pestaña PNL, para coherencia
 
-  let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
+  // mismo motor de cálculo que la tabla principal de la pestaña PNL, para que los
+  // subtotales (COGS, Wages, Gross Profit, EBITDA...) salgan exactamente igual.
+  const valoresPorBucket = buckets.map(b=>computePnlBucketValues(b, lines, allSalesLines, costHistory, otherCostHistory));
+  const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
+
   const filas = lines.map(line=>{
     if(line.esTitulo){
       if(hiddenRows.has(line.id)) return '';
       return `<tr style="background:var(--surface-2);"><td colspan="${buckets.length+1}" style="padding-left:${(line.indent||0)*20}px;font-weight:700;">${line.name}</td></tr>`;
     }
-    const values = buckets.map(b=>pnlLineValueForBucket(line, b, allSalesLines, costHistory, otherCostHistory));
-    values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totalIngresos[bi]+=v; else totalCostes[bi]+=v; });
     if(hiddenRows.has(line.id)) return '';
+    const esSubtotal = line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado';
+    const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+    const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
     const indent = line.indent||0;
-    const cells = values.map(v=>'<td class="num">'+eur(Math.round(v*100))+'</td>').join('');
-    return `<tr><td style="padding-left:${indent*20}px;">${line.name}</td>${cells}</tr>`;
+    const cells = valoresPorBucket.map(vb=>{
+      const vSigno = conSigno(vb[line.id]||0);
+      const color = vSigno<0 ? 'var(--negative)' : 'var(--positive)';
+      return '<td class="num" style="color:'+color+';font-weight:'+(esSubtotal?'700':'600')+';">'+pnlFmt(vSigno)+'</td>';
+    }).join('');
+    const estiloFila = esSubtotal ? 'background:var(--surface-2);' : '';
+    return `<tr style="${estiloFila}"><td style="padding-left:${indent*20}px;${esSubtotal?'font-weight:700;':''}">${line.name}</td>${cells}</tr>`;
   }).filter(Boolean).join('');
-  const totalCells = buckets.map((b,bi)=>'<td class="num"><b>'+eur(Math.round((totalIngresos[bi]-totalCostes[bi])*100))+'</b></td>').join('');
 
   tableEl.innerHTML = `<table>
     <thead><tr><th>Línea</th>${buckets.map(b=>'<th class="num">'+b.label+'</th>').join('')}</tr></thead>
-    <tbody>${filas}<tr style="border-top:2px solid var(--line);"><td><b>Resultado</b></td>${totalCells}</tr></tbody>
+    <tbody>${filas}</tbody>
   </table>`;
 }
 /* widget de Resumen Ejecutivo: evolución de UNA línea del PNL elegida por el usuario
@@ -8090,14 +8103,17 @@ async function renderPnl(){
     // valor de por sí se guarde siempre en positivo internamente.
     const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
     const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
+    // formato con coma para los miles y sin decimales, para que los números grandes se
+    // lean de un vistazo (ej. 12,345€ en vez de 12.345,00 €)
+    const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
     const cells = values.map((v,bi)=>{
       const vSigno = conSigno(v);
       const colorTexto = vSigno<0 ? 'var(--negative)' : 'var(--positive)';
-      if(soloLectura) return '<td class="num" style="color:'+colorTexto+';font-weight:600;">'+eur(Math.round(vSigno*100))+'</td>';
+      if(soloLectura) return '<td class="num" style="color:'+colorTexto+';font-weight:600;">'+pnlFmt(vSigno)+'</td>';
       const esOverrideManual = line.esAuto && pnlValorManualGuardado(line, buckets[bi])!==null;
       const colorBorde = line.esAuto ? (esOverrideManual?'var(--copper)':'var(--positive)') : 'var(--line)';
       const revertirBtn = esOverrideManual ? '<button data-revertir-auto="'+line.id+'|'+bi+'" title="Borrar la corrección manual y volver al valor automático" style="padding:0 4px;font-size:10px;background:none;border:none;color:var(--copper);cursor:pointer;">🔄</button>' : '';
-      return '<td class="num" style="white-space:nowrap;"><input type="number" step="0.01" value="'+vSigno.toFixed(2)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:80px;background:var(--bg);border:1px solid '+colorBorde+';color:'+colorTexto+';font-weight:600;border-radius:4px;padding:3px 6px;text-align:right;">'+revertirBtn+'</td>';
+      return '<td class="num" style="white-space:nowrap;"><input type="number" step="1" value="'+Math.round(vSigno)+'" data-pnl-cell data-line="'+line.id+'" data-bucket="'+bi+'" style="width:80px;background:var(--bg);border:1px solid '+colorBorde+';color:'+colorTexto+';font-weight:600;border-radius:4px;padding:3px 6px;text-align:right;">'+revertirBtn+'</td>';
     }).join('');
     let tag = '';
     if(esSubtotal) tag = '<span class="hint">calculado</span>';
@@ -8264,25 +8280,26 @@ async function renderPnl(){
     });
   });
 
-  // Gráfico de evolución de una línea del PNL elegida — reutiliza los totales ya calculados arriba
+  // Gráfico de evolución de una línea del PNL elegida — reutiliza los cálculos ya hechos
+  // arriba para cada bucket (valoresPorBucket)
   const selLinea = document.getElementById('pnlGraficoLineaSelect');
   if(selLinea){
     const valorPrevio = selLinea.value;
-    selLinea.innerHTML =
-      '<option value="__resultado__">'+etiquetaR+' (EBITDA)</option>' +
-      '<option value="__totalIngresos__">'+etiquetaTI+'</option>' +
-      '<option value="__totalCostes__">'+etiquetaTC+'</option>' +
-      lines.filter(l=>!l.esTitulo).map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
-    if(valorPrevio && [...selLinea.options].some(o=>o.value===valorPrevio)) selLinea.value = valorPrevio;
-    const seleccion = selLinea.value;
-    let datosGrafico;
-    if(seleccion==='__resultado__') datosGrafico = resultado;
-    else if(seleccion==='__totalIngresos__') datosGrafico = totalIngresos;
-    else if(seleccion==='__totalCostes__') datosGrafico = totalCostes;
-    else {
-      const lineaElegida = lines.find(l=>l.id===seleccion);
-      datosGrafico = lineaElegida ? buckets.map(b=>pnlLineValueForBucket(lineaElegida, b, allSalesLines, costHistory, otherCostHistory)) : buckets.map(()=>0);
+    const lineasSeleccionables = lines.filter(l=>!l.esTitulo);
+    selLinea.innerHTML = lineasSeleccionables.map(l=>'<option value="'+l.id+'">'+l.name+'</option>').join('');
+    if(valorPrevio && [...selLinea.options].some(o=>o.value===valorPrevio)){
+      selLinea.value = valorPrevio;
+    } else {
+      // por defecto, la línea "EBITDA" si existe (o cualquier subtotal acumulado, o si
+      // no hay ninguna, la primera línea de la lista)
+      const porDefecto = lineasSeleccionables.find(l=>l.name.trim().toLowerCase()==='ebitda')
+        || lineasSeleccionables.find(l=>l.tipoEspecial==='subtotal_acumulado')
+        || lineasSeleccionables[0];
+      if(porDefecto) selLinea.value = porDefecto.id;
     }
+    const seleccion = selLinea.value;
+    const lineaElegida = lines.find(l=>l.id===seleccion);
+    const datosGrafico = lineaElegida ? valoresPorBucket.map(vb=>vb[lineaElegida.id]||0) : buckets.map(()=>0);
     const cChart = chartColors();
     STATE.charts['pnlLinea'] = safeNewChart('chartPnlLinea', {
       type: trendChartType(),
@@ -9605,7 +9622,15 @@ STATE.caja = {
 
 function cajaFmt(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(n??0); }
 function cajaParseAmt(val){ if(typeof val==='number') return val; return parseFloat(String(val).replace(/\./g,'').replace(',','.'))||0; }
-function cajaISearch(needle, haystack){ if(!needle||!haystack) return false; return String(haystack).toLowerCase().includes(String(needle).toLowerCase()); }
+/* quita acentos, mayúsculas, puntuación y espacios de más — así "Eco-Centro S.L.",
+   "ECO CENTRO" o "ecocentro" coinciden todas entre sí al comparar nombres de proveedor. */
+function cajaNormalizarNombre(s){
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'');
+}
+function cajaISearch(needle, haystack){
+  if(!needle||!haystack) return false;
+  return cajaNormalizarNombre(haystack).includes(cajaNormalizarNombre(needle));
+}
 /* Decide la categoría automática de un movimiento (gasto o ingreso), con las mismas
    reglas tanto si se acaba de subir un extracto nuevo como si se está revisando uno ya
    guardado. "movement" solo necesita concept, amount y rawG (el campo de
@@ -10502,17 +10527,6 @@ function renderCajaBalancesTab(el){
   if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
   if(c.savedMonths.length===0){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">No hay balances guardados.</p>'; return; }
   const revisionHtml = `
-    <div class="card" style="margin-bottom:20px;border:1px solid var(--copper);">
-      <h3>Revisar categorización de balances ya guardados</h3>
-      <p class="hint" style="margin-bottom:10px;">Vuelve a comprobar, con las reglas actuales, si algún movimiento de tus balances ya guardados debería ser "Gasto personal socio" o "Aportación socio" y no lo está — por ejemplo, si estas reglas se han mejorado después de guardar ese balance. No toca ninguna otra categoría.</p>
-      <p class="hint" style="margin-bottom:10px;">Si quieres que también revise proveedores personales con un importe concreto (no solo los marcados como "siempre personal"), sube aquí ese mismo archivo — opcional, la revisión de "Aportación socio" funciona igual sin él.</p>
-      <div class="subfilter" style="margin-bottom:10px;">
-        <input type="file" id="cajaRevisionPersonalFile" accept=".csv,.xlsx,.xls">
-        <button class="btn secondary" id="cajaRevisarBtn">Revisar todos los balances</button>
-      </div>
-      <div id="cajaRevisionResultado"></div>
-    </div>
-    <div class="card" style="margin-bottom:20px;">
       <h3>Descargar historial de "Gasto personal socio" y "Aportación socio"</h3>
       <p class="hint" style="margin-bottom:10px;">No es posible descargar los archivos originales que subiste (la app no los guarda, solo el resultado ya procesado) — pero aquí tienes un Excel con todos los movimientos de estas dos categorías, de todos los meses guardados, en una sola hoja.</p>
       <button class="btn secondary" id="cajaExportarSociosBtn">Descargar Excel</button>
@@ -10629,7 +10643,6 @@ function renderCajaBalancesTab(el){
       renderCajaTabContent();
     });
   });
-  document.getElementById('cajaRevisarBtn').addEventListener('click', cajaRevisarCategorizacion);
   document.getElementById('cajaExportarSociosBtn').addEventListener('click', cajaExportarSocios);
   el.querySelectorAll('[data-caja-corregir-reparto]').forEach(btn=>{
     btn.addEventListener('click', ()=>cajaCorregirReparto(btn.getAttribute('data-caja-corregir-reparto')));
@@ -10698,76 +10711,6 @@ function cajaExportarSocios(){
   toast('Excel descargado ✓');
 }
 let cajaRevisionCambios = [];
-async function cajaRevisarCategorizacion(){
-  const c = STATE.caja;
-  const resEl = document.getElementById('cajaRevisionResultado');
-  resEl.innerHTML = '<p class="hint">Revisando...</p>';
-  const catMap = c.savedProviders;
-  const alwaysPersonal = c.savedPersonalProvs.map(prov=>({prov,qty:0}));
-  let personalFromFile = [];
-  const fileInput = document.getElementById('cajaRevisionPersonalFile');
-  if(fileInput && fileInput.files[0]){
-    try{
-      const rows = await cajaParseSheet(fileInput.files[0], 1);
-      personalFromFile = rows.map(r=>{
-        const k=Object.keys(r);
-        const prov=String(r['Proveedor']||r['proveedor']||r[k[0]]||'').replace(/[\r\n\t]/g,' ').replace(/\s+/g,' ').trim();
-        const qty=cajaParseAmt(r['Cantidad']||r['cantidad']||r['Importe']||r['importe']||r[k[1]]||0);
-        return {prov,qty};
-      }).filter(p=>p.prov);
-    }catch(e){ toast('No se pudo leer el archivo de proveedores personales: '+e.message, true); }
-  }
-  const personalList = [...personalFromFile, ...alwaysPersonal.filter(ap=>!personalFromFile.some(p=>p.prov.toLowerCase()===ap.prov.toLowerCase()))];
-
-  cajaRevisionCambios = [];
-  c.savedMonths.forEach(entry=>{
-    (entry.movements||[]).forEach(m=>{
-      if(m.isRecategorizacionSocio) return; // no revisar las lineas sinteticas que genera la propia simplificacion
-      const sugerido = cajaCategorizarMovimiento(m, personalList, catMap);
-      if(!sugerido) return;
-      const esCambioRelevante = (sugerido.category==='💰 Aportacion socio' || sugerido.category==='👤 Gasto personal socio') && sugerido.category!==m.category;
-      if(esCambioRelevante){
-        cajaRevisionCambios.push({ month:entry.month, title:entry.title, movementId:m.id, concept:m.concept, amount:m.amount, categoriaActual:m.category, categoriaSugerida:sugerido.category });
-      }
-    });
-  });
-
-  if(cajaRevisionCambios.length===0){
-    resEl.innerHTML = '<p class="hint" style="color:var(--positive);">Revisado — no se ha encontrado ningún movimiento que debiera cambiar de categoría.</p>';
-    return;
-  }
-  resEl.innerHTML = `<p class="hint" style="margin-bottom:8px;">Se han encontrado ${cajaRevisionCambios.length} movimiento(s) que, con las reglas actuales, deberían cambiar de categoría:</p>
-    <div style="max-height:300px;overflow:auto;margin-bottom:10px;">
-      <table><thead><tr><th>Mes</th><th>Concepto</th><th>Importe</th><th>Categoría actual</th><th>Categoría sugerida</th></tr></thead>
-      <tbody>${cajaRevisionCambios.map(ch=>`<tr><td>${ch.title||ch.month}</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ch.concept}</td><td class="num">${cajaFmt(ch.amount)}</td><td class="hint">${ch.categoriaActual}</td><td style="color:var(--positive);">${ch.categoriaSugerida}</td></tr>`).join('')}</tbody></table>
-    </div>
-    <button class="btn" id="cajaAplicarRevisionBtn">Aplicar estas ${cajaRevisionCambios.length} correcciones</button>`;
-  document.getElementById('cajaAplicarRevisionBtn').addEventListener('click', cajaAplicarRevisionCategorizacion);
-}
-async function cajaAplicarRevisionCategorizacion(){
-  const c = STATE.caja;
-  const resEl = document.getElementById('cajaRevisionResultado');
-  const porMes = {};
-  cajaRevisionCambios.forEach(ch=>{ (porMes[ch.month]=porMes[ch.month]||[]).push(ch); });
-  Object.keys(porMes).forEach(month=>{
-    const entry = c.savedMonths.find(x=>x.month===month);
-    if(!entry) return;
-    porMes[month].forEach(ch=>{
-      const mov = (entry.movements||[]).find(m=>m.id===ch.movementId);
-      if(mov) mov.category = ch.categoriaSugerida;
-      if(entry.movementsOriginal){
-        const movOrig = entry.movementsOriginal.find(m=>m.id===ch.movementId);
-        if(movOrig) movOrig.category = ch.categoriaSugerida;
-      }
-    });
-    aplicarSimplificacionSocios(entry);
-  });
-  await cajaSet('months', c.savedMonths);
-  cajaRevisionCambios = [];
-  resEl.innerHTML = '<p class="hint" style="color:var(--positive);">Correcciones aplicadas ✓</p>';
-  toast('Categorías corregidas en '+Object.keys(porMes).length+' balance(s).');
-  renderCajaTabContent();
-}
 
 function renderCajaProveedoresTab(el){
   const c = STATE.caja;
