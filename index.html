@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.177</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.179</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7829,14 +7829,13 @@ const PNL_PLANTILLA_FIJA = [
   { name:'Terrace Licence',        tipo:'coste',   indent:2 },
   { name:'Other costs',            tipo:'coste',   indent:1, tipoEspecial:'subtotal_outline' },
   { name:'Asset Insurance',        tipo:'coste',   indent:2 },
-  { name:'Card payment rates',     tipo:'coste',   indent:2 },
+  { name:'Card payment rates',     tipo:'coste',   indent:2, esRecurrente:true },
   { name:'Electricity',            tipo:'coste',   indent:2 },
   { name:'Gas',                    tipo:'coste',   indent:2 },
   { name:'Water',                  tipo:'coste',   indent:2 },
   { name:'Internet',               tipo:'coste',   indent:2 },
   { name:'Alarm',                  tipo:'coste',   indent:2 },
   { name:'Events',                 tipo:'coste',   indent:2 },
-  { name:'Square',                 tipo:'coste',   indent:2 },
   { name:'Accountant',             tipo:'coste',   indent:2 },
   { name:'Delivery service fees',  tipo:'coste',   indent:2 },
   { name:'Overheads',              tipo:'coste',   indent:0, tipoEspecial:'subtotal_outline' },
@@ -7862,6 +7861,11 @@ async function crearLineasPlantillaPnl(){
   const royaltiesLine = STATE.pnlLines.find(l=>l.name==='Royalties');
   if(royaltiesLine){
     await saveOtroCosteEntry('Royalties', 7, '2020-01-01', 'Plantilla PNL', 'pct_neto');
+  }
+  // Card payment rates: igual, pero al 2% de las ventas pagadas con tarjeta ese mes.
+  const cardRatesLine = STATE.pnlLines.find(l=>l.name==='Card payment rates');
+  if(cardRatesLine){
+    await saveOtroCosteEntry('Card payment rates', 2, '2020-01-01', 'Plantilla PNL', 'pct_tarjeta');
   }
 }
 async function ensureDefaultPnlLines(){
