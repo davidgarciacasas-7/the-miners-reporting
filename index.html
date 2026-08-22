@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.185</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.188</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1349,20 +1349,37 @@ Bowl de acai,Acai,150,g</pre>
           <div id="uploadStatus" style="margin-top:10px;"></div>
         </div>
         <div class="section-title">Propinas</div>
-        <div class="card">
-          <p class="hint" style="margin-bottom:10px;">Registro de referencia, mensual — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago). No afecta a ningún cálculo de esta app; para eso está la pestaña Caja, que trabaja con el extracto bancario real.</p>
+        <p class="hint" style="margin-bottom:10px;">Registro de referencia, mensual — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago), así que se anotan aquí a mano. <b>Pagadas</b>: las que se reparten a los empleados — se pueden descontar de la línea de nóminas del PNL y del gráfico de costes de Caja. <b>Cobradas</b>: las que se reciben de los clientes — se pueden descontar de los gráficos de ingresos de Square, con la opción correspondiente en Caja.</p>
+        <div class="card" style="margin-bottom:14px;">
+          <h3 style="margin-bottom:4px;">Propinas pagadas <span class="hint" style="font-weight:400;">(a empleados)</span></h3>
           <div class="subfilter">
-            <select id="propinaMes">
+            <select id="propinaMes_pagada">
               <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option>
               <option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option>
               <option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
             </select>
-            <select id="propinaAnio"></select>
-            <input type="number" step="0.01" min="0" id="propinaImporte" placeholder="Importe (€)" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
-            <button class="btn secondary" id="propinaAddBtn" style="padding:5px 10px;font-size:12px;">Guardar</button>
+            <select id="propinaAnio_pagada"></select>
+            <input type="number" step="0.01" min="0" id="propinaImporte_pagada" placeholder="Importe (€)" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="propinaAddBtn_pagada" style="padding:5px 10px;font-size:12px;">Guardar</button>
           </div>
           <div style="max-height:280px;overflow:auto;margin-top:12px;">
-            <table id="tablaPropinas"><thead><tr><th>Mes</th><th>Importe</th><th></th></tr></thead><tbody></tbody></table>
+            <table id="tablaPropinas_pagada"><thead><tr><th>Mes</th><th>Importe</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:4px;">Propinas cobradas <span class="hint" style="font-weight:400;">(de clientes)</span></h3>
+          <div class="subfilter">
+            <select id="propinaMes_cobrada">
+              <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option><option value="04">Abril</option>
+              <option value="05">Mayo</option><option value="06">Junio</option><option value="07">Julio</option><option value="08">Agosto</option>
+              <option value="09">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <select id="propinaAnio_cobrada"></select>
+            <input type="number" step="0.01" min="0" id="propinaImporte_cobrada" placeholder="Importe (€)" style="width:120px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
+            <button class="btn secondary" id="propinaAddBtn_cobrada" style="padding:5px 10px;font-size:12px;">Guardar</button>
+          </div>
+          <div style="max-height:280px;overflow:auto;margin-top:12px;">
+            <table id="tablaPropinas_cobrada"><thead><tr><th>Mes</th><th>Importe</th><th></th></tr></thead><tbody></tbody></table>
           </div>
         </div>
 
@@ -1695,7 +1712,7 @@ async function loadAllData(){
     STATE.inventarios = (await sbList('inventarios', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, nota:r.nota }));
     STATE.inventarioItems = (await sbList('inventario_items', 'select=*')).map(r=>({ id:r.id, inventarioId:r.inventario_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad }));
     STATE.employees = (await sbList('empleados', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre, activo:r.activo }));
-    STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), nota:r.nota }));
+    STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), tipo:r.tipo||'pagada' }));
   }catch(e){
     console.error('Error cargando datos de PNL/COGS', e);
   }
@@ -2031,45 +2048,55 @@ const NOMBRES_MES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Jul
 async function loadAndRenderPropinas(){
   try{
     const rows = await sbList('propinas', 'select=*&order=fecha.desc');
-    STATE.propinas = rows.map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe) }));
+    STATE.propinas = rows.map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), tipo:r.tipo||'pagada' }));
   }catch(e){ toast('No se pudo cargar propinas: '+e.message, true); STATE.propinas=[]; }
   renderPropinas();
 }
 function renderPropinas(){
-  const tbody = document.querySelector('#tablaPropinas tbody');
-  if(!tbody) return;
-  tbody.innerHTML = STATE.propinas.map(p=>{
-    const [anio,mes] = p.fecha.split('-');
-    const etiquetaMes = NOMBRES_MES_LARGO[parseInt(mes,10)-1]+' '+anio;
-    return `<tr><td>${etiquetaMes}</td><td class="num">${eur(Math.round(p.importe*100))}</td>
-    <td><button class="btn danger" data-del-propina="${p.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
-  }).join('') || '<tr><td colspan="3" class="hint">Sin propinas registradas todavía.</td></tr>';
-  tbody.querySelectorAll('[data-del-propina]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      if(!confirm('¿Eliminar este registro de propinas?')) return;
-      const id = btn.getAttribute('data-del-propina');
-      await sbDelete('propinas', id);
-      STATE.propinas = STATE.propinas.filter(p=>p.id!==id);
-      renderPropinas();
+  ['pagada','cobrada'].forEach(tipo=>{
+    const tbody = document.querySelector('#tablaPropinas_'+tipo+' tbody');
+    if(!tbody) return;
+    const filas = STATE.propinas.filter(p=>p.tipo===tipo);
+    tbody.innerHTML = filas.map(p=>{
+      const [anio,mes] = p.fecha.split('-');
+      const etiquetaMes = NOMBRES_MES_LARGO[parseInt(mes,10)-1]+' '+anio;
+      return `<tr><td>${etiquetaMes}</td><td class="num">${eur(Math.round(p.importe*100))}</td>
+      <td><button class="btn danger" data-del-propina="${p.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>`;
+    }).join('') || '<tr><td colspan="3" class="hint">Sin propinas registradas todavía.</td></tr>';
+    tbody.querySelectorAll('[data-del-propina]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if(!confirm('¿Eliminar este registro de propinas?')) return;
+        const id = btn.getAttribute('data-del-propina');
+        await sbDelete('propinas', id);
+        STATE.propinas = STATE.propinas.filter(p=>p.id!==id);
+        renderPropinas();
+      });
     });
   });
 }
-document.getElementById('propinaAddBtn').addEventListener('click', async ()=>{
-  const mes = document.getElementById('propinaMes').value;
-  const anio = document.getElementById('propinaAnio').value;
-  const importe = parseFloat(document.getElementById('propinaImporte').value);
-  if(!mes || !anio || isNaN(importe)){ toast('Elige mes, año, e indica el importe.', true); return; }
-  const fecha = anio+'-'+mes+'-01';
-  try{
-    const saved = await sbUpsert('propinas', { fecha, importe }, 'fecha');
-    STATE.propinas = STATE.propinas.filter(p=>p.fecha!==fecha);
-    STATE.propinas.unshift({ id:saved.id, fecha:saved.fecha, importe:parseFloat(saved.importe) });
-    STATE.propinas.sort((a,b)=>b.fecha.localeCompare(a.fecha));
-    document.getElementById('propinaImporte').value='';
-    renderPropinas();
-    toast('Guardado.');
-  }catch(e){ toast('Error: '+e.message, true); }
-});
+function wirePropinaAddBtn(tipo){
+  const btn = document.getElementById('propinaAddBtn_'+tipo);
+  if(!btn || btn.dataset.wired) return;
+  btn.dataset.wired = '1';
+  btn.addEventListener('click', async ()=>{
+    const mes = document.getElementById('propinaMes_'+tipo).value;
+    const anio = document.getElementById('propinaAnio_'+tipo).value;
+    const importe = parseFloat(document.getElementById('propinaImporte_'+tipo).value);
+    if(!mes || !anio || isNaN(importe)){ toast('Elige mes, año, e indica el importe.', true); return; }
+    const fecha = anio+'-'+mes+'-01';
+    try{
+      const saved = await sbUpsert('propinas', { fecha, importe, tipo }, 'fecha,tipo');
+      STATE.propinas = STATE.propinas.filter(p=>!(p.fecha===fecha && p.tipo===tipo));
+      STATE.propinas.unshift({ id:saved.id, fecha:saved.fecha, importe:parseFloat(saved.importe), tipo:saved.tipo });
+      STATE.propinas.sort((a,b)=>b.fecha.localeCompare(a.fecha));
+      document.getElementById('propinaImporte_'+tipo).value='';
+      renderPropinas();
+      toast('Guardado.');
+    }catch(e){ toast('Error: '+e.message, true); }
+  });
+}
+wirePropinaAddBtn('pagada');
+wirePropinaAddBtn('cobrada');
 
 /* =========================================================
    CONFIGURACION
@@ -2675,12 +2702,13 @@ function trendDataset(label, data, color){
 function getShowDataLabels(){ return localStorage.getItem('miners_show_datalabels')==='true'; }
 /* excluir "Fuera de horario" de los cálculos/gráficos de Performance, Rentabilidad y Rendimiento */
 function getExcluirFueraHorario(){ return localStorage.getItem('miners_excluir_fuera_horario')==='true'; }
-/* propinas — suma en un rango de fechas (para PNL), y por mes concreto (para Caja) */
-function sumaPropinasEnRango(desde, hasta){
-  return (STATE.propinas||[]).filter(p=>p.fecha>=desde && p.fecha<=hasta).reduce((s,p)=>s+p.importe,0);
+/* propinas — suma en un rango de fechas (para PNL), y por mes concreto (para Caja) —
+   tipo: 'pagada' (a empleados) o 'cobrada' (de clientes) */
+function sumaPropinasEnRango(desde, hasta, tipo){
+  return (STATE.propinas||[]).filter(p=>p.fecha>=desde && p.fecha<=hasta && p.tipo===tipo).reduce((s,p)=>s+p.importe,0);
 }
-function cajaPropinasDelMes(monthStr){
-  return (STATE.propinas||[]).filter(p=>p.fecha.slice(0,7)===monthStr).reduce((s,p)=>s+p.importe,0);
+function cajaPropinasDelMes(monthStr, tipo){
+  return (STATE.propinas||[]).filter(p=>p.fecha.slice(0,7)===monthStr && p.tipo===tipo).reduce((s,p)=>s+p.importe,0);
 }
 /* PNL: línea designada como "nóminas" (para poder restarle las propinas), preferencia local */
 function getPnlLineaNomina(){ return localStorage.getItem('miners_pnl_linea_nomina') || ''; }
@@ -2692,6 +2720,17 @@ function getCajaCategoriaNomina(){ return localStorage.getItem('miners_caja_cate
 function setCajaCategoriaNomina(v){ localStorage.setItem('miners_caja_categoria_nomina', v); }
 function getExcluirPropinasNominaCaja(){ return localStorage.getItem('miners_caja_excluir_propinas')==='true'; }
 function setExcluirPropinasNominaCaja(v){ localStorage.setItem('miners_caja_excluir_propinas', v?'true':'false'); }
+/* Ventas: descontar propinas COBRADAS de los gráficos de ingresos de Square — el
+   interruptor vive en Caja (pestaña Tendencias), pero afecta a los gráficos de Ventas. */
+function getExcluirPropinasCobradasCaja(){ return localStorage.getItem('miners_caja_excluir_propinas_cobradas')==='true'; }
+function setExcluirPropinasCobradasCaja(v){ localStorage.setItem('miners_caja_excluir_propinas_cobradas', v?'true':'false'); }
+/* ingreso de un mes de Caja, descontando las propinas COBRADAS de ese mes si el
+   interruptor está activado — las transferencias de Square a la cuenta bancaria
+   incluyen las propinas mezcladas con la venta, así que esto las separa de nuevo. */
+function cajaIngresoAjustado(totalIncome, monthStr){
+  if(!getExcluirPropinasCobradasCaja()) return totalIncome;
+  return totalIncome - cajaPropinasDelMes(monthStr, 'cobrada');
+}
 function setExcluirFueraHorario(v){ localStorage.setItem('miners_excluir_fuera_horario', v?'true':'false'); }
 function franjaOrderNegocioFiltrado(){
   const orden = franjaOrderFor('negocio');
@@ -6945,7 +6984,7 @@ async function calcularCajaSerieMensual(desde, hasta, tipo){
   const data = mesesFiltrados.map(m=>{
     if(tipo==='gastos') return +Math.abs(m.totalExpense).toFixed(2);
     if(tipo==='ingresos') return +cajaSquareIncomeDeMes(m).toFixed(2);
-    return +(m.totalIncome + m.totalExpense).toFixed(2);
+    return +(cajaIngresoAjustado(m.totalIncome,m.month) + m.totalExpense).toFixed(2);
   });
   return { labels, data };
 }
@@ -7740,7 +7779,7 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     valor = sum;
   }
   if(getExcluirPropinasNominaPnl() && line.id===getPnlLineaNomina()){
-    valor -= sumaPropinasEnRango(bucket.dateMin, bucket.dateMax);
+    valor -= sumaPropinasEnRango(bucket.dateMin, bucket.dateMax, 'pagada');
   }
   return valor;
 }
@@ -10320,10 +10359,12 @@ function renderCajaCheckBarsKpis(){
     ? barra('Gastos', c.data.rawGastos, cajaAccG()) + barra('Ingresos', c.data.rawIngresos, cajaAccI())
     : '';
   const toCatCount = cajaToCat().gastos.length + cajaToCat().ingresos.length;
-  const bal = c.data.totalIncome + c.data.totalExpense;
+  const monthStrSesion = (c.balanceMonth && c.balanceYear) ? (c.balanceYear+'-'+c.balanceMonth.padStart(2,'0')) : '';
+  const ingresoAjustado = cajaIngresoAjustado(c.data.totalIncome, monthStrSesion);
+  const bal = ingresoAjustado + c.data.totalExpense;
   const kpis = [
     ['Gasto Total', cajaFmt(Math.abs(c.data.totalExpense)), 'var(--copper)'],
-    ['Ingresos', cajaFmt(c.data.totalIncome), 'var(--positive)'],
+    ['Ingresos'+(getExcluirPropinasCobradasCaja()&&monthStrSesion?' (sin propinas)':''), cajaFmt(ingresoAjustado), 'var(--positive)'],
     ['Balance', cajaFmt(bal), bal>=0?'var(--positive)':'var(--negative)'],
     ['Movimientos', c.data.movements.length, '#241B12'],
     ['A categorizar', toCatCount, toCatCount>0?'var(--copper)':'var(--positive)'],
@@ -10539,7 +10580,8 @@ function renderCajaBalancesTab(el){
       <button class="btn secondary" id="cajaExportarSociosBtn">Descargar Excel</button>
     </div>`;
   el.innerHTML = revisionHtml + [...c.savedMonths].reverse().map(m=>{
-    const bal = m.totalIncome + m.totalExpense;
+    const ingresoAjustado = cajaIngresoAjustado(m.totalIncome, m.month);
+    const bal = ingresoAjustado + m.totalExpense;
     const hayDiferencia = Math.abs(m.diferenciaSocios||0)>=0.005;
     // movimientos cuya fecha valor real (campo .month, por fila) no coincide con el mes
     // de este balance — restos de extractos donde el banco incluyó algún día de otro mes.
@@ -10557,7 +10599,7 @@ function renderCajaBalancesTab(el){
         <div><div style="color:var(--copper);font-weight:700;font-size:17px;">${m.title||m.month}</div><p class="hint" style="margin-top:2px;">Guardado: ${new Date(m.savedAt).toLocaleDateString('es-ES')}</p></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span style="color:var(--negative);font-family:monospace;font-size:13px;font-weight:700;">↓ ${cajaFmt(Math.abs(m.totalExpense))}</span>
-          <span style="color:var(--positive);font-family:monospace;font-size:13px;font-weight:700;">↑ ${cajaFmt(m.totalIncome)}</span>
+          <span style="color:var(--positive);font-family:monospace;font-size:13px;font-weight:700;">↑ ${cajaFmt(ingresoAjustado)}${getExcluirPropinasCobradasCaja()?' <span class="hint" style="font-weight:400;">(sin propinas)</span>':''}</span>
           <span style="color:${bal>=0?'var(--positive)':'var(--negative)'};font-family:monospace;font-size:13px;font-weight:700;">${cajaFmt(bal)}</span>
           <button class="btn secondary" data-caja-editar-mes="${m.month}" style="padding:6px 12px;font-size:12px;">Editar</button>
           ${c.confirmDelete===m.month
@@ -10830,11 +10872,15 @@ function cajaPeriodoFiltrado(grafPeriod, grafFrom, grafTo){
   });
 }
 function cajaSquareIncomeDeMes(m){
-  return (m.movements||[]).filter(mv=>{
+  const bruto = (m.movements||[]).filter(mv=>{
     if(mv.amount<0) return false;
     const tt=[mv.rawG,mv.concept,mv.concept?.split(' · ')[0],mv.concept?.split(' · ')[1],mv.category].filter(Boolean);
     return tt.some(t=>cajaISearch(CAJA_SQUARE_KEYWORD,t)||cajaISearch('EFECTIVO',t));
   }).reduce((s,mv)=>s+mv.amount,0);
+  // esta cifra sale del extracto bancario real (no de un export limpio de Square), así
+  // que las transferencias pueden traer las propinas cobradas mezcladas con la venta —
+  // si el interruptor está activado, se descuentan aquí también.
+  return cajaIngresoAjustado(bruto, m.month);
 }
 function cajaFiltroPeriodoHtml(grafPeriod, grafFrom, grafTo, savedMonths){
   return `<span class="hint">Periodo:</span>` +
@@ -10869,7 +10915,7 @@ function renderCajaTendenciasTab(el){
     let g = excludedCats.length>0 ? (m.catData||[]).filter(x=>!excludedCats.includes(x.name)).reduce((s,x)=>s+x.value,0) : Math.abs(m.totalExpense);
     const catNomina = getCajaCategoriaNomina();
     if(getExcluirPropinasNominaCaja() && catNomina && !excludedCats.includes(catNomina)){
-      g -= cajaPropinasDelMes(m.month);
+      g -= cajaPropinasDelMes(m.month, 'pagada');
     }
     return g;
   };
@@ -10880,7 +10926,7 @@ function renderCajaTendenciasTab(el){
     { title:'Ingresos Square + Efectivo', color:'var(--positive)', colorHex:'#3DD68C',
       data: tendPeriod.map(m=>({ month:m.title||m.month, value: c.tendView==='pct' ? 100 : (sqByMonth[m.title||m.month]||0) })) },
     { title:'Balance mensual'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':'')+nominaTitleSuffix, color:'var(--copper)', colorHex:'#C17F3C',
-      data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(m.totalIncome-gastosDeMes(m), m.title||m.month) })) },
+      data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(cajaIngresoAjustado(m.totalIncome,m.month)-gastosDeMes(m), m.title||m.month) })) },
   ];
 
   const todasCatsNomina = [...new Set(c.savedMonths.flatMap(m=>(m.catData||[]).map(x=>x.name)))].sort();
@@ -10898,6 +10944,9 @@ function renderCajaTendenciasTab(el){
       </select>
       <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="cajaExcluirPropinasNomina" ${getExcluirPropinasNominaCaja()?'checked':''}> Excluir propinas de esa categoría</label>
     </div>
+    <div class="card" style="margin-bottom:16px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="cajaExcluirPropinasCobradasCaja" ${getExcluirPropinasCobradasCaja()?'checked':''}> Descontar las propinas cobradas de los ingresos (llegan mezcladas en las transferencias de Square)</label>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
       <div style="position:relative;">
         <button class="btn secondary" id="cajaExcluirCatsBtn" style="padding:5px 12px;font-size:12px;">Excluir categorías${excludedCats.length>0?' ('+excludedCats.length+')':''}</button>
@@ -10910,6 +10959,7 @@ function renderCajaTendenciasTab(el){
 
   document.getElementById('cajaCategoriaNominaSelect').addEventListener('change', (e)=>{ setCajaCategoriaNomina(e.target.value); renderCajaTabContent(); });
   document.getElementById('cajaExcluirPropinasNomina').addEventListener('change', (e)=>{ setExcluirPropinasNominaCaja(e.target.checked); renderCajaTabContent(); });
+  document.getElementById('cajaExcluirPropinasCobradasCaja').addEventListener('change', (e)=>{ setExcluirPropinasCobradasCaja(e.target.checked); renderCajaTabContent(); });
 
   const excluirBtn = document.getElementById('cajaExcluirCatsBtn');
   const excluirMenu = document.getElementById('cajaExcluirCatsMenu');
@@ -11410,7 +11460,7 @@ function cajaExportTab(tabId, format){
     if(tabId==='movimientos' || tabId==='categorizar'){
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((c.data?.movements||[]).map(m=>({Mes:m.month,Concepto:m.concept,Importe:m.amount,Categoría:m.category,Tipo:m.amount<0?'Gasto':'Ingreso'}))), 'Movimientos');
     } else if(tabId==='balances'){
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(c.savedMonths.map(m=>({Mes:m.title||m.month, Gastos:Math.abs(m.totalExpense).toFixed(2), Ingresos:m.totalIncome.toFixed(2), Balance:(m.totalIncome+m.totalExpense).toFixed(2)}))), 'Balances');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(c.savedMonths.map(m=>{ const ing=cajaIngresoAjustado(m.totalIncome,m.month); return {Mes:m.title||m.month, Gastos:Math.abs(m.totalExpense).toFixed(2), Ingresos:ing.toFixed(2), Balance:(ing+m.totalExpense).toFixed(2)}; })), 'Balances');
     } else if(tabId==='proveedores'){
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(c.savedProviders.map(p=>({Proveedor:p.prov, Categoría:p.cat}))), 'Proveedores');
     } else {
@@ -11427,7 +11477,7 @@ function cajaExportTab(tabId, format){
     }
     if(tabId==='balances'){
       html += '<table><tr><th>Mes</th><th class="r">Gastos</th><th class="r">Ingresos</th><th class="r">Balance</th></tr>';
-      c.savedMonths.forEach(m=>{ const b=m.totalIncome+m.totalExpense; html += '<tr><td>'+(m.title||m.month)+'</td><td class="r">'+cajaFmt(Math.abs(m.totalExpense))+'</td><td class="r">'+cajaFmt(m.totalIncome)+'</td><td class="r">'+cajaFmt(b)+'</td></tr>'; });
+      c.savedMonths.forEach(m=>{ const ing=cajaIngresoAjustado(m.totalIncome,m.month); const b=ing+m.totalExpense; html += '<tr><td>'+(m.title||m.month)+'</td><td class="r">'+cajaFmt(Math.abs(m.totalExpense))+'</td><td class="r">'+cajaFmt(ing)+'</td><td class="r">'+cajaFmt(b)+'</td></tr>'; });
       html += '</table>';
     }
     if(tabId==='proveedores'){
@@ -12413,15 +12463,17 @@ function showApp(){
   actualizarRendFiltroDiaTipoBoton();
   const hoy = fechaLocalISO(new Date());
   const vacFechaEl = document.getElementById('vacFecha'); if(vacFechaEl && !vacFechaEl.value) vacFechaEl.value = hoy;
-  const propinaAnioEl = document.getElementById('propinaAnio');
-  if(propinaAnioEl && !propinaAnioEl.dataset.cargado){
-    const anioActual = parseInt(hoy.slice(0,4),10);
-    const anios = []; for(let a=anioActual-2; a<=anioActual+1; a++) anios.push(a);
-    propinaAnioEl.innerHTML = anios.map(a=>'<option value="'+a+'" '+(a===anioActual?'selected':'')+'>'+a+'</option>').join('');
-    propinaAnioEl.dataset.cargado = '1';
-    const propinaMesEl = document.getElementById('propinaMes');
-    if(propinaMesEl) propinaMesEl.value = hoy.slice(5,7);
-  }
+  ['pagada','cobrada'].forEach(tipo=>{
+    const propinaAnioEl = document.getElementById('propinaAnio_'+tipo);
+    if(propinaAnioEl && !propinaAnioEl.dataset.cargado){
+      const anioActual = parseInt(hoy.slice(0,4),10);
+      const anios = []; for(let a=anioActual-2; a<=anioActual+1; a++) anios.push(a);
+      propinaAnioEl.innerHTML = anios.map(a=>'<option value="'+a+'" '+(a===anioActual?'selected':'')+'>'+a+'</option>').join('');
+      propinaAnioEl.dataset.cargado = '1';
+      const propinaMesEl = document.getElementById('propinaMes_'+tipo);
+      if(propinaMesEl) propinaMesEl.value = hoy.slice(5,7);
+    }
+  });
   const hxFechaEl = document.getElementById('hxFecha'); if(hxFechaEl && !hxFechaEl.value) hxFechaEl.value = hoy;
 }
 document.getElementById('logoutBtn').addEventListener('click', ()=>{
