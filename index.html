@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.184</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.185</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8954,8 +8954,15 @@ document.getElementById('costProdAddBtn').addEventListener('click', async ()=>{
 
 /* busca una línea recurrente de "otros costes" por nombre, o la crea si no existe */
 async function getOrCreateOtrosCostesLine(name){
-  let line = STATE.pnlLines.find(l=>l.name===name && l.esRecurrente);
-  if(line) return line;
+  // se busca SOLO por nombre (sin exigir que ya sea "recurrente") — si no, una línea de
+  // la plantilla que todavía no se hubiera marcado como recurrente no se encontraba
+  // aquí, y esto creaba una línea NUEVA Y DUPLICADA en vez de conectarse a la que ya
+  // existía en la tabla.
+  let line = STATE.pnlLines.find(l=>l.name===name);
+  if(line){
+    if(!line.esRecurrente){ await sbUpdate('pnl_lines', line.id, { es_recurrente:true }); line.esRecurrente = true; }
+    return line;
+  }
   const maxOrden = STATE.pnlLines.reduce((m,l)=>Math.max(m,l.orden),0);
   const saved = await sbInsert('pnl_lines', { name, tipo:'coste', orden:maxOrden+1, es_auto:false, es_recurrente:true });
   line = { id:saved.id, name:saved.name, tipo:saved.tipo, orden:saved.orden, esAuto:false, esRecurrente:true };
