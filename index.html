@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.198</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.199</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -10957,6 +10957,15 @@ function renderCajaGestionarCategorias(){
       if(c.data && c.data.movements){
         const movsActualizados = c.data.movements.map(mv => mv.category===cat ? {...mv, category:CAJA_UNCATEGORIZED} : mv);
         c.data = { ...c.data, movements:movsActualizados, ...cajaRecompute(movsActualizados) };
+      }
+      // si algún proveedor guardado seguía apuntando a esta categoría, se quita ese
+      // mapeo — si no, la próxima vez que subas un extracto nuevo, ese proveedor
+      // volvería a categorizarse solo con el nombre viejo, "resucitando" la categoría
+      // que acabas de borrar sin que se note por qué.
+      const proveedoresAntes = c.savedProviders.length;
+      c.savedProviders = c.savedProviders.filter(p=>p.cat!==cat);
+      if(c.savedProviders.length!==proveedoresAntes){
+        await cajaSet('providers', c.savedProviders);
       }
       toast('Categoría "'+cat+'" eliminada'+(usos>0?' — '+usos+' movimiento(s) recategorizados como "Sin categorizar".':'.'));
       renderCajaTabContent();
