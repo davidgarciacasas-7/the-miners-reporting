@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.195</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.196</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7280,6 +7280,10 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
 async function renderResumenEjecutivo(){
   const container = document.getElementById('reWidgetsContainer');
   if(!container) return;
+  // varios widgets (EBITDA, tabla de PNL, ingresos Square+Efectivo...) usan datos de
+  // Caja — si se entra a Resumen Ejecutivo sin haber visitado Caja antes en esta sesión,
+  // esos datos no estarían cargados todavía y esos widgets saldrían todos a 0.
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   let desde = document.getElementById('reDesde').value;
   let hasta = document.getElementById('reHasta').value;
   if(!desde || !hasta){
@@ -7996,6 +8000,7 @@ async function renderPnlWidgetInstance(w){
   const desde = w.pnlDesde, hasta = w.pnlHasta;
   if(!desde || !hasta){ tableEl.innerHTML = '<p class="hint">Elige un Desde y un Hasta para este PNL (arriba, en este mismo bloque).</p>'; return; }
   await ensureDefaultPnlLines();
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   const buckets = monthBucketsInRange(desde, hasta);
   if(buckets.length===0){ tableEl.innerHTML = '<p class="hint">Sin meses en ese rango.</p>'; return; }
   const allSalesLines = getAllSalesLinesRaw();
@@ -8041,6 +8046,7 @@ async function renderPnlLineaWidgetInstance(w, buckets){
   const sel = document.querySelector('[data-re-pnl-linea="'+w.instanceId+'"]');
   if(!sel) return;
   await ensureDefaultPnlLines();
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   const lines = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
   const etiquetaTI = pnlEtiquetaTotal('totalIngresos','Total ingresos'), etiquetaTC = pnlEtiquetaTotal('totalCostes','Total costes'), etiquetaR = pnlEtiquetaTotal('resultado','Resultado');
   if(!sel.dataset.cargado){
@@ -8147,6 +8153,11 @@ async function renderPnl(){
   const table = document.getElementById('tablaPnl');
   if(!table || !STATE.config.url || !STATE.config.anonKey) return;
   await ensureDefaultPnlLines();
+  // PNL calcula varias líneas (COGS, Wages, Maintenance, Operating Supplies,
+  // Accountant...) a partir de los gastos guardados en Caja — si se entra directamente a
+  // esta pestaña sin haber visitado antes Caja en esta sesión, esos datos todavía no
+  // estarían cargados y esas líneas saldrían a 0 sin ningún aviso.
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   renderProductosVendidosSinCoste('productosVendidosSinCosteAlertPnl');
   const restablecerBtn = document.getElementById('pnlRestablecerPlantillaBtn');
   if(restablecerBtn && !restablecerBtn.dataset.wired){
