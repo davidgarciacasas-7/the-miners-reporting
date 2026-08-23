@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.194</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.195</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7971,6 +7971,20 @@ async function ensureDefaultPnlLines(){
   // fija" a propósito, para no borrar nada sin que el usuario lo pida explícitamente.
   if(STATE.pnlLines.length===0){
     await crearLineasPlantillaPnl();
+    return;
+  }
+  // sincronización no destructiva: si en el futuro se marca una línea de la plantilla
+  // como "esAuto" (o cambia su tipoEspecial) DESPUÉS de que el usuario ya hubiera
+  // restablecido la plantilla una vez, la línea que ya tiene guardada (con ese mismo
+  // nombre exacto) se actualiza sola para que empiece a calcularse — sin tener que volver
+  // a restablecer toda la plantilla ni perder ningún valor manual de otras líneas.
+  for(const def of PNL_PLANTILLA_FIJA){
+    if(!def.esAuto) continue;
+    const existente = STATE.pnlLines.find(l=>l.name===def.name);
+    if(existente && !existente.esAuto){
+      await sbUpdate('pnl_lines', existente.id, { es_auto:true });
+      existente.esAuto = true;
+    }
   }
 }
 /* tabla de PNL para un widget de Resumen Ejecutivo — usa el MISMO cálculo que la pestaña
