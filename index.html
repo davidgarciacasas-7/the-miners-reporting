@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.197</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.198</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -10949,6 +10949,14 @@ function renderCajaGestionarCategorias(){
           if(cambio) aplicarSimplificacionSocios(m);
         });
         await cajaSet('months', c.savedMonths);
+      }
+      // el balance que se esté viendo o editando en este momento (c.data) es un objeto
+      // aparte de c.savedMonths — si no se actualiza también aquí, sus movimientos se
+      // quedan con la categoría vieja, y el desplegable la sigue mostrando aunque ya se
+      // haya borrado de la lista general.
+      if(c.data && c.data.movements){
+        const movsActualizados = c.data.movements.map(mv => mv.category===cat ? {...mv, category:CAJA_UNCATEGORIZED} : mv);
+        c.data = { ...c.data, movements:movsActualizados, ...cajaRecompute(movsActualizados) };
       }
       toast('Categoría "'+cat+'" eliminada'+(usos>0?' — '+usos+' movimiento(s) recategorizados como "Sin categorizar".':'.'));
       renderCajaTabContent();
