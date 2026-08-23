@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.191</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.194</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7765,6 +7765,9 @@ function sumaCajaCategorias(bucket, categoriasNormalizadas){
   return suma;
 }
 function cogsDesdeCaja(bucket){ return sumaCajaCategorias(bucket, PNL_COGS_CATEGORIAS_CAJA); }
+function mantenimientoDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['mantenimiento']); }
+function operatingSuppliesDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['consumibles operacionales']); }
+function accountantDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['gestion']); }
 /* Wages usa la categoría que se haya elegido como "categoría de nóminas" en
    Caja → Tendencias (la misma que usan la tarta, la tabla de detalle y "Gastos
    totales") — si no se ha elegido ninguna todavía, usa "nominas" como valor por
@@ -7807,6 +7810,12 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     valor = (sumBruto-sumNeto)/100;
   } else if(line.esAuto && line.name==='COGS'){
     valor = cogsDesdeCaja(bucket);
+  } else if(line.esAuto && line.name==='Maintenance'){
+    valor = mantenimientoDesdeCaja(bucket);
+  } else if(line.esAuto && line.name==='Operating Supplies'){
+    valor = operatingSuppliesDesdeCaja(bucket);
+  } else if(line.esAuto && line.name==='Accountant'){
+    valor = accountantDesdeCaja(bucket);
   } else if(line.esAuto && line.name==='Production Costs'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
@@ -7924,13 +7933,13 @@ const PNL_PLANTILLA_FIJA = [
   { name:'Internet',               tipo:'coste',   indent:2 },
   { name:'Alarm',                  tipo:'coste',   indent:2 },
   { name:'Events',                 tipo:'coste',   indent:2 },
-  { name:'Accountant',             tipo:'coste',   indent:2 },
+  { name:'Accountant',             tipo:'coste',   indent:2, esAuto:true },
   { name:'Delivery service fees',  tipo:'coste',   indent:2 },
   { name:'Overheads',              tipo:'coste',   indent:0, tipoEspecial:'subtotal_outline' },
   { name:'Royalties',              tipo:'coste',   indent:1, esRecurrente:true },
   { name:'Cleaning Supplies',      tipo:'coste',   indent:1 },
-  { name:'Operating Supplies',     tipo:'coste',   indent:1 },
-  { name:'Maintenance',            tipo:'coste',   indent:1 },
+  { name:'Operating Supplies',     tipo:'coste',   indent:1, esAuto:true },
+  { name:'Maintenance',            tipo:'coste',   indent:1, esAuto:true },
   { name:'EBITDA',                 tipo:'ingreso', indent:0, tipoEspecial:'subtotal_acumulado' },
 ];
 async function crearLineasPlantillaPnl(){
