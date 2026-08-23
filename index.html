@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.199</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.201</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -10116,11 +10116,11 @@ function cajaToCat(){
 }
 function cajaGasCatOpts(){
   const c=STATE.caja;
-  return [...new Set([...(c.data?.catData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.gastos, '💼 Gasto financiado por socio', '👤 Gasto personal socio'])];
+  return [...new Set([...(c.data?.catData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.gastos, '💼 Gasto financiado por socio', '👤 Gasto personal socio'])].sort((a,b)=>a.localeCompare(b,'es'));
 }
 function cajaIncCatOpts(){
   const c=STATE.caja;
-  return ['💰 Aportacion socio', ...new Set([...(c.data?.incomeCatData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.ingresos])];
+  return [...new Set(['💰 Aportacion socio', ...(c.data?.incomeCatData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.ingresos])].sort((a,b)=>a.localeCompare(b,'es'));
 }
 
 /* escapa texto para insertarlo con seguridad dentro de HTML — imprescindible para
@@ -10143,6 +10143,7 @@ function cajaCatSelectHtml(id, currentValue, options, placeholder){
   if(placeholder && placeholder!==CAJA_UNCATEGORIZED && !opcionesFinal.includes(placeholder)){
     opcionesFinal = [...opcionesFinal, placeholder];
   }
+  opcionesFinal = [...opcionesFinal].sort((a,b)=>a.localeCompare(b,'es'));
   return `<select data-cat-select="${escapeHtml(id)}" style="background:var(--bg);border:1px solid ${currentValue?'var(--positive)':'var(--line)'};border-radius:6px;color:${currentValue?'var(--text)':'var(--text-muted)'};font-size:12px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px;">
     <option value="">${escapeHtml(placeholder)||'— seleccionar —'}</option>
     ${opcionesFinal.map(o=>`<option value="${escapeHtml(o)}" ${o===currentValue?'selected':''}>${escapeHtml(o)}</option>`).join('')}
@@ -10918,18 +10919,26 @@ function renderCajaGestionarCategorias(){
   const c = STATE.caja;
   const cont = document.getElementById('cajaGestionarCategorias');
   if(!cont) return;
-  // se listan todas las categorías conocidas: las guardadas en la lista, y también
-  // cualquiera que esté en uso en algún movimiento de algún balance guardado, aunque no
-  // esté en la lista guardada (por si acaso).
+  // se listan todas las categorías conocidas: las guardadas en la lista, cualquiera que
+  // esté en uso en algún movimiento de algún balance guardado, Y también las que estén en
+  // uso en el balance que tengas abierto ahora mismo aunque todavía no lo hayas guardado
+  // (si no, una categoría "fantasma" que solo viviera ahí no se podría ni ver ni borrar
+  // desde aquí, aunque sí saliera en el desplegable de categorizar).
   const usoPorCategoria = {};
   c.savedMonths.forEach(m=>(m.movements||[]).forEach(mv=>{
     if(!mv.category || mv.category===CAJA_UNCATEGORIZED) return;
     usoPorCategoria[mv.category] = (usoPorCategoria[mv.category]||0)+1;
   }));
+  if(c.data && c.data.movements){
+    c.data.movements.forEach(mv=>{
+      if(!mv.category || mv.category===CAJA_UNCATEGORIZED) return;
+      usoPorCategoria[mv.category] = (usoPorCategoria[mv.category]||0)+1;
+    });
+  }
   const todas = [...new Set([...c.savedCats.ingresos, ...c.savedCats.gastos, ...Object.keys(usoPorCategoria)])].sort((a,b)=>a.localeCompare(b,'es'));
   if(todas.length===0){ cont.innerHTML = '<p class="hint">Sin categorías todavía.</p>'; return; }
   cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
-    ${todas.map(cat=>`<span class="pill noident" style="display:inline-flex;align-items:center;gap:6px;">${cat} <span class="hint">(${usoPorCategoria[cat]||0})</span> <button class="btn danger" data-del-categoria="${cat.replace(/"/g,'&quot;')}" style="padding:1px 6px;font-size:10px;">✕</button></span>`).join('')}
+    ${todas.map(cat=>`<span class="pill noident" style="display:inline-flex;align-items:center;gap:6px;">${escapeHtml(cat)} <span class="hint">(${usoPorCategoria[cat]||0})</span> <button class="btn danger" data-del-categoria="${escapeHtml(cat)}" style="padding:1px 6px;font-size:10px;">✕</button></span>`).join('')}
   </div>`;
   cont.querySelectorAll('[data-del-categoria]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
