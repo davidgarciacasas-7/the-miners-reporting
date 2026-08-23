@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.188</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.191</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1349,7 +1349,36 @@ Bowl de acai,Acai,150,g</pre>
           <div id="uploadStatus" style="margin-top:10px;"></div>
         </div>
         <div class="section-title">Propinas</div>
-        <p class="hint" style="margin-bottom:10px;">Registro de referencia, mensual — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago), así que se anotan aquí a mano. <b>Pagadas</b>: las que se reparten a los empleados — se pueden descontar de la línea de nóminas del PNL y del gráfico de costes de Caja. <b>Cobradas</b>: las que se reciben de los clientes — se pueden descontar de los gráficos de ingresos de Square, con la opción correspondiente en Caja.</p>
+        <p class="hint" style="margin-bottom:10px;">Registro de referencia, mensual — las propinas no salen del archivo de Square (es un export a nivel de producto, no de pago), así que se anotan aquí a mano. Los dos interruptores que controlan si se descuentan o no viven en <b>Caja → Tendencias</b>.</p>
+        <div class="card" style="margin-bottom:16px;overflow-x:auto;">
+          <h3 style="margin-bottom:10px;">Qué descuenta cada interruptor, y dónde</h3>
+          <table class="mono" style="font-size:12px;">
+            <thead><tr><th style="min-width:160px;">Sección</th><th>Propinas pagadas <span class="hint" style="font-weight:400;">(a empleados)</span></th><th>Propinas cobradas <span class="hint" style="font-weight:400;">(de clientes)</span></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Caja</b></td>
+                <td>✅ "Gastos totales" y "Balance mensual" (Tendencias) · gráfico de tarta por categoría · tabla de detalle "Por categoría" — solo en la categoría marcada como nóminas</td>
+                <td>✅ KPI "Ingresos" · importe de cada balance (pestaña Balances) · gráfico "Ingresos Square + Efectivo" · "Balance mensual" · exportaciones a Excel/PDF</td>
+              </tr>
+              <tr>
+                <td><b>Ventas</b></td>
+                <td class="hint">No aplica — es un gasto, no afecta a los ingresos de ventas</td>
+                <td class="hint">No aplica — el archivo de Square que subes nunca incluyó propinas, no hay nada que descontar aquí</td>
+              </tr>
+              <tr>
+                <td><b>PNL</b></td>
+                <td>✅ Línea "Wages" — usa el mismo interruptor y la misma categoría que Caja, sin necesitar nada aparte</td>
+                <td class="hint">No aplica — "Gross Sales"/"Net Sales" salen de Ventas (Square), no de Caja</td>
+              </tr>
+              <tr>
+                <td><b>Costes</b> <span class="hint" style="font-weight:400;">(coste de producto)</span></td>
+                <td class="hint">No aplica — esta pestaña es sobre coste de ingredientes/productos, no sobre nóminas</td>
+                <td class="hint">No aplica</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="hint" style="margin-top:10px;">Para que el descuento de propinas pagadas funcione, hace falta además haber elegido la categoría de nóminas en Caja → Tendencias.</p>
+        </div>
         <div class="card" style="margin-bottom:14px;">
           <h3 style="margin-bottom:4px;">Propinas pagadas <span class="hint" style="font-weight:400;">(a empleados)</span></h3>
           <div class="subfilter">
@@ -7736,7 +7765,19 @@ function sumaCajaCategorias(bucket, categoriasNormalizadas){
   return suma;
 }
 function cogsDesdeCaja(bucket){ return sumaCajaCategorias(bucket, PNL_COGS_CATEGORIAS_CAJA); }
-function wagesDesdeCaja(bucket){ return sumaCajaCategorias(bucket, PNL_WAGES_CATEGORIAS_CAJA);
+/* Wages usa la categoría que se haya elegido como "categoría de nóminas" en
+   Caja → Tendencias (la misma que usan la tarta, la tabla de detalle y "Gastos
+   totales") — si no se ha elegido ninguna todavía, usa "nominas" como valor por
+   defecto. Las propinas PAGADAS se descuentan aquí con el MISMO interruptor de
+   Caja, no uno aparte — así PNL y Caja siempre están de acuerdo, sin tener que
+   activar dos interruptores distintos para lo mismo. */
+function wagesDesdeCaja(bucket){
+  const catNomina = (getCajaCategoriaNomina()||'nominas').trim().toLowerCase();
+  let suma = sumaCajaCategorias(bucket, [catNomina]);
+  if(getExcluirPropinasNominaCaja()){
+    suma = Math.max(0, suma - sumaPropinasEnRango(bucket.dateMin, bucket.dateMax, 'pagada'));
+  }
+  return suma;
 }
 /* Para las líneas automáticas (esAuto), si el usuario ha introducido a mano un valor
    para ese bucket concreto (mismo mecanismo que las líneas manuales normales), ESE valor
@@ -7778,7 +7819,11 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     STATE.pnlValues.filter(v=>v.lineId===line.id).forEach(v=>{ sum += allocateToBucket(v.dateMin, v.dateMax, bucket.dateMin, bucket.dateMax, v.amount); });
     valor = sum;
   }
-  if(getExcluirPropinasNominaPnl() && line.id===getPnlLineaNomina()){
+  // Wages ya descuenta las propinas pagadas ella sola, dentro de wagesDesdeCaja(), con
+  // el mismo interruptor que usa Caja — este interruptor "antiguo" de PNL (con su propio
+  // desplegable para elegir la línea de nómina) solo se aplica si el usuario ha elegido
+  // OTRA línea distinta de Wages, para no restar la propina dos veces.
+  if(getExcluirPropinasNominaPnl() && line.id===getPnlLineaNomina() && line.name!=='Wages'){
     valor -= sumaPropinasEnRango(bucket.dateMin, bucket.dateMax, 'pagada');
   }
   return valor;
@@ -11028,12 +11073,18 @@ function cajaDetalleCatData(){
   const catSet = new Set();
   c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
   const cats = [...catSet].sort();
+  const catNominaDetalle = getCajaCategoriaNomina();
+  const excluirPropinas = getExcluirPropinasNominaCaja();
   const table = {};
   cats.forEach(cat=>{
     table[cat] = {};
     c.savedMonths.forEach(m=>{
-      const totalGasto = Math.abs(m.totalExpense)||1;
-      const euros = (m.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+      let totalGasto = Math.abs(m.totalExpense)||1;
+      if(excluirPropinas && catNominaDetalle){ totalGasto = Math.max(1, totalGasto - cajaPropinasDelMes(m.month, 'pagada')); }
+      let euros = (m.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+      // se descuentan las propinas PAGADAS de ese mes concreto, solo en la categoría
+      // marcada como "nóminas" — igual que en el gráfico "Gastos totales" y en la tarta.
+      if(excluirPropinas && cat===catNominaDetalle){ euros = Math.max(0, euros - cajaPropinasDelMes(m.month, 'pagada')); }
       table[cat][m.title||m.month] = { euros, pct: +(euros/totalGasto*100).toFixed(1) };
     });
   });
@@ -11092,6 +11143,13 @@ function renderCajaPieCharts(){
 
   const porCategoria = {};
   gastos.forEach(m=>{ const k=m.category||CAJA_UNCATEGORIZED; porCategoria[k]=(porCategoria[k]||0)+Math.abs(m.amount); });
+  // se descuentan las propinas PAGADAS de la categoría marcada como "nóminas", si el
+  // interruptor de Caja → Tendencias está activado — igual que ya se hacía en el
+  // gráfico "Gastos totales", pero aplicado aquí también.
+  const catNominaPie = getCajaCategoriaNomina();
+  if(getExcluirPropinasNominaCaja() && catNominaPie && porCategoria[catNominaPie]!==undefined){
+    porCategoria[catNominaPie] = Math.max(0, porCategoria[catNominaPie] - cajaPropinasDelMes(entry.month, 'pagada'));
+  }
   const catLabels = Object.keys(porCategoria).sort((a,b)=>porCategoria[b]-porCategoria[a]);
   const catValues = catLabels.map(k=>porCategoria[k]);
   const totalCat = catValues.reduce((s,v)=>s+v,0)||1;
