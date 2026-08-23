@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.196</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.197</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -10123,6 +10123,13 @@ function cajaIncCatOpts(){
   return ['💰 Aportacion socio', ...new Set([...(c.data?.incomeCatData||[]).map(x=>x.name).filter(x=>x!==CAJA_UNCATEGORIZED), ...c.savedCats.ingresos])];
 }
 
+/* escapa texto para insertarlo con seguridad dentro de HTML — imprescindible para
+   cualquier texto que venga de un banco o que haya escrito el usuario a mano (nombres de
+   categoría, conceptos...), ya que una comilla o un "&" sin escapar puede romper el HTML
+   de esa fila y arrastrar con ella al resto de la tabla. */
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function cajaCatSelectHtml(id, currentValue, options, placeholder){
   // si el valor actual (por ejemplo, una categoría recién creada a mano) no está todavía
   // en la lista de opciones conocidas, se añade aquí — si no, el <select> no tiene
@@ -10136,9 +10143,9 @@ function cajaCatSelectHtml(id, currentValue, options, placeholder){
   if(placeholder && placeholder!==CAJA_UNCATEGORIZED && !opcionesFinal.includes(placeholder)){
     opcionesFinal = [...opcionesFinal, placeholder];
   }
-  return `<select data-cat-select="${id}" style="background:var(--bg);border:1px solid ${currentValue?'var(--positive)':'var(--line)'};border-radius:6px;color:${currentValue?'var(--text)':'var(--text-muted)'};font-size:12px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px;">
-    <option value="">${placeholder||'— seleccionar —'}</option>
-    ${opcionesFinal.map(o=>`<option value="${o}" ${o===currentValue?'selected':''}>${o}</option>`).join('')}
+  return `<select data-cat-select="${escapeHtml(id)}" style="background:var(--bg);border:1px solid ${currentValue?'var(--positive)':'var(--line)'};border-radius:6px;color:${currentValue?'var(--text)':'var(--text-muted)'};font-size:12px;padding:5px 8px;outline:none;cursor:pointer;min-width:160px;">
+    <option value="">${escapeHtml(placeholder)||'— seleccionar —'}</option>
+    ${opcionesFinal.map(o=>`<option value="${escapeHtml(o)}" ${o===currentValue?'selected':''}>${escapeHtml(o)}</option>`).join('')}
     <option value="__new__">+ Nueva categoría…</option>
   </select>`;
 }
@@ -10222,7 +10229,20 @@ function attachCajaCatSelectHandlers(container){
       const id = sel.getAttribute('data-cat-select');
       if(e.target.value==='__new__'){
         const nueva = prompt('Nombre de la nueva categoría:');
-        if(nueva && nueva.trim()){ STATE.caja.pending[id] = nueva.trim(); renderCajaTabContent(); }
+        if(nueva && nueva.trim()){
+          const nombre = nueva.trim();
+          STATE.caja.pending[id] = nombre;
+          // se añade a la lista general EN MEMORIA ahora mismo (no solo al pulsar
+          // "Aplicar cambios") — si no, el resto de movimientos de esta misma pantalla
+          // no la ven como opción hasta guardar, aunque tú ya la hayas escrito.
+          const m = STATE.caja.data?.movements?.find(x=>String(x.id)===String(id));
+          const esGasto = m ? m.amount<0 : true;
+          const clave = esGasto ? 'gastos' : 'ingresos';
+          if(!STATE.caja.savedCats[clave].includes(nombre)){
+            STATE.caja.savedCats = { ...STATE.caja.savedCats, [clave]: [...STATE.caja.savedCats[clave], nombre] };
+          }
+          renderCajaTabContent();
+        }
         else { sel.value=''; }
         return;
       }
@@ -10594,14 +10614,14 @@ function renderCajaMovimientosTab(el){
       <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th><th></th></tr></thead>
       <tbody>${filtered.slice(0,400).map(m=>`
         <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">${m.fechaDia || m.month}</td>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.concept}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(m.concept)}</td>
         <td>${cajaCatSelectHtml(m.id, c.pending[m.id]||'', m.amount<0?cajaGasCatOpts():cajaIncCatOpts(), m.category)}</td>
-        <td><input type="text" list="cajaSubcatDatalist" data-subcat-input="${m.id}" value="${(m.subcategory||'').replace(/"/g,'&quot;')}" placeholder="—" style="background:var(--bg);border:1px solid ${m.subcategory?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:130px;"></td>
+        <td><input type="text" list="cajaSubcatDatalist" data-subcat-input="${m.id}" value="${escapeHtml(m.subcategory||'')}" placeholder="—" style="background:var(--bg);border:1px solid ${m.subcategory?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:130px;"></td>
         <td class="num" style="font-family:monospace;font-weight:700;color:${m.amount<0?'var(--negative)':'var(--positive)'};white-space:nowrap;">${cajaFmt(m.amount)}</td>
         <td style="text-align:center;font-size:11px;">${m.isManual?'✍️':m.autoCat?'🤖':'✋'}</td>
         <td><button class="btn danger" data-caja-borrar-mov="${m.id}" title="Borrar este movimiento" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
       `).join('')}</tbody></table>
-      <datalist id="cajaSubcatDatalist">${subcatsConocidas.map(s=>'<option value="'+s.replace(/"/g,'&quot;')+'">').join('')}</datalist>
+      <datalist id="cajaSubcatDatalist">${subcatsConocidas.map(s=>'<option value="'+escapeHtml(s)+'">').join('')}</datalist>
       ${filtered.length>400?`<p class="hint" style="padding:10px;text-align:center;">Mostrando 400 de ${filtered.length}</p>`:''}
       ${filtered.length===0?`<p class="hint" style="padding:40px 0;text-align:center;">Sin resultados</p>`:''}
     </div>`;
