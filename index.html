@@ -187,7 +187,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.201</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.202</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7823,6 +7823,18 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
   } else if(line.esAuto && line.name==='Production Costs'){
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
+  } else if(line.esAuto && line.name==='Inventory stock up'){
+    // el "sobrante" entre lo que de verdad se ha gastado en Caja (COGS) y lo que
+    // explican las otras 3 líneas de esta sección — así, entre las 4, siempre cuadran
+    // exactamente con el COGS total.
+    const cogsTotal = cogsDesdeCaja(bucket);
+    const lineaProdCosts = STATE.pnlLines.find(l=>l.name==='Production Costs');
+    const lineaWriteOff = STATE.pnlLines.find(l=>l.name==='Write-off Total');
+    const lineaMissingStock = STATE.pnlLines.find(l=>l.name==='Missing stock');
+    const prodCosts = lineaProdCosts ? pnlLineValorPrimario(lineaProdCosts, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
+    const writeOff = lineaWriteOff ? pnlLineValorPrimario(lineaWriteOff, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
+    const missingStock = lineaMissingStock ? pnlLineValorPrimario(lineaMissingStock, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
+    valor = cogsTotal - prodCosts - writeOff - missingStock;
   } else if(line.esAuto && line.name==='Wages'){
     valor = wagesDesdeCaja(bucket);
   } else if(line.esRecurrente){
@@ -7913,7 +7925,7 @@ const PNL_PLANTILLA_FIJA = [
   { name:'Expected VAT',           tipo:'ingreso', indent:1, esAuto:true,  tipoEspecial:'informativo' },
   { name:'COGS',                   tipo:'coste',   indent:0, esAuto:true },
   { name:'Production Costs',       tipo:'coste',   indent:1, esAuto:true, tipoEspecial:'informativo' },
-  { name:'Inventory stock up',     tipo:'coste',   indent:1, tipoEspecial:'informativo' },
+  { name:'Inventory stock up',     tipo:'coste',   indent:1, esAuto:true, tipoEspecial:'informativo' },
   { name:'Write-off Total',        tipo:'coste',   indent:1, tipoEspecial:'informativo' },
   { name:'Missing stock',          tipo:'coste',   indent:1, tipoEspecial:'informativo' },
   { name:'Gross Profit',           tipo:'ingreso', indent:0, tipoEspecial:'subtotal_acumulado' },
@@ -8021,7 +8033,7 @@ async function renderPnlWidgetInstance(w){
     }
     if(hiddenRows.has(line.id)) return '';
     const esSubtotal = line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado';
-    const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+    const esAcumulado = line.tipoEspecial==='subtotal_acumulado' || line.name==='Inventory stock up';
     const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
     const indent = line.indent||0;
     const cells = valoresPorBucket.map(vb=>{
@@ -8219,7 +8231,7 @@ async function renderPnl(){
     // propio signo real (positivo = beneficio, negativo = pérdida) — el resto de líneas
     // se muestran en positivo/verde si son ingreso, negativo/rojo si son coste, aunque el
     // valor de por sí se guarde siempre en positivo internamente.
-    const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+    const esAcumulado = line.tipoEspecial==='subtotal_acumulado' || line.name==='Inventory stock up';
     const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
     // formato con coma para los miles y sin decimales, para que los números grandes se
     // lean de un vistazo (ej. 12,345€ en vez de 12.345,00 €)
