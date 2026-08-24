@@ -130,7 +130,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface-2);border:1px solid var(--copper);border-radius:8px;padding:12px 16px;font-size:13px;max-width:340px;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4);}
 #legendTooltip{position:fixed;display:none;z-index:998;background:var(--surface-2);border:1px solid var(--copper);border-radius:8px;padding:6px 11px;font-size:12.5px;color:var(--text);pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.4);white-space:nowrap;}
 @media print{
-  #sidebar,.topbar,#legendTooltip,.toast,#loginScreen,#pnlHiddenRowsInfo,button,select,input[type=date],#filterbar,.no-print{display:none !important;}
+  #sidebar,.topbar,#legendTooltip,.toast,#loginScreen,#recoverScreen,#resetPasswordScreen,#pnlHiddenRowsInfo,button,select,input[type=date],#filterbar,.no-print{display:none !important;}
   #app{display:block !important;}
   #main{padding:0 !important;overflow:visible !important;}
   body{background:#fff !important;color:#111 !important;}
@@ -175,10 +175,46 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     </div>
     <div class="config-field">
       <label>Contraseña</label>
-      <input type="password" id="loginPassword" autocomplete="current-password">
+      <div style="position:relative;">
+        <input type="password" id="loginPassword" autocomplete="current-password" style="width:100%;padding-right:60px;">
+        <button type="button" id="loginTogglePasswordBtn" tabindex="-1" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;padding:4px 6px;">Mostrar</button>
+      </div>
     </div>
     <button class="btn" id="loginBtn" style="width:100%;">Iniciar sesión</button>
     <p class="hint" id="loginError" style="margin-top:10px;color:var(--negative);"></p>
+    <p class="hint" style="margin-top:12px;text-align:center;"><a href="#" id="loginGoRecoverLink" style="color:var(--copper);text-decoration:underline;">¿Olvidaste tu contraseña?</a></p>
+  </div>
+</div>
+<div id="recoverScreen" style="display:none;min-height:100vh;align-items:center;justify-content:center;background:var(--bg);">
+  <div class="card" style="max-width:360px;width:90%;">
+    <h1 style="font-size:17px;margin-bottom:4px;">Recuperar contraseña</h1>
+    <p class="hint" style="margin-bottom:16px;">Te enviamos un email con un enlace para elegir una contraseña nueva.</p>
+    <div class="config-field">
+      <label>Email</label>
+      <input type="email" id="recoverEmail" autocomplete="username">
+    </div>
+    <button class="btn" id="recoverSendBtn" style="width:100%;">Enviar email de recuperación</button>
+    <p class="hint" id="recoverStatus" style="margin-top:10px;"></p>
+    <p class="hint" style="margin-top:12px;text-align:center;"><a href="#" id="recoverBackLink" style="color:var(--copper);text-decoration:underline;">← Volver a iniciar sesión</a></p>
+  </div>
+</div>
+<div id="resetPasswordScreen" style="display:none;min-height:100vh;align-items:center;justify-content:center;background:var(--bg);">
+  <div class="card" style="max-width:360px;width:90%;">
+    <h1 style="font-size:17px;margin-bottom:4px;">Elige tu nueva contraseña</h1>
+    <p class="hint" style="margin-bottom:16px;">Este enlace de recuperación solo sirve una vez.</p>
+    <div class="config-field">
+      <label>Nueva contraseña</label>
+      <div style="position:relative;">
+        <input type="password" id="resetPassword1" autocomplete="new-password" style="width:100%;padding-right:60px;">
+        <button type="button" id="resetTogglePasswordBtn" tabindex="-1" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);font-size:11px;cursor:pointer;padding:4px 6px;">Mostrar</button>
+      </div>
+    </div>
+    <div class="config-field">
+      <label>Repite la contraseña</label>
+      <input type="password" id="resetPassword2" autocomplete="new-password">
+    </div>
+    <button class="btn" id="resetPasswordBtn" style="width:100%;">Guardar nueva contraseña</button>
+    <p class="hint" id="resetPasswordStatus" style="margin-top:10px;"></p>
   </div>
 </div>
 <div id="legendTooltip"></div>
@@ -187,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.203</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.207</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7634,57 +7670,71 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const bucketsW = monthBucketsInRange(desdeW, hastaW);
       if(bucketsW.length===0) continue;
       await ensureDefaultPnlLines();
+      if(!STATE.caja.storageLoaded) await cajaLoadStorage();
       const allSalesLinesW = getAllSalesLinesRaw();
       const costHistoryW = buildCostHistoryMap();
       const otherCostHistoryW = buildOtherCostHistoryMap();
       const linesW = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
       const hiddenRowsW = getPnlHiddenRows();
-      let totIng = bucketsW.map(()=>0), totCos = bucketsW.map(()=>0);
-      const filasW = [];
-      linesW.forEach(line=>{
-        const values = bucketsW.map(b=>pnlLineValueForBucket(line, b, allSalesLinesW, costHistoryW, otherCostHistoryW));
-        values.forEach((v,bi)=>{ if(line.tipo==='ingreso') totIng[bi]+=v; else totCos[bi]+=v; });
-        if(hiddenRowsW.has(line.id)) return;
-        filasW.push({ nombre: line.name, indent: line.indent||0, values });
-      });
+      // mismo motor de cálculo que la pestaña PNL — necesario para que los subtotales
+      // (COGS, Wages, Gross Profit, EBITDA...) salgan bien y no dupliquen sumas.
+      const valoresPorBucketW = bucketsW.map(b=>computePnlBucketValues(b, linesW, allSalesLinesW, costHistoryW, otherCostHistoryW));
+      const pnlFmtPdf = (val) => Math.round(val).toLocaleString('en-US');
 
       const numCols = bucketsW.length;
       const colNombreAncho = 46;
       const colAncho = Math.min(24, (W-margin*2-colNombreAncho)/Math.max(numCols,1));
       const filaAlto = 5;
-      const alturaTotal = 13 + (filasW.length+2)*filaAlto + 8;
-      if(y + alturaTotal > yLimite) nuevaPagina();
 
-      doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
-      doc.text('PNL — '+desdeW+' a '+hastaW, margin, y+5);
-      y += 9;
+      const dibujarCabeceraTabla = () => {
+        doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
+        doc.text('PNL — '+desdeW+' a '+hastaW, margin, y+5);
+        y += 9;
+        doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
+        doc.text('Línea', margin, y+3.5);
+        bucketsW.forEach((b,i)=>{ doc.text(b.label, margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
+        y += filaAlto;
+        doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
+        y += 3;
+      };
 
-      doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
-      doc.text('Línea', margin, y+3.5);
-      bucketsW.forEach((b,i)=>{ doc.text(b.label, margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
-      y += filaAlto;
-      doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
-      y += 3;
+      if(y + 20 > yLimite) nuevaPagina();
+      dibujarCabeceraTabla();
 
       doc.setFontSize(7);
-      filasW.forEach((f,fi)=>{
-        if(fi%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAncho+numCols*colAncho+4, filaAlto, 'F'); }
-        doc.setTextColor(...NEGRO);
-        doc.text(f.nombre, margin+f.indent*3, y+3.5, { maxWidth: colNombreAncho-2 });
-        f.values.forEach((v,i)=>{ doc.text(eur(Math.round(v*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'}); });
+      let filaIdx = 0;
+      linesW.forEach(line=>{
+        if(line.esTitulo || hiddenRowsW.has(line.id)) return;
+        // si no cabe ni una fila más, se pasa de página y se repite la cabecera de la
+        // tabla (con los meses) para que se pueda seguir leyendo sin volver atrás.
+        if(y + filaAlto > yLimite){
+          nuevaPagina();
+          dibujarCabeceraTabla();
+          doc.setFontSize(7);
+          filaIdx = 0;
+        }
+        const esSubtotal = line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado';
+        const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+        const esLineaPrincipal = (line.indent||0)===0;
+        const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
+        if(filaIdx%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAncho+numCols*colAncho+4, filaAlto, 'F'); }
+        filaIdx++;
+        // título de la línea: negrita y en verde oscuro/rojo oscuro (ingreso/coste) SOLO
+        // en las líneas principales (sin sangría) — las sublíneas se quedan en negro
+        // normal, para no saturar de color toda la tabla.
+        doc.setFont('helvetica', esSubtotal?'bold':'normal');
+        doc.setTextColor(...(esLineaPrincipal ? (line.tipo==='ingreso'?VERDE:ROJO) : NEGRO));
+        doc.text(line.name, margin+(line.indent||0)*3, y+3.5, { maxWidth: colNombreAncho-2 });
+        doc.setFont('helvetica', esSubtotal?'bold':'normal');
+        bucketsW.forEach((b,i)=>{
+          const vSigno = conSigno(valoresPorBucketW[i][line.id]||0);
+          const esLineaEbitda = line.name.trim().toLowerCase()==='ebitda';
+          doc.setTextColor(...(esLineaEbitda ? (vSigno<0?ROJO:VERDE) : NEGRO));
+          doc.text(pnlFmtPdf(vSigno), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'});
+        });
         y += filaAlto;
       });
-      doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAncho+numCols*colAncho, y);
-      y += 3;
-      doc.setFont('times','bold'); doc.setFontSize(8);
-      doc.setTextColor(...COBRE);
-      doc.text('Resultado', margin, y+3.5);
-      bucketsW.forEach((b,i)=>{
-        const v = totIng[i]-totCos[i];
-        doc.setTextColor(...(v>=0?VERDE:ROJO));
-        doc.text(eur(Math.round(v*100)), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'});
-      });
-      y += filaAlto + 10;
+      y += 10;
       continue;
     }
     const type = RE_WIDGET_TYPES[w.typeId];
@@ -7704,7 +7754,17 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const pxPorMm = 3.78;
       chart.resize(Math.round(chartW*pxPorMm), Math.round(chartH*pxPorMm));
       chart.update('none');
-      doc.addImage(chart.toBase64Image(), 'PNG', x, y+9, chartW, chartH);
+      // se espera a que el navegador termine de repintar con el tamaño nuevo antes de
+      // capturar — si no, con gráficos "responsive" a veces el propio Chart.js corrige el
+      // tamaño solo justo después de este cambio manual, y la captura sale en blanco o con
+      // el tamaño antiguo. Doble requestAnimationFrame = "después del próximo repintado".
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const imgData = chart.toBase64Image();
+      if(imgData && imgData.length > 200){
+        doc.addImage(imgData, 'PNG', x, y+9, chartW, chartH);
+      } else {
+        doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartW,chartH);
+      }
       chart.resize();
       chart.update('none');
     }
@@ -12588,7 +12648,51 @@ async function renderSimGuardadas(){
    ========================================================= */
 function showLoginScreen(){
   document.getElementById('app').style.display='none';
+  document.getElementById('recoverScreen').style.display='none';
+  document.getElementById('resetPasswordScreen').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
+}
+function showRecoverScreen(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('resetPasswordScreen').style.display='none';
+  document.getElementById('recoverScreen').style.display='flex';
+  document.getElementById('recoverStatus').textContent = '';
+  const emailPrevio = document.getElementById('loginEmail').value.trim();
+  if(emailPrevio) document.getElementById('recoverEmail').value = emailPrevio;
+}
+function showResetPasswordScreen(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('recoverScreen').style.display='none';
+  document.getElementById('resetPasswordScreen').style.display='flex';
+}
+/* pide a Supabase Auth que envíe el email de recuperación — el propio Supabase genera el
+   enlace y lo manda, aquí solo se pide que lo haga. redirect_to hace que, al pulsar el
+   enlace del email, vuelva a esta misma página (con el token de recuperación en la URL). */
+async function authSendRecoveryEmail(email){
+  const res = await fetch(sbUrl()+'/auth/v1/recover', {
+    method:'POST',
+    headers: { 'apikey': STATE.config.anonKey, 'Content-Type':'application/json' },
+    body: JSON.stringify({ email, options: { redirect_to: window.location.origin + window.location.pathname } })
+  });
+  if(!res.ok){
+    let data = {}; try{ data = await res.json(); }catch(e){}
+    throw new Error(data.error_description || data.msg || 'No se pudo enviar el email.');
+  }
+}
+/* cambia la contraseña usando el token de recuperación que llega en la URL (lo manda
+   Supabase en el enlace del email) — se autentica con ESE token, no con la sesión normal. */
+async function authUpdatePasswordWithRecoveryToken(accessToken, newPassword){
+  const res = await fetch(sbUrl()+'/auth/v1/user', {
+    method:'PUT',
+    headers: { 'apikey': STATE.config.anonKey, 'Authorization':'Bearer '+accessToken, 'Content-Type':'application/json' },
+    body: JSON.stringify({ password: newPassword })
+  });
+  if(!res.ok){
+    let data = {}; try{ data = await res.json(); }catch(e){}
+    throw new Error(data.error_description || data.msg || 'No se pudo cambiar la contraseña.');
+  }
 }
 function showApp(){
   document.getElementById('loginScreen').style.display='none';
@@ -12629,6 +12733,47 @@ document.getElementById('logoutBtn').addEventListener('click', ()=>{
   if(confirm('¿Cerrar sesión?')) logout();
 });
 document.getElementById('loginBtn').addEventListener('click', doLogin);
+function wireTogglePassword(btnId, inputId){
+  const btn = document.getElementById(btnId), inp = document.getElementById(inputId);
+  if(!btn || !inp) return;
+  btn.addEventListener('click', ()=>{
+    const mostrando = inp.type==='text';
+    inp.type = mostrando ? 'password' : 'text';
+    btn.textContent = mostrando ? 'Mostrar' : 'Ocultar';
+  });
+}
+wireTogglePassword('loginTogglePasswordBtn', 'loginPassword');
+wireTogglePassword('resetTogglePasswordBtn', 'resetPassword1');
+document.getElementById('loginGoRecoverLink').addEventListener('click', (e)=>{ e.preventDefault(); showRecoverScreen(); });
+document.getElementById('recoverBackLink').addEventListener('click', (e)=>{ e.preventDefault(); showLoginScreen(); });
+document.getElementById('recoverSendBtn').addEventListener('click', async ()=>{
+  const email = document.getElementById('recoverEmail').value.trim();
+  const statusEl = document.getElementById('recoverStatus');
+  if(!email){ statusEl.style.color='var(--negative)'; statusEl.textContent='Escribe tu email primero.'; return; }
+  statusEl.style.color='var(--text-muted)'; statusEl.textContent='Enviando…';
+  try{
+    await authSendRecoveryEmail(email);
+    statusEl.style.color='var(--positive)';
+    statusEl.textContent = 'Email enviado — revisa tu bandeja de entrada (y spam) y sigue el enlace.';
+  }catch(e){ statusEl.style.color='var(--negative)'; statusEl.textContent = e.message; }
+});
+document.getElementById('resetPasswordBtn').addEventListener('click', async ()=>{
+  const p1 = document.getElementById('resetPassword1').value;
+  const p2 = document.getElementById('resetPassword2').value;
+  const statusEl = document.getElementById('resetPasswordStatus');
+  if(!p1 || p1.length<6){ statusEl.style.color='var(--negative)'; statusEl.textContent='La contraseña debe tener al menos 6 caracteres.'; return; }
+  if(p1!==p2){ statusEl.style.color='var(--negative)'; statusEl.textContent='Las dos contraseñas no coinciden.'; return; }
+  const accessToken = STATE.recoveryAccessToken;
+  if(!accessToken){ statusEl.style.color='var(--negative)'; statusEl.textContent='El enlace de recuperación ya no es válido — pide uno nuevo.'; return; }
+  statusEl.style.color='var(--text-muted)'; statusEl.textContent='Guardando…';
+  try{
+    await authUpdatePasswordWithRecoveryToken(accessToken, p1);
+    statusEl.style.color='var(--positive)';
+    statusEl.textContent = 'Contraseña actualizada ✓ Ya puedes iniciar sesión con ella.';
+    history.replaceState(null, '', window.location.pathname);
+    setTimeout(()=>{ showLoginScreen(); }, 1800);
+  }catch(e){ statusEl.style.color='var(--negative)'; statusEl.textContent = e.message; }
+});
 document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 async function doLogin(){
   const email = document.getElementById('loginEmail').value.trim();
@@ -12658,6 +12803,21 @@ async function doLogin(){
 (async function init(){
   loadConfig();
   loadSession();
+  // si se llega aquí desde el enlace del email de recuperación, Supabase añade el token
+  // en el trozo de la URL después de "#" (nunca se envía al servidor, solo lo lee el
+  // propio navegador) — si está, se muestra la pantalla de nueva contraseña en vez del
+  // login normal, sea cual sea el estado de sesión que hubiera antes.
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  if(hashParams.get('type')==='recovery' && hashParams.get('access_token')){
+    if(!STATE.config.url || !STATE.config.anonKey){
+      showLoginScreen();
+      document.getElementById('loginConfigFields').style.display = 'block';
+      return;
+    }
+    STATE.recoveryAccessToken = hashParams.get('access_token');
+    showResetPasswordScreen();
+    return;
+  }
   if(!STATE.config.url || !STATE.config.anonKey){
     showLoginScreen();
     document.getElementById('loginConfigFields').style.display = 'block';
