@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.208</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.209</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8060,40 +8060,62 @@ async function ensureDefaultPnlLines(){
   // restablecido la plantilla una vez, la línea que ya tiene guardada (con ese mismo
   // nombre exacto) se actualiza sola para que empiece a calcularse — sin tener que volver
   // a restablecer toda la plantilla ni perder ningún valor manual de otras líneas.
-  for(const def of PNL_PLANTILLA_FIJA){
-    if(!def.esAuto) continue;
-    const existente = STATE.pnlLines.find(l=>l.name===def.name);
-    if(existente && !existente.esAuto){
-      await sbUpdate('pnl_lines', existente.id, { es_auto:true });
-      existente.esAuto = true;
-    }
-  }
-  // lo mismo para las líneas recurrentes (Royalties, Card payment rates...) — además,
-  // si hubiera más de una línea con el mismo nombre (por ejemplo, por el fallo antiguo ya
-  // corregido de "getOrCreateOtrosCostesLine", que en su día pudo crear una duplicada al
-  // añadir la entrada en Otros Costes a mano), se conserva la que estaba primero en el
-  // orden de la plantilla y se le pasa el cálculo de la duplicada, borrando esta última —
-  // así no cambia el orden de tu tabla ni se pierde el cálculo que ya tuvieras andando.
-  for(const [nombre, def] of Object.entries(PNL_RECURRENTE_DEFAULTS)){
-    const coincidencias = STATE.pnlLines.filter(l=>l.name===nombre).sort((a,b)=>a.orden-b.orden);
-    if(coincidencias.length===0) continue;
-    const principal = coincidencias[0];
-    for(const dup of coincidencias.slice(1)){
-      const entradaDup = STATE.otherCosts.find(oc=>oc.lineId===dup.id);
-      if(entradaDup){
-        await sbUpdate('other_costs', entradaDup.id, { line_id: principal.id });
-        entradaDup.lineId = principal.id;
+  // Envuelto en try/catch: si algo de esta sincronización fallara por cualquier motivo,
+  // NUNCA debe impedir que se vea el resto de la tabla PNL con lo que ya hubiera.
+  try{
+    for(const def of PNL_PLANTILLA_FIJA){
+      if(!def.esAuto) continue;
+      try{
+        const existente = STATE.pnlLines.find(l=>l.name===def.name);
+        if(existente && !existente.esAuto){
+          await sbUpdate('pnl_lines', existente.id, { es_auto:true });
+          existente.esAuto = true;
+        }
+      }catch(e){
+        console.error('Error sincronizando la línea automática "'+def.name+'" (no debería afectar a las demás):', e);
       }
-      await sbDelete('pnl_lines', dup.id);
-      STATE.pnlLines = STATE.pnlLines.filter(l=>l.id!==dup.id);
     }
-    if(!principal.esRecurrente){
-      await sbUpdate('pnl_lines', principal.id, { es_recurrente:true });
-      principal.esRecurrente = true;
+    // lo mismo para las líneas recurrentes (Royalties, Card payment rates...) — cada una
+    // se procesa de forma INDEPENDIENTE (con su propio try/catch), para que un problema
+    // con una no impida arreglar las demás. Además, si hubiera más de una línea con el
+    // mismo nombre (por ejemplo, por el fallo antiguo ya corregido de
+    // "getOrCreateOtrosCostesLine", que en su día pudo crear una duplicada al añadir la
+    // entrada en Otros Costes a mano), se conserva la que estaba primero en el orden de
+    // la plantilla y se le pasa el cálculo de la duplicada, borrando esta última — así no
+    // cambia el orden de tu tabla ni se pierde el cálculo que ya tuvieras andando.
+    for(const [nombre, def] of Object.entries(PNL_RECURRENTE_DEFAULTS)){
+      try{
+        const coincidencias = STATE.pnlLines.filter(l=>l.name===nombre).sort((a,b)=>a.orden-b.orden);
+        if(coincidencias.length===0) continue;
+        const principal = coincidencias[0];
+        for(const dup of coincidencias.slice(1)){
+          const entradaDup = (STATE.otherCosts||[]).find(oc=>oc.lineId===dup.id);
+          if(entradaDup){
+            await sbUpdate('other_costs', entradaDup.id, { line_id: principal.id });
+            entradaDup.lineId = principal.id;
+          }
+          // si la duplicada tuviera algún valor manual guardado (pnl_values), se borra
+          // también — si no, podría impedir borrar la línea por una restricción de la
+          // base de datos, dejando la duplicada a medio limpiar.
+          const valoresDup = STATE.pnlValues.filter(v=>v.lineId===dup.id);
+          for(const v of valoresDup){ try{ await sbDelete('pnl_values', v.id); }catch(e2){} }
+          STATE.pnlValues = STATE.pnlValues.filter(v=>v.lineId!==dup.id);
+          await sbDelete('pnl_lines', dup.id);
+          STATE.pnlLines = STATE.pnlLines.filter(l=>l.id!==dup.id);
+        }
+        if(!principal.esRecurrente){
+          await sbUpdate('pnl_lines', principal.id, { es_recurrente:true });
+          principal.esRecurrente = true;
+        }
+        if(!(STATE.otherCosts||[]).some(oc=>oc.lineId===principal.id)){
+          await saveOtroCosteEntry(nombre, def.amount, '2020-01-01', 'Plantilla PNL', def.tipo);
+        }
+      }catch(e){
+        console.error('Error sincronizando la línea recurrente "'+nombre+'" (no debería afectar a las demás):', e);
+      }
     }
-    if(!STATE.otherCosts.some(oc=>oc.lineId===principal.id)){
-      await saveOtroCosteEntry(nombre, def.amount, '2020-01-01', 'Plantilla PNL', def.tipo);
-    }
+  }catch(e){
+    console.error('Error en la sincronización no destructiva de líneas de PNL (no debería afectar al resto de la tabla):', e);
   }
 }
 /* tabla de PNL para un widget de Resumen Ejecutivo — usa el MISMO cálculo que la pestaña
