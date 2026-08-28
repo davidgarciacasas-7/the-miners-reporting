@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.210</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.211</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9918,21 +9918,95 @@ function cajaCategorizarMovimiento(movement, personalList, catMap){
 
   let category=null;
   if(amount>=0){
-    // se comprueba primero si "aportación socio" aparece en CUALQUIER parte del texto
-    // (sin importar acentos/mayúsculas) — si no, con textos como "David García Casas ·
-    // Aportación socio" se cogía el nombre de la persona como categoría, en vez de
-    // reconocer que es una aportación de socio.
-    const normalizado = searchTexts.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    if(normalizado.includes('aportacion socio') || normalizado.includes('aportacion de socio') || normalizado.includes('aportacion socios')){
-      category = '💰 Aportacion socio';
+    // los proveedores guardados marcados como "ingreso" (ej. Amazon → Devolución) se
+    // comprueban primero — si coincide alguno, gana sobre el resto de reglas de ingreso
+    // (incluida "Aportación socio" y la categoría automática por el propio concepto).
+    const provMatchIngreso = catMap.find(p=>p.tipo==='ingreso' && searchTexts.some(t=>cajaISearch(p.prov,t)));
+    if(provMatchIngreso){
+      category = provMatchIngreso.cat;
     } else {
-      const src = searchTexts.find(s=>s.trim().length>2) || 'Otros ingresos';
-      category = '💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
+      // se comprueba primero si "aportación socio" aparece en CUALQUIER parte del texto
+      // (sin importar acentos/mayúsculas) — si no, con textos como "David García Casas ·
+      // Aportación socio" se cogía el nombre de la persona como categoría, en vez de
+      // reconocer que es una aportación de socio.
+      const normalizado = searchTexts.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(normalizado.includes('aportacion socio') || normalizado.includes('aportacion de socio') || normalizado.includes('aportacion socios')){
+        category = '💰 Aportacion socio';
+      } else {
+        const src = searchTexts.find(s=>s.trim().length>2) || 'Otros ingresos';
+        category = '💰 '+src.trim().split(/\s+/).slice(0,3).join(' ');
+      }
     }
   } else {
-    for(const {prov,cat} of catMap){ if(searchTexts.some(t=>cajaISearch(prov,t))){ category=cat; break; } }
+    for(const {prov,cat,tipo} of catMap){ if(tipo==='ingreso') continue; if(searchTexts.some(t=>cajaISearch(prov,t))){ category=cat; break; } }
   }
   return category ? { category, autoCat:true } : null;
+}
+let cajaRevisionProveedoresCambios = [];
+function cajaRevisarCategorizacionProveedores(){
+  const c = STATE.caja;
+  const tipoElegido = document.getElementById('cajaRevisarTipoSelect').value; // 'ingreso'|'gasto'|'ambos'
+  const resEl = document.getElementById('cajaRevisionProveedoresResultado');
+  cajaRevisionProveedoresCambios = [];
+  c.savedMonths.forEach(m=>{
+    (m.movements||[]).forEach(mv=>{
+      const esIngreso = mv.amount>=0;
+      if(tipoElegido==='ingreso' && !esIngreso) return;
+      if(tipoElegido==='gasto' && esIngreso) return;
+      const searchTexts = [mv.concept, mv.rawG, mv.rawConcepto].filter(Boolean).map(String);
+      let categoriaSugerida = null;
+      if(esIngreso){
+        const match = c.savedProviders.find(p=>p.tipo==='ingreso' && searchTexts.some(t=>cajaISearch(p.prov,t)));
+        if(match) categoriaSugerida = match.cat;
+      } else {
+        const match = c.savedProviders.find(p=>p.tipo!=='ingreso' && searchTexts.some(t=>cajaISearch(p.prov,t)));
+        if(match) categoriaSugerida = match.cat;
+      }
+      if(categoriaSugerida && categoriaSugerida!==mv.category){
+        cajaRevisionProveedoresCambios.push({ mesId:m.month, movId:mv.id, concept:mv.concept, amount:mv.amount, de:mv.category, a:categoriaSugerida });
+      }
+    });
+  });
+  if(cajaRevisionProveedoresCambios.length===0){
+    resEl.innerHTML = '<p class="hint" style="margin-top:10px;color:var(--positive);">Todo está ya categorizado según las reglas actuales — no hay nada que cambiar ✓</p>';
+    return;
+  }
+  resEl.innerHTML = `
+    <p class="hint" style="margin-top:10px;margin-bottom:8px;">Se han encontrado <b>${cajaRevisionProveedoresCambios.length}</b> movimiento(s) que cambiarían:</p>
+    <div class="card" style="padding:0;overflow:auto;max-height:280px;margin-bottom:10px;">
+      <table><thead><tr><th>Concepto</th><th>Importe</th><th>De</th><th>A</th></tr></thead>
+      <tbody>${cajaRevisionProveedoresCambios.map(ch=>`<tr><td>${escapeHtml(ch.concept)}</td><td class="num">${cajaFmt(ch.amount)}</td><td class="hint">${escapeHtml(ch.de||'Sin categorizar')}</td><td>${escapeHtml(ch.a)}</td></tr>`).join('')}</tbody></table>
+    </div>
+    <button class="btn" id="cajaAplicarRevisionProveedoresBtn">Aplicar estos ${cajaRevisionProveedoresCambios.length} cambio(s)</button>
+  `;
+  document.getElementById('cajaAplicarRevisionProveedoresBtn').addEventListener('click', cajaAplicarRevisionCategorizacionProveedores);
+}
+async function cajaAplicarRevisionCategorizacionProveedores(){
+  const c = STATE.caja;
+  const resEl = document.getElementById('cajaRevisionProveedoresResultado');
+  const porMes = {};
+  cajaRevisionProveedoresCambios.forEach(ch=>{ (porMes[ch.mesId]=porMes[ch.mesId]||[]).push(ch); });
+  Object.keys(porMes).forEach(mesId=>{
+    const entry = c.savedMonths.find(m=>m.month===mesId);
+    if(!entry) return;
+    const cambiosPorId = {}; porMes[mesId].forEach(ch=>{ cambiosPorId[ch.movId]=ch.a; });
+    (entry.movements||[]).forEach(mv=>{ if(cambiosPorId[mv.id]!==undefined) mv.category = cambiosPorId[mv.id]; });
+    if(entry.movementsOriginal){ entry.movementsOriginal.forEach(mv=>{ if(cambiosPorId[mv.id]!==undefined) mv.category = cambiosPorId[mv.id]; }); }
+    Object.assign(entry, cajaRecompute(entry.movements));
+    aplicarSimplificacionSocios(entry);
+  });
+  await cajaSet('months', c.savedMonths);
+  // el balance que se esté viendo o editando en este momento también se actualiza, igual
+  // que al borrar una categoría — si no, se quedaría con el nombre viejo hasta recargar.
+  if(c.data && c.data.movements){
+    const cambiosPorId = {}; cajaRevisionProveedoresCambios.forEach(ch=>{ cambiosPorId[ch.movId]=ch.a; });
+    const movsActualizados = c.data.movements.map(mv => cambiosPorId[mv.id]!==undefined ? {...mv, category:cambiosPorId[mv.id]} : mv);
+    c.data = { ...c.data, movements:movsActualizados, ...cajaRecompute(movsActualizados) };
+  }
+  cajaRevisionProveedoresCambios = [];
+  resEl.innerHTML = '<p class="hint" style="color:var(--positive);">Cambios aplicados ✓</p>';
+  toast('Categorías corregidas en '+Object.keys(porMes).length+' balance(s).');
+  renderCajaTabContent();
 }
 function cajaRecompute(movements){
   const catT={}, incT={}, provT={};
@@ -9985,7 +10059,7 @@ async function cajaSet(key, value){
 async function cajaLoadStorage(){
   try{
     const pp = await cajaGet('personal_provs'); if(pp) STATE.caja.savedPersonalProvs = pp;
-    const p = await cajaGet('providers'); if(p) STATE.caja.savedProviders = p;
+    const p = await cajaGet('providers'); if(p) STATE.caja.savedProviders = p.map(x=>({...x, tipo:x.tipo||'gasto'}));
     const sc2 = await cajaGet('subcats'); if(sc2) STATE.caja.savedSubcats = sc2;
     const a = await cajaGet('months'); if(a) STATE.caja.savedMonths = a;
     const b = await cajaGet('cats'); if(b) STATE.caja.savedCats = b;
@@ -10813,6 +10887,20 @@ function renderCajaBalancesTab(el){
   if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
   if(c.savedMonths.length===0){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">No hay balances guardados.</p>'; return; }
   const revisionHtml = `
+    <div class="card" style="margin-bottom:20px;border:1px solid var(--copper);">
+      <h3>Revisar categorización por proveedor en balances ya guardados</h3>
+      <p class="hint" style="margin-bottom:10px;">Vuelve a comprobar, con las reglas de "Proveedores" que tengas ahora mismo, si algún movimiento ya guardado debería estar categorizado según esas reglas y no lo está. No toca movimientos que ya tengan una categoría puesta a mano que no coincida por otro motivo — solo aplica cuando encuentra una coincidencia real de proveedor.</p>
+      <div class="subfilter" style="margin-bottom:10px;">
+        <select id="cajaRevisarTipoSelect">
+          <option value="ambos">Ingresos y gastos</option>
+          <option value="ingreso">Solo ingresos</option>
+          <option value="gasto">Solo gastos</option>
+        </select>
+        <button class="btn secondary" id="cajaRevisarProveedoresBtn">Revisar todos los balances</button>
+      </div>
+      <div id="cajaRevisionProveedoresResultado"></div>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
       <h3>Descargar historial de "Gasto personal socio" y "Aportación socio"</h3>
       <p class="hint" style="margin-bottom:10px;">No es posible descargar los archivos originales que subiste (la app no los guarda, solo el resultado ya procesado) — pero aquí tienes un Excel con todos los movimientos de estas dos categorías, de todos los meses guardados, en una sola hoja.</p>
       <button class="btn secondary" id="cajaExportarSociosBtn">Descargar Excel</button>
@@ -10931,6 +11019,7 @@ function renderCajaBalancesTab(el){
     });
   });
   document.getElementById('cajaExportarSociosBtn').addEventListener('click', cajaExportarSocios);
+  document.getElementById('cajaRevisarProveedoresBtn').addEventListener('click', cajaRevisarCategorizacionProveedores);
   el.querySelectorAll('[data-caja-corregir-reparto]').forEach(btn=>{
     btn.addEventListener('click', ()=>cajaCorregirReparto(btn.getAttribute('data-caja-corregir-reparto')));
   });
@@ -11015,14 +11104,18 @@ function renderCajaProveedoresTab(el){
     </div>
     <div class="card" style="border:1px solid var(--copper)55;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <input type="text" id="cajaNuevoProvNombre" placeholder="Proveedor…" style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
+      <select id="cajaNuevoProvTipo" style="background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
+        <option value="gasto">Gasto</option>
+        <option value="ingreso">Ingreso</option>
+      </select>
       <input type="text" id="cajaNuevoProvCategoria" placeholder="Categoría…" style="flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
       <button class="btn" id="cajaAddProvBtn" style="padding:6px 14px;font-size:12px;">+ Añadir</button>
     </div>
     ${c.savedProviders.length===0 ? '<p class="hint" style="text-align:center;padding:40px;">No hay proveedores guardados.</p>' : `
     <div class="card" style="padding:0;overflow:auto;">
-      <table><thead><tr><th>Proveedor</th><th>Categoría</th><th></th></tr></thead>
+      <table><thead><tr><th>Proveedor</th><th>Tipo</th><th>Categoría</th><th></th></tr></thead>
       <tbody>${c.savedProviders.map((p,i)=>`
-        <tr><td>${p.prov}</td><td><span class="pill noident">${p.cat}</span></td>
+        <tr><td>${escapeHtml(p.prov)}</td><td><span class="pill ${p.tipo==='ingreso'?'nuevo':'noident'}">${p.tipo==='ingreso'?'Ingreso':'Gasto'}</span></td><td><span class="pill noident">${escapeHtml(p.cat)}</span></td>
         <td><button class="btn danger" data-del-prov="${i}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
       `).join('')}</tbody></table>
     </div>`}
@@ -11043,8 +11136,9 @@ function renderCajaProveedoresTab(el){
   document.getElementById('cajaAddProvBtn').addEventListener('click', ()=>{
     const prov = document.getElementById('cajaNuevoProvNombre').value.trim();
     const cat = document.getElementById('cajaNuevoProvCategoria').value.trim();
+    const tipo = document.getElementById('cajaNuevoProvTipo').value;
     if(!prov||!cat) return;
-    c.savedProviders = [...c.savedProviders, {prov,cat}];
+    c.savedProviders = [...c.savedProviders, {prov,cat,tipo}];
     cajaSet('providers', c.savedProviders); renderCajaTabContent();
   });
   el.querySelectorAll('[data-del-prov]').forEach(btn=>btn.addEventListener('click', ()=>{
