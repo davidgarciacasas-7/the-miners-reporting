@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.216</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.220</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -502,6 +502,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card" style="overflow-x:auto;">
           <table id="tablaPnl" class="mono"><thead><tr></tr></thead><tbody></tbody><tfoot></tfoot></table>
         </div>
+        <div id="pnlInventoryStockUpTabla"></div>
         <p class="hint" style="margin-top:10px;">El periodo Desde/Hasta se ajusta siempre a meses completos (en vista Mensual) o semanas completas (en vista Semanal) — elige cualquier día dentro del primer y el último mes/semana que quieras ver.</p>
         <p class="hint">Formato de importación CSV (una fila por importe/periodo): columnas <code>Nombre,Tipo,Fecha_inicio,Fecha_fin,Importe</code> — Tipo debe ser <code>ingreso</code> o <code>coste</code>, fechas en formato AAAA-MM-DD.</p>
         <p class="hint">Formato "Importar mi propio PNL" (tu hoja habitual, una columna por mes): cabecera <code>Nombre,Tipo,2026-01,2026-02,2026-03...</code> (los meses en formato AAAA-MM) y una fila por cada línea de tu PNL, con el importe de cada mes en su columna. Se crean las líneas que falten automáticamente.</p>
@@ -6841,6 +6842,7 @@ const RE_WIDGET_TYPES = {
   cajaBalance:   { label:'Caja — Balance mensual', tipo:'snapshot-async' },
   pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
   pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
+  cajaCategoriaLinea: { label:'Caja — evolución de una categoría de gasto (tú eliges cuál)', tipo:'cajaCategoriaLinea' },
 };
 function getReWidgets(){
   try{
@@ -7347,6 +7349,16 @@ async function renderResumenEjecutivo(){
         <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
       </div>`;
     }
+    if(w.typeId==='cajaCategoriaLinea'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — evolución de categoría</h3>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <div class="field no-print" style="margin-bottom:8px;"><select data-re-caja-categoria="${w.instanceId}"></select></div>
+        <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
+      </div>`;
+    }
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!type) return '';
     return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
@@ -7367,6 +7379,7 @@ async function renderResumenEjecutivo(){
     if(w.typeId==='texto') continue;
     if(w.typeId==='pnl'){ await renderPnlWidgetInstance(w); continue; }
     if(w.typeId==='pnlLinea'){ await renderPnlLineaWidgetInstance(w, buckets); continue; }
+    if(w.typeId==='cajaCategoriaLinea'){ await renderCajaCategoriaLineaWidgetInstance(w, buckets); continue; }
     await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta, w);
   }
 
@@ -7392,6 +7405,14 @@ async function renderResumenEjecutivo(){
       const widgets2 = getReWidgets();
       const w2 = widgets2.find(x=>x.instanceId===id);
       if(w2){ w2.pnlLineaId = sel.value; setReWidgets(widgets2); await renderPnlLineaWidgetInstance(w2, buckets); }
+    });
+  });
+  container.querySelectorAll('[data-re-caja-categoria]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const id = sel.getAttribute('data-re-caja-categoria');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.cajaCategoriaNombre = sel.value; setReWidgets(widgets2); await renderCajaCategoriaLineaWidgetInstance(w2, buckets); }
     });
   });
 
@@ -7669,6 +7690,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       doc.setFontSize(7);
       let filaIdx = 0;
       linesW.forEach(line=>{
+        if(line.name==='Inventory stock up') return; // no forma parte del PNL principal
         if(line.esTitulo || hiddenRowsW.has(line.id)) return;
         // si no cabe ni una fila más, se pasa de página y se repite la cabecera de la
         // tabla (con los meses) para que se pueda seguir leyendo sin volver atrás.
@@ -7679,7 +7701,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
           filaIdx = 0;
         }
         const esSubtotal = line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado';
-        const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+        const esAcumulado = line.tipoEspecial==='subtotal_acumulado' || line.name==='Inventory stock up';
         const esLineaPrincipal = (line.indent||0)===0;
         const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
         if(filaIdx%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAncho+numCols*colAncho+4, filaAlto, 'F'); }
@@ -7852,16 +7874,20 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
   } else if(line.esAuto && line.name==='Inventory stock up'){
-    // las otras 3 líneas de esta sección, menos el COGS total real (Caja) — entre las 4,
-    // siempre cuadran exactamente con el COGS total.
+    // el valor que faltaría para llegar al COGS real de Caja (alimentos+bebidas), después
+    // de sumar Production Costs + las otras 3 líneas manuales que sí cuentan para EBITDA
+    // (Write-off Total, Missing stock, Packaging costs). Se muestra en una tabla aparte,
+    // debajo del PNL principal — no forma parte de la suma de COGS ni influye en EBITDA.
     const cogsTotal = cogsDesdeCaja(bucket);
     const lineaProdCosts = STATE.pnlLines.find(l=>l.name==='Production Costs');
     const lineaWriteOff = STATE.pnlLines.find(l=>l.name==='Write-off Total');
     const lineaMissingStock = STATE.pnlLines.find(l=>l.name==='Missing stock');
+    const lineaPackaging = STATE.pnlLines.find(l=>l.name==='Packaging costs');
     const prodCosts = lineaProdCosts ? pnlLineValorPrimario(lineaProdCosts, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
     const writeOff = lineaWriteOff ? pnlLineValorPrimario(lineaWriteOff, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
     const missingStock = lineaMissingStock ? pnlLineValorPrimario(lineaMissingStock, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
-    valor = prodCosts + writeOff + missingStock - cogsTotal;
+    const packaging = lineaPackaging ? pnlLineValorPrimario(lineaPackaging, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
+    valor = prodCosts + writeOff + missingStock + packaging - cogsTotal;
   } else if(line.esAuto && line.name==='Wages'){
     valor = wagesDesdeCaja(bucket);
   } else if(line.esRecurrente){
@@ -7910,7 +7936,7 @@ function computePnlBucketValues(bucket, lines, allSalesLines, costHistory, other
     for(let j=idx+1; j<lines.length; j++){
       const sig = lines[j];
       if((sig.indent||0) <= (line.indent||0)) break;
-      if((sig.indent||0) === (line.indent||0)+1 && !sig.esTitulo) suma += (valores[sig.id]||0);
+      if((sig.indent||0) === (line.indent||0)+1 && !sig.esTitulo && sig.tipoEspecial!=='informativo') suma += (valores[sig.id]||0);
     }
     valores[line.id] = suma;
   }
@@ -7950,11 +7976,12 @@ const PNL_PLANTILLA_FIJA = [
   { name:'Gross Sales',            tipo:'ingreso', indent:0, esAuto:true,  tipoEspecial:'informativo' },
   { name:'Net Sales',              tipo:'ingreso', indent:0, esAuto:true },
   { name:'Expected VAT',           tipo:'ingreso', indent:1, esAuto:true,  tipoEspecial:'informativo' },
-  { name:'COGS',                   tipo:'coste',   indent:0, esAuto:true },
-  { name:'Production Costs',       tipo:'coste',   indent:1, esAuto:true, tipoEspecial:'informativo' },
+  { name:'COGS',                   tipo:'coste',   indent:0, tipoEspecial:'subtotal_outline' },
+  { name:'Production Costs',       tipo:'coste',   indent:1, esAuto:true },
+  { name:'Write-off Total',        tipo:'coste',   indent:1 },
+  { name:'Missing stock',          tipo:'coste',   indent:1 },
+  { name:'Packaging costs',        tipo:'coste',   indent:1 },
   { name:'Inventory stock up',     tipo:'coste',   indent:1, esAuto:true, tipoEspecial:'informativo' },
-  { name:'Write-off Total',        tipo:'coste',   indent:1, tipoEspecial:'informativo' },
-  { name:'Missing stock',          tipo:'coste',   indent:1, tipoEspecial:'informativo' },
   { name:'Gross Profit',           tipo:'ingreso', indent:0, tipoEspecial:'subtotal_acumulado' },
   { name:'Wages',                  tipo:'coste',   indent:0, esAuto:true },
   { name:'Barista',                tipo:'coste',   indent:1, tipoEspecial:'informativo' },
@@ -7969,7 +7996,7 @@ const PNL_PLANTILLA_FIJA = [
   { name:'Terrace Licence',        tipo:'coste',   indent:2 },
   { name:'Other costs',            tipo:'coste',   indent:1, tipoEspecial:'subtotal_outline' },
   { name:'Asset Insurance',        tipo:'coste',   indent:2 },
-  { name:'Card payment rates',     tipo:'coste',   indent:2, esRecurrente:true },
+  { name:'Card payment rates',     tipo:'coste',   indent:2 },
   { name:'Electricity',            tipo:'coste',   indent:2 },
   { name:'Gas',                    tipo:'coste',   indent:2 },
   { name:'Water',                  tipo:'coste',   indent:2 },
@@ -7990,7 +8017,6 @@ const PNL_PLANTILLA_FIJA = [
    fuera recurrente (para no repetir estos números por partida doble en dos sitios). */
 const PNL_RECURRENTE_DEFAULTS = {
   'Royalties': { amount: 7, tipo: 'pct_neto' },
-  'Card payment rates': { amount: 2, tipo: 'pct_tarjeta' },
 };
 async function crearLineasPlantillaPnl(){
   // se borran las líneas actuales (los valores manuales ya introducidos se quedan
@@ -8028,6 +8054,37 @@ async function ensureDefaultPnlLines(){
   // Envuelto en try/catch: si algo de esta sincronización fallara por cualquier motivo,
   // NUNCA debe impedir que se vea el resto de la tabla PNL con lo que ya hubiera.
   try{
+    // corrección puntual: "Card payment rates" se marcó como recurrente por error en su
+    // día — ahora se quiere que sea un valor manual normal, que se introduce a mano cada
+    // mes, así que se revierte aquí una sola vez si se encuentra así marcada todavía.
+    const cardRatesLine = STATE.pnlLines.find(l=>l.name==='Card payment rates');
+    if(cardRatesLine && cardRatesLine.esRecurrente){
+      await sbUpdate('pnl_lines', cardRatesLine.id, { es_recurrente:false });
+      cardRatesLine.esRecurrente = false;
+    }
+    // corrección puntual: COGS pasaba de "Caja" directamente — ahora es la suma de sus 4
+    // líneas hijas (Production Costs + Write-off Total + Missing stock + Packaging
+    // costs), y estas 3 últimas dejan de estar marcadas como "informativo" para que
+    // cuenten de verdad en COGS y en EBITDA. "Inventory stock up" se queda igual (sigue
+    // siendo automática e informativa, ahora se muestra en su propia tabla aparte).
+    const lineaCogs = STATE.pnlLines.find(l=>l.name==='COGS');
+    if(lineaCogs && lineaCogs.esAuto){
+      await sbUpdate('pnl_lines', lineaCogs.id, { es_auto:false, tipo_especial:'subtotal_outline' });
+      lineaCogs.esAuto = false; lineaCogs.tipoEspecial = 'subtotal_outline';
+    }
+    for(const nombre of ['Production Costs','Write-off Total','Missing stock']){
+      const l = STATE.pnlLines.find(x=>x.name===nombre);
+      if(l && l.tipoEspecial==='informativo'){
+        await sbUpdate('pnl_lines', l.id, { tipo_especial:null });
+        l.tipoEspecial = null;
+      }
+    }
+    if(!STATE.pnlLines.find(l=>l.name==='Packaging costs')){
+      const lineaMissing = STATE.pnlLines.find(l=>l.name==='Missing stock');
+      const ordenNuevo = lineaMissing ? lineaMissing.orden + 0.5 : (STATE.pnlLines.length ? Math.max(...STATE.pnlLines.map(l=>l.orden))+1 : 0);
+      const saved = await sbInsert('pnl_lines', { name:'Packaging costs', tipo:'coste', orden:ordenNuevo, es_auto:false, es_recurrente:false, indent:1, tipo_especial:null });
+      STATE.pnlLines.push({ id:saved.id, name:'Packaging costs', tipo:'coste', orden:ordenNuevo, esAuto:false, esRecurrente:false, indent:1, esTitulo:false, tipoEspecial:null });
+    }
     for(const def of PNL_PLANTILLA_FIJA){
       if(!def.esAuto) continue;
       try{
@@ -8107,13 +8164,14 @@ async function renderPnlWidgetInstance(w){
   const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
 
   const filas = lines.map(line=>{
+    if(line.name==='Inventory stock up') return ''; // no forma parte del PNL principal
     if(line.esTitulo){
       if(hiddenRows.has(line.id)) return '';
       return `<tr style="background:var(--surface-2);"><td colspan="${buckets.length+1}" style="padding-left:${(line.indent||0)*20}px;font-weight:700;">${line.name}</td></tr>`;
     }
     if(hiddenRows.has(line.id)) return '';
     const esSubtotal = line.tipoEspecial==='subtotal_outline' || line.tipoEspecial==='subtotal_acumulado';
-    const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+    const esAcumulado = line.tipoEspecial==='subtotal_acumulado' || line.name==='Inventory stock up';
     const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
     const indent = line.indent||0;
     const cells = valoresPorBucket.map(vb=>{
@@ -8171,6 +8229,35 @@ async function renderPnlLineaWidgetInstance(w, buckets){
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type: trendChartType(),
     data:{ labels: buckets.map(b=>b.label), datasets:[ trendDataset(sel.options[sel.selectedIndex]?.text||'', datos.map(v=>+v.toFixed(2)), c.copper) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+/* widget "Caja — evolución de una categoría de gasto" — deja elegir UNA categoría
+   concreta (a diferencia de "Caja — Gastos por categoría (tendencia)", que las mete
+   todas juntas en el mismo gráfico) y muestra solo esa, en el mismo periodo que el resto
+   de Resumen Ejecutivo — los mismos gráficos individuales por categoría que se ven en
+   Caja → Gráficos → Por categoría, aquí eligiendo cuál en vez de verlas todas a la vez. */
+async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
+  const sel = document.querySelector('[data-re-caja-categoria="'+w.instanceId+'"]');
+  if(!sel) return;
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+  const cc = STATE.caja;
+  const detalleCatData = cajaDetalleCatData();
+  if(!sel.dataset.cargado){
+    sel.innerHTML = detalleCatData.cats.map(cat=>'<option value="'+escapeHtml(cat)+'">'+escapeHtml(cat)+'</option>').join('');
+    sel.value = w.cajaCategoriaNombre || detalleCatData.cats[0] || '';
+    sel.dataset.cargado = '1';
+  }
+  const categoriaElegida = sel.value;
+  const c = chartColors();
+  if(!categoriaElegida){ destroyChart('reW_'+w.instanceId); return; }
+  const desde = buckets[0]?.dateMin, hasta = buckets[buckets.length-1]?.dateMax;
+  const mesesEnRango = cc.savedMonths.filter(m=>m.month>=(desde||'').slice(0,7) && m.month<=(hasta||'').slice(0,7));
+  const labelsRango = mesesEnRango.map(m=>m.title||m.month);
+  const datos = labelsRango.map(mes => detalleCatData.table[categoriaElegida]?.[mes]?.euros || 0);
+  STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
+    type: trendChartType(),
+    data:{ labels: labelsRango, datasets:[ trendDataset(categoriaElegida, datos.map(v=>+v.toFixed(2)), c.copper) ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
   });
 }
@@ -8285,7 +8372,30 @@ async function renderPnl(){
   const valoresPorBucket = buckets.map(b=>computePnlBucketValues(b, lines, allSalesLines, costHistory, otherCostHistory));
   let totalIngresos = buckets.map(()=>0), totalCostes = buckets.map(()=>0);
   const hiddenRows = getPnlHiddenRows();
+
+  // "Inventory stock up" se muestra en su propia tabla, aparte del PNL principal — no
+  // cuenta para COGS ni para EBITDA, solo informa de lo que faltaría para llegar al COGS
+  // real de Caja después de sumar Production Costs + las 3 líneas manuales.
+  const tablaInvEl = document.getElementById('pnlInventoryStockUpTabla');
+  if(tablaInvEl){
+    const lineaInv = lines.find(l=>l.name==='Inventory stock up');
+    if(lineaInv){
+      tablaInvEl.innerHTML = `<div class="card" style="margin-bottom:14px;">
+        <h3>Inventory stock up <span class="hint">(no cuenta para COGS ni para EBITDA)</span></h3>
+        <p class="hint" style="margin-bottom:10px;">Lo que faltaría para llegar al COGS real de Caja (alimentos + bebidas) de ese mes, después de sumar Production Costs, Write-off Total, Missing stock y Packaging costs.</p>
+        <div style="overflow:auto;"><table><thead><tr><th>Línea</th>${buckets.map(b=>'<th class="num">'+b.label+'</th>').join('')}</tr></thead>
+        <tbody><tr><td>Inventory stock up</td>${buckets.map((b,bi)=>{
+          const v = valoresPorBucket[bi][lineaInv.id]||0;
+          return '<td class="num" style="color:'+(v<0?'var(--negative)':'var(--positive)')+';">'+Math.round(v).toLocaleString('en-US')+'€</td>';
+        }).join('')}</tr></tbody></table></div>
+      </div>`;
+    } else {
+      tablaInvEl.innerHTML = '';
+    }
+  }
+
   const rows = lines.map(line=>{
+    if(line.name==='Inventory stock up') return ''; // se muestra en su propia tabla, debajo — no forma parte del PNL principal
     if(line.esTitulo){
       if(hiddenRows.has(line.id)) return '';
       const indent = line.indent||0;
@@ -8311,7 +8421,7 @@ async function renderPnl(){
     // propio signo real (positivo = beneficio, negativo = pérdida) — el resto de líneas
     // se muestran en positivo/verde si son ingreso, negativo/rojo si son coste, aunque el
     // valor de por sí se guarde siempre en positivo internamente.
-    const esAcumulado = line.tipoEspecial==='subtotal_acumulado';
+    const esAcumulado = line.tipoEspecial==='subtotal_acumulado' || line.name==='Inventory stock up';
     const conSigno = (val) => esAcumulado ? val : (line.tipo==='coste' ? -Math.abs(val) : Math.abs(val));
     // formato con coma para los miles y sin decimales, para que los números grandes se
     // lean de un vistazo (ej. 12,345€ en vez de 12.345,00 €)
@@ -10025,6 +10135,7 @@ async function cajaLoadStorage(){
   try{
     const pp = await cajaGet('personal_provs'); if(pp) STATE.caja.savedPersonalProvs = pp;
     const p = await cajaGet('providers'); if(p) STATE.caja.savedProviders = p.map(x=>({...x, tipo:x.tipo||'gasto'}));
+    const catsOcultas = await cajaGet('categoriasOcultasGraficos'); if(catsOcultas) STATE.caja.categoriasOcultasGraficos = catsOcultas;
     const sc2 = await cajaGet('subcats'); if(sc2) STATE.caja.savedSubcats = sc2;
     const a = await cajaGet('months'); if(a) STATE.caja.savedMonths = a;
     const b = await cajaGet('cats'); if(b) STATE.caja.savedCats = b;
@@ -11623,13 +11734,22 @@ function renderCajaGraficosGrid(){
   } else if(c.detalleMode!=='proveedor'){
     const detalleCatData = cajaDetalleCatData();
     const search = (c.detalleSearch||'').toLowerCase();
-    const cats = detalleCatData.cats.filter(cat=>!search||cat.toLowerCase().includes(search)).filter(cat=>periodMonthNames.some(m=>(detalleCatData.table[cat]?.[m]?.euros||0)>0));
+    const ocultas = c.categoriasOcultasGraficos||[];
+    const cats = detalleCatData.cats.filter(cat=>!search||cat.toLowerCase().includes(search)).filter(cat=>periodMonthNames.some(m=>(detalleCatData.table[cat]?.[m]?.euros||0)>0)).filter(cat=>!ocultas.includes(cat));
     const getVal = (cat,month) => {
       const euros = detalleCatData.table[cat]?.[month]?.euros||0;
       if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0? +(euros/sq*100).toFixed(1):0; }
       return euros;
     };
     let html = '';
+    if(ocultas.length>0){
+      html += `<div style="margin-bottom:12px;"><button class="btn secondary" id="cajaVerOcultasBtn" style="padding:5px 12px;font-size:11px;">👁 ${ocultas.length} categoría(s) oculta(s) — ver</button></div>
+      <div id="cajaOcultasPanel" class="hidden card" style="margin-bottom:14px;border:1px solid var(--copper)55;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${ocultas.map(cat=>`<span class="pill noident" style="display:inline-flex;align-items:center;gap:6px;">${escapeHtml(cat)} <button class="btn secondary" data-mostrar-cat="${escapeHtml(cat)}" style="padding:1px 6px;font-size:10px;">Mostrar</button></span>`).join('')}
+        </div>
+      </div>`;
+    }
     if(c.detalleCatSelected){
       html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
@@ -11639,16 +11759,17 @@ function renderCajaGraficosGrid(){
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
     cats.forEach((cat,ci)=>{
       const total = periodMonthNames.reduce((s,m)=>s+getVal(cat,m),0);
-      html += `<div class="card" data-select-cat="${cat.replace(/"/g,'&quot;')}" style="cursor:pointer;border:1px solid ${c.detalleCatSelected===cat?'var(--copper)':'var(--line)'};">
+      html += `<div class="card" style="border:1px solid ${c.detalleCatSelected===cat?'var(--copper)':'var(--line)'};">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
-          <div style="color:${c.detalleCatSelected===cat?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;">${cat}</div>
-          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;">${cajaFmt(total)}</div>`:''}
+          <div data-select-cat="${cat.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${c.detalleCatSelected===cat?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;flex:1;">${cat}</div>
+          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;margin-right:8px;">${cajaFmt(total)}</div>`:''}
+          <button class="btn secondary" data-ocultar-cat="${cat.replace(/"/g,'&quot;')}" title="Ocultar este gráfico" style="padding:1px 5px;font-size:10px;">🙈</button>
         </div>
-        <div class="chart-wrap" style="height:120px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
+        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:120px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
       </div>`;
     });
     html += `</div>`;
-    if(cats.length===0) html = `<p class="hint" style="text-align:center;padding:40px;">Sin categorías con datos en este periodo.</p>`;
+    if(cats.length===0 && ocultas.length===0) html = `<p class="hint" style="text-align:center;padding:40px;">Sin categorías con datos en este periodo.</p>`;
     gridEl.innerHTML = html;
 
     if(c.detalleCatSelected){
@@ -11676,6 +11797,25 @@ function renderCajaGraficosGrid(){
         renderCajaGraficosGrid();
       });
     });
+    gridEl.querySelectorAll('[data-ocultar-cat]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const cat = btn.getAttribute('data-ocultar-cat');
+        c.categoriasOcultasGraficos = [...new Set([...(c.categoriasOcultasGraficos||[]), cat])];
+        cajaSet('categoriasOcultasGraficos', c.categoriasOcultasGraficos);
+        renderCajaGraficosGrid();
+      });
+    });
+    gridEl.querySelectorAll('[data-mostrar-cat]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cat = btn.getAttribute('data-mostrar-cat');
+        c.categoriasOcultasGraficos = (c.categoriasOcultasGraficos||[]).filter(x=>x!==cat);
+        cajaSet('categoriasOcultasGraficos', c.categoriasOcultasGraficos);
+        renderCajaGraficosGrid();
+      });
+    });
+    const verOcultasBtn = document.getElementById('cajaVerOcultasBtn');
+    if(verOcultasBtn) verOcultasBtn.addEventListener('click', ()=>{ document.getElementById('cajaOcultasPanel').classList.toggle('hidden'); });
   } else {
     const detalleData = cajaDetalleProvData();
     const search = (c.detalleSearch||'').toLowerCase();
