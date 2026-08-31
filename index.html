@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.214</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.216</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1174,33 +1174,19 @@ Bowl de acai,Acai,150,g</pre>
 
       <!-- ROTACIÓN DE STOCK -->
       <div class="tabpanel" id="tab-rotacion">
+        <div class="section-title">Stock existente</div>
         <div class="card" style="margin-bottom:14px;">
           <div class="subfilter" style="margin-bottom:0;">
-            <div class="filter-group"><label>Desde</label><input type="date" id="rotacionDesde"></div>
-            <div class="filter-group"><label>Hasta</label><input type="date" id="rotacionHasta"></div>
-            <button class="clear-btn" id="rotacionRefreshBtn">Actualizar</button>
+            <div class="filter-group"><label>Ver stock en esta fecha</label><input type="date" id="stockExistenteFecha"></div>
+            <button class="clear-btn" id="stockExistenteRefreshBtn">Actualizar</button>
           </div>
         </div>
-        <div class="section-title">Producto final (comprado ya hecho, sin receta)</div>
-        <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Productos de Brunch vendidos que no tienen ninguna receta con ese nombre en el Recetario — se cuentan directamente: cada unidad vendida es una unidad consumida.</p>
-          <div style="max-height:300px;overflow:auto;">
-            <table id="tablaRotacionProductoFinal"><thead><tr><th>Producto</th><th>Consumo teórico</th><th>Unidad</th></tr></thead><tbody></tbody></table>
-          </div>
+        <div class="card" style="padding:0;overflow:auto;max-height:600px;">
+          <table id="tablaStockExistente"><thead><tr><th>Ingrediente</th><th id="stockExistenteColInv">Último inventario</th><th>Consumo teórico</th><th>Stock existente</th><th>Unidad</th></tr></thead><tbody></tbody></table>
         </div>
 
-        <div class="section-title">Ingredientes (según recetas)</div>
+        <div class="section-title">Plantillas de inventario</div>
         <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Consumo teórico de cada ingrediente, calculado a partir de tus ventas reales y las recetas del Recetario — para los productos de Brunch que sí tienen una receta con el mismo nombre.</p>
-          <div style="max-height:400px;overflow:auto;">
-            <table id="tablaRotacionStock"><thead><tr><th>Ingrediente</th><th>Consumo teórico</th><th>Unidad</th><th>Procedencia (recetas)</th></tr></thead><tbody></tbody></table>
-          </div>
-        </div>
-        <p class="hint" id="rotacionSinRecetaAviso" style="margin-bottom:26px;"></p>
-
-        <div class="section-title">Inventario (stock por fecha)</div>
-        <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Lista de ingredientes disponibles para hacer inventario — un Excel con una columna con el nombre de cada ingrediente (sin cabecera, o con cualquier cabecera en la primera fila, se ignora). Al subir un archivo, sustituye por completo la lista anterior de ese tipo. Esta misma lista es la que verán también en la app de empleados.</p>
           <div class="subfilter" style="margin-bottom:0;">
             <button class="btn secondary" id="invSubirListaCocinaBtn">Subir lista — Ingredientes de cocina</button>
             <input type="file" id="invListaCocinaFile" accept=".xlsx,.xls,.csv" style="display:none;">
@@ -1209,32 +1195,6 @@ Bowl de acai,Acai,150,g</pre>
           </div>
           <p class="hint" id="invListaStatus" style="margin-top:8px;"></p>
         </div>
-
-        <div class="card" style="margin-bottom:14px;">
-          <p class="hint" style="margin-bottom:10px;">Registra aquí un recuento real de lo que tienes en stock — el de cocina se suele hacer a diario. Comparándolo con el consumo teórico de arriba, puedes ver si cuadra o hay mermas/desajustes no explicados.</p>
-          <div class="subfilter">
-            <input type="date" id="invNuevaFecha">
-            <input type="text" id="invNuevaNota" placeholder="Nota (opcional, ej. 'recuento semanal')" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
-            <button class="btn secondary" id="invNuevoBtn">+ Nuevo inventario</button>
-          </div>
-        </div>
-        <div id="invFormNuevo"></div>
-
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <button class="btn" id="invTipoCocinaBtn" data-inv-tipo="cocina">Ingredientes de cocina</button>
-          <button class="btn secondary" id="invTipoBebidasBtn" data-inv-tipo="bebidas">Ingredientes de bebidas</button>
-        </div>
-        <div class="card" style="margin-bottom:14px;">
-          <div class="subfilter" style="margin-bottom:0;">
-            <input type="text" id="invStockBuscar" placeholder="Buscar ingrediente…" style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
-            <div class="filter-group"><label>Desde</label><input type="date" id="invStockDesde"></div>
-            <div class="filter-group"><label>Hasta</label><input type="date" id="invStockHasta"></div>
-          </div>
-        </div>
-        <div class="card" style="padding:0;overflow:auto;max-height:520px;">
-          <table id="tablaStockPivote" class="mono"><thead><tr></tr></thead><tbody></tbody></table>
-        </div>
-        <p class="hint" style="margin-top:8px;">Por ahora, este stock se introduce a mano — en el futuro vendrá directamente de la sección de inventario de la app que usan los empleados para registrar la merma.</p>
       </div>
 
       <!-- RESUMEN EJECUTIVO -->
@@ -1796,7 +1756,7 @@ async function loadAllData(){
     STATE.employeeTypeCosts = (await sbList('employee_type_costs', 'select=*&order=type_name.asc,effective_from.asc')).map(r=>({ id:r.id, typeName:r.type_name, hourlyCost:parseFloat(r.hourly_cost), effectiveFrom:r.effective_from }));
     STATE.employeeHoursWeekly = (await sbList('employee_hours_weekly', 'select=*&order=week_start.desc')).map(r=>({ id:r.id, weekStart:r.week_start, typeName:r.type_name, hours:parseFloat(r.hours) }));
     STATE.recetas = (await sbList('recetas', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre }));
-    STATE.stockIngredientesLista = (await sbList('stock_ingredientes_lista', 'select=*')).map(r=>({ id:r.id, tipo:r.tipo, ingrediente:r.ingrediente }));
+    STATE.stockIngredientesLista = (await sbList('stock_ingredientes_lista', 'select=*')).map(r=>({ id:r.id, tipo:r.tipo, ingrediente:r.ingrediente, unidad:r.unidad||'' }));
     STATE.recetaIngredientes = (await sbList('receta_ingredientes', 'select=*')).map(r=>({ id:r.id, recetaId:r.receta_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad }));
     STATE.recetasHistorial = (await sbList('recetas_archivos_historial', 'select=*&order=fecha_subida.desc')).map(r=>({ id:r.id, nombreArchivo:r.nombre_archivo, fechaSubida:r.fecha_subida, numRecetas:r.num_recetas, numIngredientes:r.num_ingredientes }));
     STATE.inventarios = (await sbList('inventarios', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, nota:r.nota }));
@@ -2575,14 +2535,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.tab==='resumenejecutivo') renderResumenEjecutivo();
     if(item.dataset.tab==='recetario') renderRecetario();
     if(item.dataset.tab==='rotacion'){
-      const rDesdeInp = document.getElementById('rotacionDesde'), rHastaInp = document.getElementById('rotacionHasta');
-      if(!rDesdeInp.value){
-        const hoy = fechaLocalISO(new Date());
-        const hace4Semanas = (()=>{ const d=new Date(hoy+'T00:00:00'); d.setDate(d.getDate()-28); return fechaLocalISO(d); })();
-        rDesdeInp.value = hace4Semanas; rHastaInp.value = hoy;
-      }
-      renderRotacionStock();
-      renderInventarioHistorial();
+      renderStockExistente();
     }
     if(item.dataset.tab==='vacaciones'){
       if(STATE.vacaciones.length===0 && STATE.horasExtras.length===0) loadAndRenderVacaciones();
@@ -6662,68 +6615,98 @@ document.getElementById('recetarioAddRecetaBtn').addEventListener('click', async
 });
 
 /* =========================================================
-   ROTACIÓN DE STOCK — consumo teórico de ingredientes, según ventas reales de Brunch
+   STOCK EXISTENTE — a partir del último inventario contado (app de empleados o aquí
+   mismo) y el consumo teórico (según ventas reales) desde esa fecha hasta la elegida.
+   Cocina: consumo teórico vía recetas del Recetario, sobre ventas de la categoría
+   "Brunch". Bebidas: consumo teórico directo (cada unidad vendida = una consumida),
+   sobre ventas de la categoría "Beans" — mismo ingrediente = mismo nombre de producto.
    ========================================================= */
-function renderRotacionStock(){
-  const desde = document.getElementById('rotacionDesde').value;
-  const hasta = document.getElementById('rotacionHasta').value;
-  const tbodyIng = document.querySelector('#tablaRotacionStock tbody');
-  const tbodyFinal = document.querySelector('#tablaRotacionProductoFinal tbody');
-  const avisoEl = document.getElementById('rotacionSinRecetaAviso');
-  if(!tbodyIng || !tbodyFinal) return;
-  if(!desde || !hasta){
-    tbodyIng.innerHTML = '<tr><td colspan="4" class="hint">Elige un periodo Desde/Hasta.</td></tr>';
-    tbodyFinal.innerHTML = '<tr><td colspan="3" class="hint">Elige un periodo Desde/Hasta.</td></tr>';
+function ultimoInventarioIngrediente(ingrediente, tipo, fechaLimite){
+  const candidatos = STATE.inventarioItems
+    .filter(it=>it.ingrediente===ingrediente && (it.tipo||'cocina')===tipo)
+    .map(it=>{ const inv = STATE.inventarios.find(i=>i.id===it.inventarioId); return inv ? {...it, fecha:inv.fecha} : null; })
+    .filter(Boolean)
+    .filter(it=>it.fecha<=fechaLimite)
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  return candidatos[0] || null;
+}
+function consumoTeoricoCocina(ingrediente, desdeExclusivo, hastaInclusivo){
+  const lineas = getAllSalesLinesRaw().filter(l=>l.fecha>desdeExclusivo && l.fecha<=hastaInclusivo && (l.categoria||'').toLowerCase()==='brunch');
+  const ventasPorProducto = {};
+  lineas.forEach(l=>{ ventasPorProducto[l.articulo] = (ventasPorProducto[l.articulo]||0) + l.cant; });
+  let total = 0;
+  STATE.recetas.forEach(receta=>{
+    const nombreVendido = Object.keys(ventasPorProducto).find(p=>p.toLowerCase()===receta.nombre.toLowerCase());
+    if(!nombreVendido) return;
+    const cantVendida = ventasPorProducto[nombreVendido];
+    STATE.recetaIngredientes.filter(ri=>ri.recetaId===receta.id && ri.ingrediente===ingrediente).forEach(ri=>{ total += ri.cantidad * cantVendida; });
+  });
+  return total;
+}
+function consumoTeoricoBebidas(ingrediente, desdeExclusivo, hastaInclusivo){
+  return getAllSalesLinesRaw()
+    .filter(l=>l.fecha>desdeExclusivo && l.fecha<=hastaInclusivo && l.articulo===ingrediente && (l.categoria||'').toLowerCase()==='beans')
+    .reduce((s,l)=>s+l.cant, 0);
+}
+function renderStockExistente(){
+  const fechaInput = document.getElementById('stockExistenteFecha');
+  if(!fechaInput.value) fechaInput.value = fechaLocalISO(new Date());
+  const fechaFiltro = fechaInput.value;
+  const colInv = document.getElementById('stockExistenteColInv');
+  if(colInv) colInv.textContent = 'Último inventario (hasta '+fechaFiltro+')';
+  const tbody = document.querySelector('#tablaStockExistente tbody');
+  if(!tbody) return;
+
+  const listaCocina = STATE.stockIngredientesLista.filter(x=>x.tipo==='cocina');
+  const listaBebidas = STATE.stockIngredientesLista.filter(x=>x.tipo==='bebidas');
+
+  const filas = [];
+  listaCocina.forEach(item=>{
+    const ult = ultimoInventarioIngrediente(item.ingrediente, 'cocina', fechaFiltro);
+    const consumo = ult ? consumoTeoricoCocina(item.ingrediente, ult.fecha, fechaFiltro) : null;
+    const stockExistente = (ult && consumo!==null) ? ult.cantidad - consumo : null;
+    filas.push({ ingrediente:item.ingrediente, tipo:'cocina', listaId:item.id, ultimo:ult, consumo, stockExistente, unidad:item.unidad||'' });
+  });
+  listaBebidas.forEach(item=>{
+    const ult = ultimoInventarioIngrediente(item.ingrediente, 'bebidas', fechaFiltro);
+    const consumo = ult ? consumoTeoricoBebidas(item.ingrediente, ult.fecha, fechaFiltro) : null;
+    const stockExistente = (ult && consumo!==null) ? ult.cantidad - consumo : null;
+    filas.push({ ingrediente:item.ingrediente, tipo:'bebidas', listaId:item.id, ultimo:ult, consumo, stockExistente, unidad:item.unidad||'' });
+  });
+  filas.sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+
+  if(filas.length===0){
+    tbody.innerHTML = '<tr><td colspan="5" class="hint" style="text-align:center;padding:30px;">Sin ingredientes en la lista todavía — sube una en "Plantillas de inventario", más abajo.</td></tr>';
     return;
   }
 
-  const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta && (l.categoria||'').toLowerCase()==='brunch');
-  const ventasPorProducto = {};
-  allLines.forEach(l=>{ ventasPorProducto[l.articulo] = (ventasPorProducto[l.articulo]||0) + l.cant; });
+  tbody.innerHTML = filas.map(f=>{
+    return `<tr>
+      <td>${escapeHtml(f.ingrediente)} <span class="pill ${f.tipo==='cocina'?'noident':'nuevo'}" style="font-size:9px;">${f.tipo==='cocina'?'Cocina':'Bebidas'}</span></td>
+      <td class="num">${f.ultimo ? (f.ultimo.cantidad+' <span class="hint">('+f.ultimo.fecha+')</span>') : '<span class="hint">Sin inventario</span>'}</td>
+      <td class="num">${f.consumo!==null ? (+f.consumo.toFixed(2)) : '<span class="hint">—</span>'}</td>
+      <td class="num" style="font-weight:700;color:${f.stockExistente!==null?(f.stockExistente<0?'var(--negative)':'var(--positive)'):'var(--text-muted)'};">${f.stockExistente!==null ? (+f.stockExistente.toFixed(2)) : '<span class="hint">—</span>'}</td>
+      <td><input type="text" data-stock-unidad="${f.listaId}" value="${escapeHtml(f.unidad)}" placeholder="unidad" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;"></td>
+    </tr>`;
+  }).join('');
 
-  const consumoIngredientes = {};
-  const productoFinal = {};
-  Object.keys(ventasPorProducto).forEach(producto=>{
-    const unidadesVendidas = ventasPorProducto[producto];
-    const receta = STATE.recetas.find(r=>r.nombre.toLowerCase()===producto.toLowerCase());
-    if(receta){
-      const ingredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId===receta.id);
-      ingredientes.forEach(ing=>{
-        const key = ing.ingrediente+'|'+ing.unidad;
-        if(!consumoIngredientes[key]) consumoIngredientes[key] = { ingrediente:ing.ingrediente, unidad:ing.unidad, cantidad:0, procedencias:new Set() };
-        consumoIngredientes[key].cantidad += ing.cantidad * unidadesVendidas;
-        consumoIngredientes[key].procedencias.add(producto);
-      });
-    } else {
-      productoFinal[producto] = (productoFinal[producto]||0) + unidadesVendidas;
-    }
+  tbody.querySelectorAll('[data-stock-unidad]').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const id = inp.getAttribute('data-stock-unidad');
+      const nuevaUnidad = inp.value.trim();
+      try{
+        await sbUpdate('stock_ingredientes_lista', id, { unidad:nuevaUnidad });
+        const item = STATE.stockIngredientesLista.find(x=>x.id===id);
+        if(item) item.unidad = nuevaUnidad;
+        toast('Unidad guardada ✓');
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
   });
-
-  const filasIng = Object.values(consumoIngredientes).sort((a,b)=>b.cantidad-a.cantidad);
-  tbodyIng.innerHTML = filasIng.map(f=>`
-    <tr><td>${f.ingrediente}</td><td class="num">${+f.cantidad.toFixed(2)}</td><td>${f.unidad}</td><td class="hint">${[...f.procedencias].join(', ')}</td></tr>
-  `).join('') || '<tr><td colspan="4" class="hint">Sin productos de Brunch con receta vendidos en este periodo.</td></tr>';
-
-  const nombresFinal = Object.keys(productoFinal).sort((a,b)=>productoFinal[b]-productoFinal[a]);
-  tbodyFinal.innerHTML = nombresFinal.map(nombre=>`
-    <tr><td>${nombre}</td><td class="num">${+productoFinal[nombre].toFixed(2)}</td><td>unidad</td></tr>
-  `).join('') || '<tr><td colspan="3" class="hint">Sin producto final vendido en este periodo (o todo tenía receta).</td></tr>';
-
-  avisoEl.innerHTML = nombresFinal.length
-    ? '⚠ '+nombresFinal.length+' producto(s) de Brunch vendidos sin receta encontrada — están en la tabla de arriba "Producto final". Añádeles una receta en Recetario si quieres desglosarlos en ingredientes.'
-    : '';
 }
-document.getElementById('rotacionRefreshBtn').addEventListener('click', renderRotacionStock);
+document.getElementById('stockExistenteRefreshBtn').addEventListener('click', renderStockExistente);
 
-/* --- Inventario (dentro de Rotación de Stock) --- */
-/* ingredientes de cocina y bebidas disponibles: la lista que se haya subido por Excel en
-   "Subir lista" — ya no se toman directamente del Recetario ni de las ventas de Square. */
-function ingredientesCocinaDisponibles(){
-  return STATE.stockIngredientesLista.filter(x=>x.tipo==='cocina').map(x=>x.ingrediente).sort((a,b)=>a.localeCompare(b,'es'));
-}
-function ingredientesBebidasDisponibles(){
-  return STATE.stockIngredientesLista.filter(x=>x.tipo==='bebidas').map(x=>x.ingrediente).sort((a,b)=>a.localeCompare(b,'es'));
-}
+/* --- Plantillas de inventario: listas de ingredientes subidas por Excel — la usan tanto
+   este panel como la app de empleados, para saber qué ingredientes se pueden contar. --- */
 async function subirListaIngredientes(tipo, file){
   const statusEl = document.getElementById('invListaStatus');
   statusEl.style.color = 'var(--text-muted)';
@@ -6738,173 +6721,28 @@ async function subirListaIngredientes(tipo, file){
       const text = await file.text();
       filas = text.split(/\r\n|\n/).filter(l=>l.trim()).map(l=>l.split(','));
     }
-    // se coge el valor de la primera columna de cada fila — si la primera fila parece
-    // una cabecera (una sola palabra corta sin números), se ignora; si no, se cuenta como
-    // un ingrediente más, por si el archivo no trae cabecera.
     let ingredientes = filas.map(f=>String((f&&f[0])||'').trim()).filter(Boolean);
     if(ingredientes.length>0 && /^(ingrediente|producto|nombre)s?$/i.test(ingredientes[0])) ingredientes = ingredientes.slice(1);
     ingredientes = [...new Set(ingredientes)];
     if(ingredientes.length===0) throw new Error('No se ha encontrado ningún ingrediente en la primera columna del archivo.');
 
-    // se sustituye la lista anterior de este tipo por la nueva, por completo.
     const anteriores = STATE.stockIngredientesLista.filter(x=>x.tipo===tipo);
     for(const a of anteriores){ await sbDelete('stock_ingredientes_lista', a.id); }
     STATE.stockIngredientesLista = STATE.stockIngredientesLista.filter(x=>x.tipo!==tipo);
     for(const ing of ingredientes){
       const saved = await sbInsert('stock_ingredientes_lista', { tipo, ingrediente:ing });
-      STATE.stockIngredientesLista.push({ id:saved.id, tipo, ingrediente:ing });
+      STATE.stockIngredientesLista.push({ id:saved.id, tipo, ingrediente:ing, unidad:'' });
     }
     statusEl.style.color = 'var(--positive)';
     statusEl.textContent = 'Lista de "'+(tipo==='cocina'?'cocina':'bebidas')+'" actualizada ✓ ('+ingredientes.length+' ingrediente(s))';
-    renderInventarioHistorial();
+    renderStockExistente();
   }catch(e){ statusEl.style.color = 'var(--negative)'; statusEl.textContent = 'Error: '+e.message; }
 }
 document.getElementById('invSubirListaCocinaBtn').addEventListener('click', ()=>document.getElementById('invListaCocinaFile').click());
 document.getElementById('invListaCocinaFile').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) subirListaIngredientes('cocina', f); e.target.value=''; });
 document.getElementById('invSubirListaBebidasBtn').addEventListener('click', ()=>document.getElementById('invListaBebidasFile').click());
 document.getElementById('invListaBebidasFile').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) subirListaIngredientes('bebidas', f); e.target.value=''; });
-let invDraftItems = [];
-document.getElementById('invNuevoBtn').addEventListener('click', ()=>{
-  const fecha = document.getElementById('invNuevaFecha').value || fechaLocalISO(new Date());
-  document.getElementById('invNuevaFecha').value = fecha;
-  invDraftItems = [];
-  renderInvFormNuevo(fecha);
-});
-function renderInvFormNuevo(fecha){
-  const cont = document.getElementById('invFormNuevo');
-  const listaCocina = ingredientesCocinaDisponibles();
-  const listaBebidas = ingredientesBebidasDisponibles();
-  cont.innerHTML = `<div class="card" style="margin-bottom:26px;border:2px solid var(--copper);">
-    <h3>Nuevo inventario — ${fecha}</h3>
-    <p class="hint" style="margin-bottom:8px;">Al escribir, se sugieren los ingredientes de las recetas del Recetario (cocina) o los productos de la categoría "Beans" de Square (bebidas) — pero puedes escribir cualquier otro nombre si hace falta.</p>
-    <table><thead><tr><th>Ingrediente / producto</th><th>Tipo</th><th>Cantidad</th><th>Unidad</th><th></th></tr></thead>
-    <tbody id="invDraftTbody">${invDraftItems.map((it,i)=>`
-      <tr><td><input type="text" list="invDraftSugerencias_${i}" data-inv-draft-nombre="${i}" value="${escapeHtml(it.ingrediente)}" style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;">
-        <datalist id="invDraftSugerencias_${i}">${(it.tipo==='bebidas'?listaBebidas:listaCocina).map(s=>'<option value="'+escapeHtml(s)+'">').join('')}</datalist></td>
-      <td><select data-inv-draft-tipo="${i}" style="background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;"><option value="cocina" ${it.tipo==='cocina'?'selected':''}>Cocina</option><option value="bebidas" ${it.tipo==='bebidas'?'selected':''}>Bebidas</option></select></td>
-      <td class="num"><input type="number" step="0.1" data-inv-draft-cantidad="${i}" value="${it.cantidad}" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td><input type="text" data-inv-draft-unidad="${i}" value="${escapeHtml(it.unidad)}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;"></td>
-      <td><button class="btn danger" data-inv-draft-quitar="${i}" style="padding:2px 8px;font-size:10px;">✕</button></td></tr>
-    `).join('') || '<tr><td colspan="5" class="hint">Sin líneas todavía.</td></tr>'}</tbody></table>
-    <div style="display:flex;gap:8px;margin-top:12px;">
-      <button class="btn secondary" id="invDraftAnadirBtn">+ Añadir línea</button>
-      <button class="btn" id="invDraftGuardarBtn">Guardar inventario</button>
-      <button class="btn secondary" id="invDraftCancelarBtn">Cancelar</button>
-    </div>
-  </div>`;
-  cont.querySelectorAll('[data-inv-draft-nombre]').forEach(inp=>inp.addEventListener('input', e=>{ invDraftItems[+inp.getAttribute('data-inv-draft-nombre')].ingrediente = e.target.value; }));
-  cont.querySelectorAll('[data-inv-draft-tipo]').forEach(sel=>sel.addEventListener('change', e=>{ invDraftItems[+sel.getAttribute('data-inv-draft-tipo')].tipo = e.target.value; renderInvFormNuevo(fecha); }));
-  cont.querySelectorAll('[data-inv-draft-cantidad]').forEach(inp=>inp.addEventListener('input', e=>{ invDraftItems[+inp.getAttribute('data-inv-draft-cantidad')].cantidad = parseFloat(e.target.value)||0; }));
-  cont.querySelectorAll('[data-inv-draft-unidad]').forEach(inp=>inp.addEventListener('input', e=>{ invDraftItems[+inp.getAttribute('data-inv-draft-unidad')].unidad = e.target.value; }));
-  cont.querySelectorAll('[data-inv-draft-quitar]').forEach(btn=>btn.addEventListener('click', ()=>{ invDraftItems.splice(+btn.getAttribute('data-inv-draft-quitar'),1); renderInvFormNuevo(fecha); }));
-  document.getElementById('invDraftAnadirBtn').addEventListener('click', ()=>{ invDraftItems.push({ingrediente:'',cantidad:0,unidad:'unidad',tipo:'cocina'}); renderInvFormNuevo(fecha); });
-  document.getElementById('invDraftCancelarBtn').addEventListener('click', ()=>{ invDraftItems=[]; cont.innerHTML=''; });
-  document.getElementById('invDraftGuardarBtn').addEventListener('click', async ()=>{
-    const validos = invDraftItems.filter(it=>it.ingrediente.trim());
-    if(validos.length===0){ toast('Añade al menos una línea con nombre.', true); return; }
-    try{
-      const nota = document.getElementById('invNuevaNota').value.trim();
-      const savedInv = await sbInsert('inventarios', { fecha, nota });
-      STATE.inventarios.unshift({ id:savedInv.id, fecha, nota });
-      for(const it of validos){
-        const saved = await sbInsert('inventario_items', { inventario_id:savedInv.id, ingrediente:it.ingrediente, cantidad:it.cantidad, unidad:it.unidad, tipo:it.tipo||'cocina' });
-        STATE.inventarioItems.push({ id:saved.id, inventarioId:savedInv.id, ingrediente:it.ingrediente, cantidad:it.cantidad, unidad:it.unidad, tipo:it.tipo||'cocina' });
-      }
-      invDraftItems = [];
-      cont.innerHTML = '';
-      document.getElementById('invNuevaNota').value = '';
-      toast('Inventario guardado ✓');
-      renderInventarioHistorial();
-    }catch(e){ toast('Error: '+e.message, true); }
-  });
-}
-function renderInventarioHistorial(){
-  const tabla = document.getElementById('tablaStockPivote');
-  if(!tabla) return;
-  const tipo = STATE.invStockTipo || 'cocina';
-  document.getElementById('invTipoCocinaBtn').className = 'btn'+(tipo==='cocina'?'':' secondary');
-  document.getElementById('invTipoBebidasBtn').className = 'btn'+(tipo==='bebidas'?'':' secondary');
-  // los filtros se conectan siempre, ANTES de comprobar si hay datos — si no, cuando no
-  // hubiera ningún dato todavía para ese tipo/filtro, la función terminaba antes de
-  // llegar a conectar nada, y los filtros se quedaban sin funcionar.
-  const tipoCocinaBtn = document.getElementById('invTipoCocinaBtn'), tipoBebidasBtn = document.getElementById('invTipoBebidasBtn');
-  const buscarInp = document.getElementById('invStockBuscar'), desdeInp = document.getElementById('invStockDesde'), hastaInp = document.getElementById('invStockHasta');
-  if(tipoCocinaBtn && !tipoCocinaBtn.dataset.wired){
-    tipoCocinaBtn.dataset.wired = '1'; tipoBebidasBtn.dataset.wired = '1';
-    tipoCocinaBtn.addEventListener('click', ()=>{ STATE.invStockTipo='cocina'; renderInventarioHistorial(); });
-    tipoBebidasBtn.addEventListener('click', ()=>{ STATE.invStockTipo='bebidas'; renderInventarioHistorial(); });
-    buscarInp.value = STATE.invStockBuscar||''; desdeInp.value = STATE.invStockDesde||''; hastaInp.value = STATE.invStockHasta||'';
-    buscarInp.addEventListener('input', e=>{ STATE.invStockBuscar = e.target.value; renderInventarioHistorial(); });
-    desdeInp.addEventListener('change', e=>{ STATE.invStockDesde = e.target.value; renderInventarioHistorial(); });
-    hastaInp.addEventListener('change', e=>{ STATE.invStockHasta = e.target.value; renderInventarioHistorial(); });
-  }
-  const buscar = (STATE.invStockBuscar||'').trim().toLowerCase();
-  const desde = STATE.invStockDesde||'', hasta = STATE.invStockHasta||'';
 
-  // cada item hereda la fecha de su "inventario" (la sesión en la que se registró) —
-  // aquí se juntan, se filtran por tipo/búsqueda/rango de fechas, y se convierten en una
-  // tabla con las fechas como columnas y los ingredientes como filas.
-  const itemsFiltrados = STATE.inventarioItems
-    .filter(it=>(it.tipo||'cocina')===tipo)
-    .map(it=>{ const inv = STATE.inventarios.find(i=>i.id===it.inventarioId); return inv ? {...it, fecha:inv.fecha} : null; })
-    .filter(Boolean)
-    .filter(it=>!buscar || it.ingrediente.toLowerCase().includes(buscar))
-    .filter(it=>(!desde || it.fecha>=desde) && (!hasta || it.fecha<=hasta));
-
-  const fechas = [...new Set(itemsFiltrados.map(it=>it.fecha))].sort();
-  const ingredientes = [...new Set(itemsFiltrados.map(it=>it.ingrediente))].sort((a,b)=>a.localeCompare(b,'es'));
-
-  if(ingredientes.length===0){
-    tabla.innerHTML = '<thead><tr><th>Ingrediente</th></tr></thead><tbody><tr><td class="hint" style="padding:30px;text-align:center;">Sin datos de stock para este filtro — añade un inventario arriba, o prueba a quitar el filtro de búsqueda/fechas.</td></tr></tbody>';
-    return;
-  }
-
-  const celdaInfo = {}; // "ingrediente|fecha" -> {cantidad, unidad, id}
-  const unidadPorIngrediente = {};
-  itemsFiltrados.forEach(it=>{
-    celdaInfo[it.ingrediente+'|'+it.fecha] = { cantidad:it.cantidad, unidad:it.unidad, id:it.id };
-    unidadPorIngrediente[it.ingrediente] = it.unidad;
-  });
-
-  tabla.querySelector('thead').innerHTML = '<tr><th style="position:sticky;left:0;background:var(--surface);z-index:1;">Ingrediente</th>'+
-    fechas.map(f=>'<th class="num">'+f+'</th>').join('')+'</tr>';
-  tabla.querySelector('tbody').innerHTML = ingredientes.map(ing=>{
-    const celdas = fechas.map(f=>{
-      const info = celdaInfo[ing+'|'+f];
-      return '<td class="num">'+(info!==undefined ? info.cantidad+' '+escapeHtml(info.unidad||'') : '<span class="hint">—</span>')+'</td>';
-    }).join('');
-    return '<tr><td style="position:sticky;left:0;background:var(--surface);white-space:nowrap;">'+escapeHtml(ing)+' <span class="hint">('+escapeHtml(unidadPorIngrediente[ing]||'')+')</span> '+
-      '<button class="btn secondary" data-inv-editar-ing="'+escapeHtml(ing)+'" title="Renombrar este ingrediente (en todas las fechas)" style="padding:1px 5px;font-size:10px;">✏️</button> '+
-      '<button class="btn danger" data-inv-borrar-ing="'+escapeHtml(ing)+'" title="Borrar este ingrediente (en todas las fechas)" style="padding:1px 5px;font-size:10px;">✕</button>'+
-      '</td>'+celdas+'</tr>';
-  }).join('');
-  tabla.querySelectorAll('[data-inv-editar-ing]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const nombreViejo = btn.getAttribute('data-inv-editar-ing');
-      const nombreNuevo = prompt('Nuevo nombre para "'+nombreViejo+'" (se cambia en todas las fechas donde aparezca):', nombreViejo);
-      if(!nombreNuevo || !nombreNuevo.trim() || nombreNuevo.trim()===nombreViejo) return;
-      const afectados = STATE.inventarioItems.filter(it=>it.ingrediente===nombreViejo && (it.tipo||'cocina')===tipo);
-      for(const it of afectados){
-        try{ await sbUpdate('inventario_items', it.id, { ingrediente:nombreNuevo.trim() }); it.ingrediente = nombreNuevo.trim(); }catch(e){ toast('Error: '+e.message, true); }
-      }
-      toast('Ingrediente renombrado en '+afectados.length+' fecha(s) ✓');
-      renderInventarioHistorial();
-    });
-  });
-  tabla.querySelectorAll('[data-inv-borrar-ing]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const nombre = btn.getAttribute('data-inv-borrar-ing');
-      const afectados = STATE.inventarioItems.filter(it=>it.ingrediente===nombre && (it.tipo||'cocina')===tipo);
-      if(!confirm('¿Borrar "'+nombre+'" de las '+afectados.length+' fecha(s) donde aparece? No se puede deshacer.')) return;
-      for(const it of afectados){
-        try{ await sbDelete('inventario_items', it.id); }catch(e){ toast('Error: '+e.message, true); }
-      }
-      STATE.inventarioItems = STATE.inventarioItems.filter(it=>!(it.ingrediente===nombre && (it.tipo||'cocina')===tipo));
-      toast('Ingrediente borrado ✓');
-      renderInventarioHistorial();
-    });
-  });
-}
 
 /* =========================================================
    RESUMEN EJECUTIVO
@@ -10953,7 +10791,10 @@ function renderCajaMovimientosTab(el){
     <div class="card" style="padding:0;overflow:auto;">
       <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th><th></th></tr></thead>
       <tbody>${filtered.slice(0,400).map(m=>`
-        <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">${m.fechaDia || m.month}</td>
+        <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">
+          <span data-fecha-texto="${m.id}">${m.fechaDia || m.month}</span>
+          <button class="btn secondary" data-fecha-editar="${m.id}" title="Cambiar la fecha valor de este movimiento (lo mueve al mes que le corresponda al guardar)" style="padding:1px 4px;font-size:9px;">✏️</button>
+        </td>
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(m.concept)}</td>
         <td>${cajaCatSelectHtml(m.id, c.pending[m.id]||'', m.amount<0?cajaGasCatOpts():cajaIncCatOpts(), m.category)}</td>
         <td><input type="text" list="cajaSubcatDatalist" data-subcat-input="${m.id}" value="${escapeHtml(m.subcategory||'')}" placeholder="—" style="background:var(--bg);border:1px solid ${m.subcategory?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:130px;"></td>
@@ -10986,6 +10827,41 @@ function renderCajaMovimientosTab(el){
     inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
   });
   const aplicarBtn2 = document.getElementById('cajaAplicarBtn2'); if(aplicarBtn2) aplicarBtn2.addEventListener('click', cajaApplyPending);
+  el.querySelectorAll('[data-fecha-editar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-fecha-editar');
+      const mov = c.data.movements.find(m=>String(m.id)===String(id));
+      const span = el.querySelector('[data-fecha-texto="'+id+'"]');
+      if(!mov || !span) return;
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.value = mov.fechaDia || '';
+      input.style.cssText = 'background:var(--bg);border:1px solid var(--copper);color:var(--text);border-radius:4px;padding:2px 4px;font-size:11px;';
+      span.replaceWith(input);
+      btn.style.display = 'none';
+      input.focus();
+      input.addEventListener('change', async ()=>{
+        const nuevaFecha = input.value;
+        if(!nuevaFecha){ renderCajaTabContent(); return; }
+        const mesAnterior = mov.month;
+        const nuevoMes = nuevaFecha.slice(0,7);
+        const movsActualizados = c.data.movements.map(m => String(m.id)===String(id) ? {...m, fechaDia:nuevaFecha, month:nuevoMes} : m);
+        c.data = { ...c.data, movements:movsActualizados, ...cajaRecompute(movsActualizados) };
+        // igual que "Borrar": si se está editando un balance ya guardado, se guarda al
+        // momento — cajaSaveMonth() ya reparte cada movimiento a su mes real según su
+        // propio campo .month, así que si el mes ha cambiado, este movimiento se mueve
+        // solo al balance que le corresponda (fusionándose sin duplicar si ya hubiera
+        // algo ahí), sin tener que programar nada nuevo para "mover" movimientos.
+        if(c.data.esEdicionExistente){
+          await cajaSaveMonth();
+          toast(nuevoMes!==mesAnterior ? 'Fecha cambiada — movido a '+cajaNombreMes(nuevoMes)+' ✓' : 'Fecha cambiada y guardada ✓');
+          return;
+        }
+        toast('Fecha cambiada.');
+        renderCaja();
+      });
+    });
+  });
   el.querySelectorAll('[data-caja-borrar-mov]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.getAttribute('data-caja-borrar-mov');
