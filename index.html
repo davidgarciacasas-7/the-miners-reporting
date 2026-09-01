@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.231</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.232</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1275,12 +1275,16 @@ Bowl de acai,Acai,150,g</pre>
             <button class="btn secondary" id="hxAddBtn" style="padding:5px 10px;font-size:12px;">Guardar</button>
           </div>
         </div>
-        <div class="section-title">Total por empleado</div>
+        <div class="section-title">Total por empleado (pendiente de pago)</div>
         <div class="card" style="margin-bottom:14px;">
-          <table id="tablaHxTotal"><thead><tr><th>Empleado</th><th>Total horas</th><th>Pagadas</th><th>Pendientes de pago</th></tr></thead><tbody></tbody></table>
+          <table id="tablaHxTotal"><thead><tr><th>Empleado</th><th>Horas pendientes de pago</th></tr></thead><tbody></tbody></table>
         </div>
         <div class="section-title">Histórico de horas extras</div>
         <div class="card">
+          <div class="subfilter" style="margin-bottom:10px;">
+            <span class="hint">Filtrar por empleado:</span>
+            <select id="hxHistoricoFiltroEmpleado"><option value="">Todos</option></select>
+          </div>
           <div style="max-height:320px;overflow:auto;">
             <table id="tablaHxHistorico"><thead><tr><th>Fecha</th><th>Empleado</th><th>Horas</th><th>Nota</th><th>Pago</th><th></th></tr></thead><tbody></tbody></table>
           </div>
@@ -9782,22 +9786,36 @@ function renderHorasExtras(){
   if(!tbodyTotal) return;
   const porEmpleado = {};
   STATE.horasExtras.forEach(h=>{
-    if(!porEmpleado[h.empleado]) porEmpleado[h.empleado] = { total:0, pagadas:0, pendientes:0 };
-    porEmpleado[h.empleado].total += h.horas;
-    if(h.pagada) porEmpleado[h.empleado].pagadas += h.horas;
-    else porEmpleado[h.empleado].pendientes += h.horas;
+    if(!porEmpleado[h.empleado]) porEmpleado[h.empleado] = { pendientes:0 };
+    if(!h.pagada) porEmpleado[h.empleado].pendientes += h.horas;
   });
-  const nombres = Object.keys(porEmpleado).sort();
+  // solo se muestran los empleados que todavía tienen algo pendiente de pago — en cuanto
+  // se marcan como pagadas todas sus horas, desaparecen solos de esta lista.
+  const nombres = Object.keys(porEmpleado).filter(n=>porEmpleado[n].pendientes>0).sort();
   tbodyTotal.innerHTML = nombres.map(n=>{
     const d = porEmpleado[n];
-    return `<tr><td>${n}</td><td class="num">${d.total}</td><td class="num" style="color:var(--positive)">${d.pagadas}</td><td class="num" style="color:${d.pendientes>0?'var(--negative)':'var(--text)'}"><b>${d.pendientes}</b></td></tr>`;
-  }).join('') || '<tr><td colspan="4" class="hint">Sin registros todavía.</td></tr>';
+    return `<tr><td>${escapeHtml(n)}</td><td class="num" style="color:var(--negative);"><b>${d.pendientes}</b></td></tr>`;
+  }).join('') || '<tr><td colspan="2" class="hint">Nada pendiente de pago — todo al día ✓</td></tr>';
 
-  document.querySelector('#tablaHxHistorico tbody').innerHTML = STATE.horasExtras.map(h=>`
-    <tr><td>${h.fecha}</td><td>${h.empleado}</td><td class="num">${h.horas}</td><td class="hint">${h.nota||''}</td>
+  // filtro por empleado en el histórico — se reconstruye la lista de opciones cada vez,
+  // conservando la selección actual si sigue siendo válida.
+  const filtroSel = document.getElementById('hxHistoricoFiltroEmpleado');
+  const empleadosHistorico = [...new Set(STATE.horasExtras.map(h=>h.empleado))].sort();
+  const seleccionActual = filtroSel.value;
+  filtroSel.innerHTML = '<option value="">Todos</option>' + empleadosHistorico.map(n=>`<option value="${escapeHtml(n)}" ${seleccionActual===n?'selected':''}>${escapeHtml(n)}</option>`).join('');
+  const filtroEmpleado = filtroSel.value;
+  const historicoFiltrado = filtroEmpleado ? STATE.horasExtras.filter(h=>h.empleado===filtroEmpleado) : STATE.horasExtras;
+
+  document.querySelector('#tablaHxHistorico tbody').innerHTML = historicoFiltrado.map(h=>`
+    <tr><td>${h.fecha}</td><td>${escapeHtml(h.empleado)}</td><td class="num">${h.horas}</td><td class="hint">${escapeHtml(h.nota||'')}</td>
     <td><button class="btn ${h.pagada?'secondary':'danger'}" data-toggle-pagada="${h.id}" style="padding:3px 10px;font-size:11px;">${h.pagada?'✓ Pagada':'Sin pagar'}</button></td>
     <td><button class="btn danger" data-del-hx="${h.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
-  `).join('') || '<tr><td colspan="6" class="hint">Sin registros todavía.</td></tr>';
+  `).join('') || `<tr><td colspan="6" class="hint">${filtroEmpleado?'Sin registros de este empleado.':'Sin registros todavía.'}</td></tr>`;
+
+  if(!filtroSel.dataset.wired){
+    filtroSel.dataset.wired = '1';
+    filtroSel.addEventListener('change', renderHorasExtras);
+  }
   document.querySelectorAll('[data-toggle-pagada]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.getAttribute('data-toggle-pagada');
