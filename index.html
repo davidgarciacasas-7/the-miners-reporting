@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.232</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.237</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -787,13 +787,13 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           </div>
           <p style="margin:0 0 4px 0;font-size:15px;"><b>Semana de referencia elegida:</b> <span id="ajusteSemanaReferencia" style="color:var(--copper);"></span></p>
           <p style="margin:0 0 8px 0;font-size:15px;"><b>Este ajuste se aplicará:</b> <span id="ajusteAplicaDesde" style="color:var(--negative);"></span></p>
-          <p class="hint" style="margin-bottom:0;">Los porcentajes que pongas aquí se aplican, <b>tal cual y sin acumular</b>, durante el periodo de arriba — no es un incremento que vaya subiendo semana a semana (no es +5% la semana que viene, +10% la de después...); es el <b>mismo ajuste fijo</b> cada vez, comparado siempre contra la semana de referencia de arriba. Un valor positivo significa que esperas consumir más de lo normal en esa franja; uno negativo, menos. Si dejas "Aplica hasta" en blanco, el ajuste se queda indefinido, hasta que guardes otro distinto.</p>
+          <p class="hint" style="margin-bottom:0;">Los porcentajes que pongas aquí se aplican, <b>tal cual y sin acumular</b>, durante el periodo de arriba — no es un incremento que vaya subiendo semana a semana (no es +5% la semana que viene, +10% la de después...); es el <b>mismo ajuste fijo</b> cada vez, comparado siempre contra la semana de referencia de arriba. Un valor positivo significa que esperas consumir más de lo normal ese día; uno negativo, menos. Si dejas "Aplica hasta" en blanco, el ajuste se queda indefinido, hasta que guardes otro distinto.</p>
         </div>
         <div class="card" style="margin-bottom:14px;">
-          <table id="tablaAjusteDemanda">
-            <thead><tr><th>Franja</th><th>L-V (%)</th><th>Sábado (%)</th><th>Domingo (%)</th></tr></thead>
-            <tbody></tbody>
-          </table>
+          <div class="subfilter" style="margin-bottom:0;">
+            <div class="field" style="max-width:160px;"><label>L-V (%)</label><input type="number" step="1" id="ajusteSemanaInput" value="0"></div>
+            <div class="field" style="max-width:160px;"><label>S-D (%)</label><input type="number" step="1" id="ajusteFindeInput" value="0"></div>
+          </div>
           <button class="btn" id="ajusteGuardarBtn" style="margin-top:14px;">Guardar ajustes</button>
           <p class="hint" id="ajusteGuardarStatus" style="margin-top:8px;"></p>
         </div>
@@ -2993,6 +2993,11 @@ if(window.ChartDataLabels && window.Chart){
    hasta donde se coloca su etiqueta — solo para las porciones por debajo del umbral, que
    son las que no tienen sitio para escribir el % por dentro sin que se salga o se solape. */
 const PIE_LEADER_LINE_THRESHOLD = 0.06;
+// por debajo de este otro umbral (más pequeño que el anterior), la categoría ni siquiera
+// saca su % fuera con línea — directamente no se escribe ninguna etiqueta, para no
+// amontonar texto cuando hay muchas categorías diminutas juntas (sigue viéndose la
+// porción en la tarta, y el nombre en la leyenda de abajo, solo que sin el %).
+const PIE_HIDE_LABEL_THRESHOLD = 0.02;
 if(window.Chart){
   Chart.register({
     id: 'pieLeaderLines',
@@ -3006,7 +3011,7 @@ if(window.Chart){
       ctx.save();
       meta.data.forEach((arc,i)=>{
         const pct = Math.abs(data[i]||0)/total;
-        if(pct<=0 || pct>=PIE_LEADER_LINE_THRESHOLD) return;
+        if(pct<PIE_HIDE_LABEL_THRESHOLD || pct>=PIE_LEADER_LINE_THRESHOLD) return;
         const angle = (arc.startAngle + arc.endAngle)/2;
         const cx = arc.x, cy = arc.y, outerR = arc.outerRadius;
         const x1 = cx + Math.cos(angle)*outerR, y1 = cy + Math.sin(angle)*outerR;
@@ -6876,8 +6881,9 @@ const RE_WIDGET_TYPES = {
   cajaBalance:   { label:'Caja — Balance mensual', tipo:'snapshot-async' },
   pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
   pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
-  cajaCategoriaLinea: { label:'Caja — evolución de una categoría o subcategoría de gasto (tú eliges cuál, € o % sobre ventas)', tipo:'cajaCategoriaLinea' },
-  cajaPieCategoria: { label:'Caja — reparto de gastos por categoría/subcategoría (tarta con %)', tipo:'cajaPieCategoria' },
+  cajaCategoriaLinea: { label:'Caja — evolución de gasto por categoría (añade de golpe todas las que no tengas ocultas en Caja, en €)', tipo:'cajaCategoriaLinea' },
+  cajaCategoriaLineaPct: { label:'Caja — evolución de gasto por categoría (añade de golpe todas las que no tengas ocultas en Caja, en % de ventas)', tipo:'cajaCategoriaLineaPct' },
+  cajaPieCategoria: { label:'Caja — reparto de gastos por categoría (añade de golpe las 3 vistas: total/3 meses/1 mes)', tipo:'cajaPieCategoria' },
 };
 function getReWidgets(){
   try{
@@ -6961,13 +6967,41 @@ function renderReAddWidgetSelect(){
   const sel = document.getElementById('reAddWidgetSelect');
   sel.innerHTML = '<option value="">Elegir...</option>' + Object.entries(RE_WIDGET_TYPES).map(([id,t])=>'<option value="'+id+'">'+t.label+'</option>').join('');
 }
-document.getElementById('reAddWidgetSelect').addEventListener('change', (e)=>{
+document.getElementById('reAddWidgetSelect').addEventListener('change', async (e)=>{
   const typeId = e.target.value;
   if(!typeId) return;
+  e.target.value = '';
+  // estos 3 tipos, en vez de añadir un único widget con un desplegable para elegir, crean
+  // de golpe todos los que correspondan — las categorías visibles (sin las que tengas
+  // ocultas en Caja → Gráficos), o las 3 vistas de la tarta.
+  if(typeId==='cajaCategoriaLinea' || typeId==='cajaCategoriaLineaPct'){
+    if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+    const enPct = typeId==='cajaCategoriaLineaPct';
+    const ocultas = STATE.caja.categoriasOcultasGraficos||[];
+    const categoriasVisibles = cajaDetalleCatData().cats.filter(cat=>!ocultas.includes(cat));
+    if(categoriasVisibles.length===0){ toast('No hay categorías visibles en Caja → Gráficos para añadir.', true); return; }
+    const widgets = getReWidgets();
+    categoriasVisibles.forEach(cat=>{
+      widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'cajaCategoriaLinea', cajaCategoriaTipo:'categoria', cajaCategoriaNombre:cat, cajaCategoriaEnPct:enPct });
+    });
+    setReWidgets(widgets);
+    toast(categoriasVisibles.length+' gráfico(s) añadido(s) ✓');
+    renderResumenEjecutivo();
+    return;
+  }
+  if(typeId==='cajaPieCategoria'){
+    const widgets = getReWidgets();
+    [ {periodo:'total', etiqueta:'Periodo total'}, {periodo:'3m', etiqueta:'Últimos 3 meses'}, {periodo:'1m', etiqueta:'Último mes'} ].forEach(p=>{
+      widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'cajaPieCategoria', cajaPieTipo:'categoria', cajaPiePeriodo:p.periodo });
+    });
+    setReWidgets(widgets);
+    toast('3 gráficos añadidos ✓');
+    renderResumenEjecutivo();
+    return;
+  }
   const widgets = getReWidgets();
   widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId });
   setReWidgets(widgets);
-  e.target.value = '';
   renderResumenEjecutivo();
 });
 document.getElementById('reAddTituloBtn').addEventListener('click', ()=>{
@@ -8043,12 +8077,12 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     let sum=0; allSalesLines.forEach(l=>{ if(l.fecha>=bucket.dateMin && l.fecha<=bucket.dateMax) sum += l.cant*costAtDate(costHistory, l.articulo, l.fecha); });
     valor = sum;
   } else if(line.esAuto && line.name==='Inventory stock up'){
-    // Production Costs + Write-off Total + Missing stock + Packaging costs (en valor
-    // absoluto, por si alguna se guardó como negativa) menos el COGS real de Caja
-    // (alimentos+bebidas) — con los signos reales de cada uno (todos costes, negativos),
-    // esto equivale a: COGS_Caja − (Production + Write-off + Missing + Packaging). Sale
-    // en negativo cuando el COGS real de Caja es mayor que la suma de esas 4 líneas — se
-    // muestra en una tabla aparte, debajo del PNL principal, y no influye en EBITDA.
+    // COGS real de Caja (alimentos+bebidas) menos Production Costs + Write-off Total +
+    // Missing stock + Packaging costs (en valor absoluto). Negativo = se ha CONSUMIDO
+    // stock ese mes (los costes teóricos superan lo comprado de verdad en Caja — se ha
+    // tirado de existencias). Positivo = se ha GENERADO stock (se compró más de lo que se
+    // consumió teóricamente ese mes). Se muestra en una tabla aparte, debajo del PNL
+    // principal, y no influye en EBITDA.
     const cogsTotal = cogsDesdeCaja(bucket);
     const lineaProdCosts = STATE.pnlLines.find(l=>l.name==='Production Costs');
     const lineaWriteOff = STATE.pnlLines.find(l=>l.name==='Write-off Total');
@@ -8058,7 +8092,7 @@ function pnlLineValorPrimario(line, bucket, allSalesLines, costHistory, otherCos
     const writeOff = lineaWriteOff ? pnlLineValorPrimario(lineaWriteOff, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
     const missingStock = lineaMissingStock ? pnlLineValorPrimario(lineaMissingStock, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
     const packaging = lineaPackaging ? pnlLineValorPrimario(lineaPackaging, bucket, allSalesLines, costHistory, otherCostHistory) : 0;
-    valor = (Math.abs(prodCosts) + Math.abs(writeOff) + Math.abs(missingStock) + Math.abs(packaging)) - Math.abs(cogsTotal);
+    valor = Math.abs(cogsTotal) - (Math.abs(prodCosts) + Math.abs(writeOff) + Math.abs(missingStock) + Math.abs(packaging));
   } else if(line.esAuto && line.name==='Wages'){
     valor = wagesDesdeCaja(bucket);
   } else if(line.esRecurrente){
@@ -11886,7 +11920,7 @@ function cajaPieDatalabelsPlugins(c2){
     pieLeaderLines: { enabled:true },
     legend:{ position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}} },
     datalabels:{
-      display: (ctx) => pctDe(ctx) > 0,
+      display: (ctx) => pctDe(ctx) >= PIE_HIDE_LABEL_THRESHOLD,
       formatter: (value, ctx) => (pctDe(ctx)*100).toFixed(1)+'%',
       color: (ctx) => esPequena(ctx) ? c2.text : '#fff',
       font: { size: 10, weight: 'bold' },
@@ -11900,8 +11934,14 @@ function renderCajaPieCharts(){
   const c = STATE.caja;
   const contCat = document.getElementById('cajaPieCategoriaCont');
   const contSub = document.getElementById('cajaPieSubcategoriaCont');
+  const bloqueSub = document.getElementById('cajaPieSubcategoriaBloque');
   if(!contCat || !contSub) return;
   const c2 = chartColors();
+  // las tartas de subcategoría son costosas de construir (una por periodo) y no aportan
+  // nada mientras no se esté mirando ese modo — solo se construyen y se muestran cuando
+  // "Por subcategoría" está seleccionado abajo.
+  const mostrarSubcategoria = c.detalleMode==='subcategoria';
+  if(bloqueSub) bloqueSub.style.display = mostrarSubcategoria ? '' : 'none';
 
   const ordenados = [...c.savedMonths].sort((a,b)=>a.month.localeCompare(b.month));
   const periodoTotal = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
@@ -11917,13 +11957,15 @@ function renderCajaPieCharts(){
   contCat.innerHTML = periodos.map(p=>`
     <div>
       <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">${p.titulo}</div>
-      <div class="chart-wrap" style="height:240px;"><canvas id="cajaPieCategoria_${p.key}"></canvas></div>
+      <div class="chart-wrap" style="height:320px;"><canvas id="cajaPieCategoria_${p.key}"></canvas></div>
     </div>`).join('');
-  contSub.innerHTML = periodos.map(p=>`
-    <div>
-      <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">${p.titulo}</div>
-      <div class="chart-wrap" style="height:240px;"><canvas id="cajaPieSubcategoria_${p.key}"></canvas></div>
-    </div>`).join('');
+  if(mostrarSubcategoria){
+    contSub.innerHTML = periodos.map(p=>`
+      <div>
+        <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">${p.titulo}</div>
+        <div class="chart-wrap" style="height:320px;"><canvas id="cajaPieSubcategoria_${p.key}"></canvas></div>
+      </div>`).join('');
+  }
 
   periodos.forEach(p=>{
     const {labels:catLabels, values:catValues} = cajaAgregarPorCategoria(p.entries);
@@ -11936,6 +11978,7 @@ function renderCajaPieCharts(){
         tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalCat*100).toFixed(1)+'%)' } } } }
     });
 
+    if(!mostrarSubcategoria) return;
     const {labels:subLabels, values:subValues} = cajaAgregarPorSubcategoria(p.entries);
     const totalSub = subValues.reduce((s,v)=>s+v,0)||1;
     destroyChart('cajaPieSubcategoria_'+p.key);
@@ -11957,9 +12000,11 @@ function renderCajaGraficosTab(el){
       <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:6px;">Reparto de gastos por categoría — cada porción es su % sobre el total de gastos de ese periodo</div>
       <p class="hint" style="margin-bottom:14px;">Cómo se calcula: se cogen todos los gastos (importes negativos) del periodo indicado en cada tarta, y cada porción es el % que representa esa categoría (o subcategoría) sobre el <b>total de gastos de ese periodo</b> — "Periodo total" usa el filtro de fecha de abajo, las otras dos son siempre los últimos 3 meses y el último mes, independientemente del filtro. En el de subcategoría, los movimientos que todavía no tienen subcategoría puesta se agrupan bajo el nombre de su categoría.</p>
       <div class="hint" style="font-weight:600;margin-bottom:6px;">Por categoría</div>
-      <div id="cajaPieCategoriaCont" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:20px;"></div>
-      <div class="hint" style="font-weight:600;margin-bottom:6px;">Por subcategoría</div>
-      <div id="cajaPieSubcategoriaCont" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;"></div>
+      <div id="cajaPieCategoriaCont" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;margin-bottom:20px;"></div>
+      <div id="cajaPieSubcategoriaBloque">
+        <div class="hint" style="font-weight:600;margin-bottom:6px;">Por subcategoría</div>
+        <div id="cajaPieSubcategoriaCont" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;"></div>
+      </div>
     </div>
     <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
       <div style="display:flex;gap:8px;">
@@ -13061,10 +13106,12 @@ document.getElementById('horneadoRegHasta').addEventListener('change', renderHor
 document.getElementById('horneadoRegRefreshBtn').addEventListener('click', renderHorneadoRegistros);
 
 /* =========================================================
-   AJUSTE DE DEMANDA — % manual por franja y tipo de día, fijo respecto a la
-   semana de referencia (la actual), aplicado igual a todas las semanas siguientes
+   AJUSTE DE DEMANDA — % manual, uno para L-V y otro para S-D (fin de semana entero, sin
+   distinguir sábado de domingo), fijo respecto a la semana de referencia (la actual),
+   aplicado igual a todas las semanas siguientes. Se sigue guardando en la misma tabla de
+   siempre (demanda_ajustes), pero con un único franja fijo ("total") y tipo_dia "semana"
+   o "finde" — así no hace falta ninguna migración para simplificar esto.
    ========================================================= */
-const AJUSTE_DEMANDA_FRANJAS = ['08:00-11:00','11:00-13:00','13:00-15:00','15:00-cierre'];
 async function renderAjusteDemanda(){
   const hoy = fechaLocalISO(new Date());
   const inputRef = document.getElementById('ajusteSemanaReferenciaInput');
@@ -13083,27 +13130,15 @@ async function renderAjusteDemanda(){
   }
   actualizarTextoAplicaPeriodo();
 
-  const tbody = document.querySelector('#tablaAjusteDemanda tbody');
-  tbody.innerHTML = '<tr><td colspan="4" class="hint">Cargando...</td></tr>';
-  let ajustesGuardados = [];
+  const inputSemana = document.getElementById('ajusteSemanaInput'), inputFinde = document.getElementById('ajusteFindeInput');
   try{
-    ajustesGuardados = await sbList('demanda_ajustes', 'select=*');
+    const ajustesGuardados = await sbList('demanda_ajustes', 'select=*&franja=eq.total');
+    const valorGuardado = (tipo) => { const r = ajustesGuardados.find(x=>x.tipo_dia===tipo); return r ? parseFloat(r.porcentaje) : 0; };
+    inputSemana.value = valorGuardado('semana');
+    inputFinde.value = valorGuardado('finde');
   }catch(e){
-    tbody.innerHTML = '<tr><td colspan="4" class="hint">Error cargando: '+e.message+'</td></tr>';
-    return;
+    document.getElementById('ajusteGuardarStatus').innerHTML = '<span style="color:var(--negative)">Error cargando: '+e.message+'</span>';
   }
-  const valorGuardado = (franja, tipo) => {
-    const r = ajustesGuardados.find(x=>x.franja===franja && x.tipo_dia===tipo);
-    return r ? parseFloat(r.porcentaje) : 0;
-  };
-  tbody.innerHTML = AJUSTE_DEMANDA_FRANJAS.map(f=>`
-    <tr>
-      <td>${f}</td>
-      <td class="num"><input type="number" step="1" data-ajuste="${f}|semana" value="${valorGuardado(f,'semana')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="1" data-ajuste="${f}|sabado" value="${valorGuardado(f,'sabado')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-      <td class="num"><input type="number" step="1" data-ajuste="${f}|domingo" value="${valorGuardado(f,'domingo')}" style="width:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;text-align:right;"></td>
-    </tr>
-  `).join('');
   renderAjusteDemandaHistorial();
 }
 document.getElementById('ajusteSemanaReferenciaInput').addEventListener('change', renderAjusteDemanda);
@@ -13122,24 +13157,25 @@ document.getElementById('ajusteAplicaHastaInput').addEventListener('change', act
 document.getElementById('ajusteGuardarBtn').addEventListener('click', async ()=>{
   const statusEl = document.getElementById('ajusteGuardarStatus');
   const btn = document.getElementById('ajusteGuardarBtn');
-  const inputs = document.querySelectorAll('[data-ajuste]');
   const hastaValue = document.getElementById('ajusteAplicaHastaInput').value;
   const aplicaHasta = hastaValue ? isoMonday(hastaValue) : null;
   const aplicaDesde = isoMonday(document.getElementById('ajusteAplicaDesdeInput').value);
   if(aplicaHasta && aplicaHasta<aplicaDesde){ statusEl.innerHTML = '<span style="color:var(--negative)">"Aplica hasta" no puede ser antes que "Aplica desde".</span>'; return; }
   btn.disabled = true; statusEl.textContent = 'Guardando...';
+  const valores = [
+    { tipo_dia:'semana', porcentaje: parseFloat(document.getElementById('ajusteSemanaInput').value)||0 },
+    { tipo_dia:'finde', porcentaje: parseFloat(document.getElementById('ajusteFindeInput').value)||0 },
+  ];
   let ok = 0; const errores = []; const snapshot = [];
-  for(const inp of inputs){
-    const [franja, tipoDia] = inp.getAttribute('data-ajuste').split('|');
-    const porcentaje = parseFloat(inp.value)||0;
-    snapshot.push({ franja, tipo_dia:tipoDia, porcentaje });
+  for(const v of valores){
+    snapshot.push({ franja:'total', tipo_dia:v.tipo_dia, porcentaje:v.porcentaje });
     try{
-      await sbUpsert('demanda_ajustes', { franja, tipo_dia:tipoDia, porcentaje, aplica_hasta:aplicaHasta }, 'franja,tipo_dia');
+      await sbUpsert('demanda_ajustes', { franja:'total', tipo_dia:v.tipo_dia, porcentaje:v.porcentaje, aplica_hasta:aplicaHasta }, 'franja,tipo_dia');
       ok++;
-    }catch(e){ errores.push(franja+'/'+tipoDia+': '+e.message); }
+    }catch(e){ errores.push(v.tipo_dia+': '+e.message); }
   }
   if(errores.length===0){
-    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente ('+ok+' de '+inputs.length+').</span>';
+    statusEl.innerHTML = '<span style="color:var(--positive)">Guardado correctamente.</span>';
     try{
       await sbInsert('demanda_ajustes_historial', {
         semana_referencia: isoMonday(document.getElementById('ajusteSemanaReferenciaInput').value),
@@ -13150,7 +13186,7 @@ document.getElementById('ajusteGuardarBtn').addEventListener('click', async ()=>
     }catch(e){ /* si falla el registro del historial, los ajustes en sí ya se guardaron bien igualmente */ }
     renderAjusteDemandaHistorial();
   } else {
-    statusEl.innerHTML = '<span style="color:var(--negative)">Guardadas '+ok+' de '+inputs.length+'. Fallos: '+errores.slice(0,3).join(' · ')+'</span>';
+    statusEl.innerHTML = '<span style="color:var(--negative)">Guardados '+ok+' de '+valores.length+'. Fallos: '+errores.join(' · ')+'</span>';
   }
   btn.disabled = false;
 });
@@ -13164,7 +13200,7 @@ async function renderAjusteDemandaHistorial(){
     el.innerHTML = rows.map(r=>{
       const fechaGuardado = new Date(r.guardado_en);
       const resumen = (r.ajustes||[]).filter(a=>parseFloat(a.porcentaje)!==0)
-        .map(a=>a.franja+' ('+({semana:'L-V',sabado:'Sáb',domingo:'Dom'}[a.tipo_dia]||a.tipo_dia)+'): '+(a.porcentaje>0?'+':'')+a.porcentaje+'%').join(' · ') || 'todo a 0%';
+        .map(a=>({semana:'L-V',finde:'S-D',sabado:'Sáb',domingo:'Dom'}[a.tipo_dia]||a.tipo_dia)+': '+(a.porcentaje>0?'+':'')+a.porcentaje+'%').join(' · ') || 'todo a 0%';
       return `<div style="padding:8px 0;border-bottom:1px solid var(--line);">
         <div><b>Aplicado ${r.aplica_hasta ? 'del '+r.aplica_desde+' al '+r.aplica_hasta : 'desde la semana del '+r.aplica_desde+' en adelante'}</b> <span class="hint">— guardado el ${fechaLocalISO(fechaGuardado)} a las ${fechaGuardado.toTimeString().slice(0,5)}, comparado contra la semana de referencia del ${r.semana_referencia||'—'}</span></div>
         <div class="hint" style="margin-top:2px;">${resumen}</div>
@@ -13392,8 +13428,8 @@ function showApp(){
     const propinaAnioEl = document.getElementById('propinaAnio_'+tipo);
     if(propinaAnioEl && !propinaAnioEl.dataset.cargado){
       const anioActual = parseInt(hoy.slice(0,4),10);
-      const anios = []; for(let a=anioActual-2; a<=anioActual+1; a++) anios.push(a);
-      propinaAnioEl.innerHTML = anios.map(a=>'<option value="'+a+'" '+(a===anioActual?'selected':'')+'>'+a+'</option>').join('');
+      const anios = []; for(let a=2026; a<=Math.max(anioActual+1,2026); a++) anios.push(a);
+      propinaAnioEl.innerHTML = anios.map(a=>'<option value="'+a+'" '+(a===Math.max(anioActual,2026)?'selected':'')+'>'+a+'</option>').join('');
       propinaAnioEl.dataset.cargado = '1';
       const propinaMesEl = document.getElementById('propinaMes_'+tipo);
       if(propinaMesEl) propinaMesEl.value = hoy.slice(5,7);
