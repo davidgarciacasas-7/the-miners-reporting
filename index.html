@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.220</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.226</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2983,6 +2983,35 @@ if(window.ChartDataLabels && window.Chart){
       return Number.isInteger(value) ? value : value.toFixed(1);
     }
   };
+}
+/* plugin propio: dibuja una línea fina desde el borde de una porción pequeña de tarta
+   hasta donde se coloca su etiqueta — solo para las porciones por debajo del umbral, que
+   son las que no tienen sitio para escribir el % por dentro sin que se salga o se solape. */
+const PIE_LEADER_LINE_THRESHOLD = 0.06;
+if(window.Chart){
+  Chart.register({
+    id: 'pieLeaderLines',
+    afterDraw(chart){
+      if(!chart.config.options?.plugins?.pieLeaderLines?.enabled) return;
+      const meta = chart.getDatasetMeta(0);
+      if(!meta || !meta.data || !meta.data.length) return;
+      const data = chart.data.datasets[0].data;
+      const total = data.reduce((s,v)=>s+Math.abs(v),0) || 1;
+      const {ctx} = chart;
+      ctx.save();
+      meta.data.forEach((arc,i)=>{
+        const pct = Math.abs(data[i]||0)/total;
+        if(pct<=0 || pct>=PIE_LEADER_LINE_THRESHOLD) return;
+        const angle = (arc.startAngle + arc.endAngle)/2;
+        const cx = arc.x, cy = arc.y, outerR = arc.outerRadius;
+        const x1 = cx + Math.cos(angle)*outerR, y1 = cy + Math.sin(angle)*outerR;
+        const x2 = cx + Math.cos(angle)*(outerR+16), y2 = cy + Math.sin(angle)*(outerR+16);
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+        ctx.strokeStyle = 'rgba(150,140,130,0.7)'; ctx.lineWidth = 1; ctx.stroke();
+      });
+      ctx.restore();
+    }
+  });
 }
 /* vuelve a dibujar todo lo que esté cargado, para que el cambio de preferencia se note al momento */
 function refrescarTodosLosGraficos(){
@@ -6842,7 +6871,8 @@ const RE_WIDGET_TYPES = {
   cajaBalance:   { label:'Caja — Balance mensual', tipo:'snapshot-async' },
   pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
   pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
-  cajaCategoriaLinea: { label:'Caja — evolución de una categoría de gasto (tú eliges cuál)', tipo:'cajaCategoriaLinea' },
+  cajaCategoriaLinea: { label:'Caja — evolución de una categoría o subcategoría de gasto (tú eliges cuál, € o % sobre ventas)', tipo:'cajaCategoriaLinea' },
+  cajaPieCategoria: { label:'Caja — reparto de gastos por categoría/subcategoría (tarta con %)', tipo:'cajaPieCategoria' },
 };
 function getReWidgets(){
   try{
@@ -7352,10 +7382,38 @@ async function renderResumenEjecutivo(){
     if(w.typeId==='cajaCategoriaLinea'){
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — evolución de categoría</h3>
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — evolución de categoría/subcategoría</h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
-        <div class="field no-print" style="margin-bottom:8px;"><select data-re-caja-categoria="${w.instanceId}"></select></div>
+        <div class="field no-print" style="display:flex;gap:6px;margin-bottom:8px;">
+          <select data-re-caja-cat-tipo="${w.instanceId}" style="width:auto;">
+            <option value="categoria" ${(w.cajaCategoriaTipo||'categoria')==='categoria'?'selected':''}>Categoría</option>
+            <option value="subcategoria" ${w.cajaCategoriaTipo==='subcategoria'?'selected':''}>Subcategoría</option>
+          </select>
+          <select data-re-caja-categoria="${w.instanceId}" style="flex:1;"></select>
+          <button class="btn secondary" data-re-caja-cat-pct="${w.instanceId}" style="padding:4px 10px;font-size:11px;flex-shrink:0;">${w.cajaCategoriaEnPct?'% ventas':'€'}</button>
+        </div>
+        <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
+      </div>`;
+    }
+    if(w.typeId==='cajaPieCategoria'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — reparto de gastos (% del total)</h3>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <div class="field no-print" style="display:flex;gap:6px;margin-bottom:8px;">
+          <select data-re-caja-pie-tipo="${w.instanceId}" style="width:auto;">
+            <option value="categoria" ${(w.cajaPieTipo||'categoria')==='categoria'?'selected':''}>Categoría</option>
+            <option value="subcategoria" ${w.cajaPieTipo==='subcategoria'?'selected':''}>Subcategoría</option>
+          </select>
+          <select data-re-caja-pie-periodo="${w.instanceId}" style="flex:1;">
+            <option value="total" ${(w.cajaPiePeriodo||'total')==='total'?'selected':''}>Periodo total (según Resumen Ejecutivo)</option>
+            <option value="3m" ${w.cajaPiePeriodo==='3m'?'selected':''}>Últimos 3 meses</option>
+            <option value="1m" ${w.cajaPiePeriodo==='1m'?'selected':''}>Último mes</option>
+          </select>
+        </div>
+        <p class="hint" style="margin-bottom:6px;">Cada porción es su % sobre el total de gastos de ese periodo.</p>
         <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
       </div>`;
     }
@@ -7380,6 +7438,7 @@ async function renderResumenEjecutivo(){
     if(w.typeId==='pnl'){ await renderPnlWidgetInstance(w); continue; }
     if(w.typeId==='pnlLinea'){ await renderPnlLineaWidgetInstance(w, buckets); continue; }
     if(w.typeId==='cajaCategoriaLinea'){ await renderCajaCategoriaLineaWidgetInstance(w, buckets); continue; }
+    if(w.typeId==='cajaPieCategoria'){ await renderCajaPieCategoriaWidgetInstance(w, buckets); continue; }
     await pintarWidgetRe(w.typeId, 'chartReW_'+w.instanceId, 'reW_'+w.instanceId, resultado, labels, desde, hasta, w);
   }
 
@@ -7413,6 +7472,38 @@ async function renderResumenEjecutivo(){
       const widgets2 = getReWidgets();
       const w2 = widgets2.find(x=>x.instanceId===id);
       if(w2){ w2.cajaCategoriaNombre = sel.value; setReWidgets(widgets2); await renderCajaCategoriaLineaWidgetInstance(w2, buckets); }
+    });
+  });
+  container.querySelectorAll('[data-re-caja-cat-tipo]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const id = sel.getAttribute('data-re-caja-cat-tipo');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.cajaCategoriaTipo = sel.value; w2.cajaCategoriaNombre = null; setReWidgets(widgets2); await renderResumenEjecutivo(); }
+    });
+  });
+  container.querySelectorAll('[data-re-caja-cat-pct]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-re-caja-cat-pct');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.cajaCategoriaEnPct = !w2.cajaCategoriaEnPct; setReWidgets(widgets2); await renderResumenEjecutivo(); }
+    });
+  });
+  container.querySelectorAll('[data-re-caja-pie-tipo]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const id = sel.getAttribute('data-re-caja-pie-tipo');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.cajaPieTipo = sel.value; setReWidgets(widgets2); await renderCajaPieCategoriaWidgetInstance(w2, buckets); }
+    });
+  });
+  container.querySelectorAll('[data-re-caja-pie-periodo]').forEach(sel=>{
+    sel.addEventListener('change', async ()=>{
+      const id = sel.getAttribute('data-re-caja-pie-periodo');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2){ w2.cajaPiePeriodo = sel.value; setReWidgets(widgets2); await renderCajaPieCategoriaWidgetInstance(w2, buckets); }
     });
   });
 
@@ -8057,34 +8148,44 @@ async function ensureDefaultPnlLines(){
     // corrección puntual: "Card payment rates" se marcó como recurrente por error en su
     // día — ahora se quiere que sea un valor manual normal, que se introduce a mano cada
     // mes, así que se revierte aquí una sola vez si se encuentra así marcada todavía.
-    const cardRatesLine = STATE.pnlLines.find(l=>l.name==='Card payment rates');
-    if(cardRatesLine && cardRatesLine.esRecurrente){
-      await sbUpdate('pnl_lines', cardRatesLine.id, { es_recurrente:false });
-      cardRatesLine.esRecurrente = false;
-    }
+    try{
+      const cardRatesLine = STATE.pnlLines.find(l=>l.name==='Card payment rates');
+      if(cardRatesLine && cardRatesLine.esRecurrente){
+        await sbUpdate('pnl_lines', cardRatesLine.id, { es_recurrente:false });
+        cardRatesLine.esRecurrente = false;
+      }
+    }catch(e){ console.error('Error revirtiendo "Card payment rates" a manual (no debería afectar a lo demás):', e); }
     // corrección puntual: COGS pasaba de "Caja" directamente — ahora es la suma de sus 4
     // líneas hijas (Production Costs + Write-off Total + Missing stock + Packaging
     // costs), y estas 3 últimas dejan de estar marcadas como "informativo" para que
     // cuenten de verdad en COGS y en EBITDA. "Inventory stock up" se queda igual (sigue
     // siendo automática e informativa, ahora se muestra en su propia tabla aparte).
-    const lineaCogs = STATE.pnlLines.find(l=>l.name==='COGS');
-    if(lineaCogs && lineaCogs.esAuto){
-      await sbUpdate('pnl_lines', lineaCogs.id, { es_auto:false, tipo_especial:'subtotal_outline' });
-      lineaCogs.esAuto = false; lineaCogs.tipoEspecial = 'subtotal_outline';
-    }
-    for(const nombre of ['Production Costs','Write-off Total','Missing stock']){
-      const l = STATE.pnlLines.find(x=>x.name===nombre);
-      if(l && l.tipoEspecial==='informativo'){
-        await sbUpdate('pnl_lines', l.id, { tipo_especial:null });
-        l.tipoEspecial = null;
+    // Cada paso va en su propio try/catch — si uno falla, los demás (incluida la creación
+    // de "Packaging costs" más abajo) se intentan igualmente.
+    try{
+      const lineaCogs = STATE.pnlLines.find(l=>l.name==='COGS');
+      if(lineaCogs && lineaCogs.esAuto){
+        await sbUpdate('pnl_lines', lineaCogs.id, { es_auto:false, tipo_especial:'subtotal_outline' });
+        lineaCogs.esAuto = false; lineaCogs.tipoEspecial = 'subtotal_outline';
       }
+    }catch(e){ console.error('Error migrando la línea COGS a suma de hijas (no debería afectar a lo demás):', e); }
+    for(const nombre of ['Production Costs','Write-off Total','Missing stock']){
+      try{
+        const l = STATE.pnlLines.find(x=>x.name===nombre);
+        if(l && l.tipoEspecial==='informativo'){
+          await sbUpdate('pnl_lines', l.id, { tipo_especial:null });
+          l.tipoEspecial = null;
+        }
+      }catch(e){ console.error('Error quitando "informativo" de "'+nombre+'" (no debería afectar a lo demás):', e); }
     }
-    if(!STATE.pnlLines.find(l=>l.name==='Packaging costs')){
-      const lineaMissing = STATE.pnlLines.find(l=>l.name==='Missing stock');
-      const ordenNuevo = lineaMissing ? lineaMissing.orden + 0.5 : (STATE.pnlLines.length ? Math.max(...STATE.pnlLines.map(l=>l.orden))+1 : 0);
-      const saved = await sbInsert('pnl_lines', { name:'Packaging costs', tipo:'coste', orden:ordenNuevo, es_auto:false, es_recurrente:false, indent:1, tipo_especial:null });
-      STATE.pnlLines.push({ id:saved.id, name:'Packaging costs', tipo:'coste', orden:ordenNuevo, esAuto:false, esRecurrente:false, indent:1, esTitulo:false, tipoEspecial:null });
-    }
+    try{
+      if(!STATE.pnlLines.find(l=>l.name==='Packaging costs')){
+        const lineaMissing = STATE.pnlLines.find(l=>l.name==='Missing stock');
+        const ordenNuevo = lineaMissing ? lineaMissing.orden + 0.5 : (STATE.pnlLines.length ? Math.max(...STATE.pnlLines.map(l=>l.orden))+1 : 0);
+        const saved = await sbInsert('pnl_lines', { name:'Packaging costs', tipo:'coste', orden:ordenNuevo, es_auto:false, es_recurrente:false, indent:1, tipo_especial:null });
+        STATE.pnlLines.push({ id:saved.id, name:'Packaging costs', tipo:'coste', orden:ordenNuevo, esAuto:false, esRecurrente:false, indent:1, esTitulo:false, tipoEspecial:null });
+      }
+    }catch(e){ console.error('Error creando la línea "Packaging costs" (no debería afectar a lo demás):', e); }
     for(const def of PNL_PLANTILLA_FIJA){
       if(!def.esAuto) continue;
       try{
@@ -8242,23 +8343,63 @@ async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
   if(!sel) return;
   if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   const cc = STATE.caja;
-  const detalleCatData = cajaDetalleCatData();
-  if(!sel.dataset.cargado){
-    sel.innerHTML = detalleCatData.cats.map(cat=>'<option value="'+escapeHtml(cat)+'">'+escapeHtml(cat)+'</option>').join('');
-    sel.value = w.cajaCategoriaNombre || detalleCatData.cats[0] || '';
-    sel.dataset.cargado = '1';
+  const tipo = w.cajaCategoriaTipo || 'categoria';
+  const fuente = tipo==='categoria' ? cajaDetalleCatData() : cajaDetalleSubcatData();
+  const claves = tipo==='categoria' ? fuente.cats : fuente.subcats;
+  // la lista de opciones se vuelve a construir si ha cambiado el tipo (categoría ↔
+  // subcategoría), ya que son listas distintas — si no, al cambiar de tipo se seguiría
+  // mostrando el desplegable con las opciones del tipo anterior.
+  if(sel.dataset.tipoCargado !== tipo){
+    sel.innerHTML = claves.map(k=>'<option value="'+escapeHtml(k)+'">'+escapeHtml(k)+'</option>').join('');
+    sel.value = (w.cajaCategoriaNombre && claves.includes(w.cajaCategoriaNombre)) ? w.cajaCategoriaNombre : (claves[0] || '');
+    sel.dataset.tipoCargado = tipo;
   }
-  const categoriaElegida = sel.value;
+  const claveElegida = sel.value;
   const c = chartColors();
-  if(!categoriaElegida){ destroyChart('reW_'+w.instanceId); return; }
+  if(!claveElegida){ destroyChart('reW_'+w.instanceId); return; }
   const desde = buckets[0]?.dateMin, hasta = buckets[buckets.length-1]?.dateMax;
   const mesesEnRango = cc.savedMonths.filter(m=>m.month>=(desde||'').slice(0,7) && m.month<=(hasta||'').slice(0,7));
   const labelsRango = mesesEnRango.map(m=>m.title||m.month);
-  const datos = labelsRango.map(mes => detalleCatData.table[categoriaElegida]?.[mes]?.euros || 0);
+  const enPct = !!w.cajaCategoriaEnPct;
+  const sqByMonth = {};
+  if(enPct) mesesEnRango.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  const datos = labelsRango.map(mes => {
+    const euros = fuente.table[claveElegida]?.[mes]?.euros || 0;
+    if(enPct){ const sq = sqByMonth[mes]||0; return sq>0 ? +(euros/sq*100).toFixed(1) : 0; }
+    return +euros.toFixed(2);
+  });
+  const color = enPct ? '#5B8C7A' : c.copper;
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type: trendChartType(),
-    data:{ labels: labelsRango, datasets:[ trendDataset(categoriaElegida, datos.map(v=>+v.toFixed(2)), c.copper) ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+    data:{ labels: labelsRango, datasets:[ trendDataset(claveElegida, datos, color) ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback: v => enPct ? v+'%' : eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+  });
+}
+/* widget "Caja — reparto de gastos (% del total)" — la misma tarta con datalabels y
+   líneas finas que ya se ve en Caja → Gráficos, con el mismo selector de periodo
+   (total/3 meses/1 mes) — "total" usa el periodo compartido de Resumen Ejecutivo. */
+async function renderCajaPieCategoriaWidgetInstance(w, buckets){
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+  const cc = STATE.caja;
+  const tipo = w.cajaPieTipo || 'categoria';
+  const periodo = w.cajaPiePeriodo || 'total';
+  const ordenados = [...cc.savedMonths].sort((a,b)=>a.month.localeCompare(b.month));
+  let entries;
+  if(periodo==='3m') entries = ordenados.slice(-3);
+  else if(periodo==='1m') entries = ordenados.slice(-1);
+  else {
+    const desde = buckets[0]?.dateMin, hasta = buckets[buckets.length-1]?.dateMax;
+    entries = ordenados.filter(m=>m.month>=(desde||'').slice(0,7) && m.month<=(hasta||'').slice(0,7));
+  }
+  const {labels, values} = tipo==='categoria' ? cajaAgregarPorCategoria(entries) : cajaAgregarPorSubcategoria(entries);
+  const total = values.reduce((s,v)=>s+v,0)||1;
+  const c2 = chartColors();
+  destroyChart('reW_'+w.instanceId);
+  STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data:values, backgroundColor:labels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+      tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)' } } } }
   });
 }
 async function movePnlLine(lineId, dir){
@@ -11556,51 +11697,110 @@ function cajaDetalleProvData(){
   return { months, providers, table };
 }
 
+/* suma los gastos de una lista de balances (uno o varios meses) por categoría o por
+   subcategoría — se reutiliza para las 3 tartas (periodo total / últimos 3 meses / último
+   mes), en vez de tener que repetir la misma lógica 3 veces. */
+function cajaAgregarPorCategoria(entries){
+  const porCategoria = {};
+  const catNominaPie = getCajaCategoriaNomina();
+  const excluirPropinas = getExcluirPropinasNominaCaja();
+  entries.forEach(entry=>{
+    (entry.movements||[]).filter(m=>m.amount<0).forEach(m=>{
+      const k = m.category||CAJA_UNCATEGORIZED;
+      porCategoria[k] = (porCategoria[k]||0) + Math.abs(m.amount);
+    });
+    if(excluirPropinas && catNominaPie && porCategoria[catNominaPie]!==undefined){
+      porCategoria[catNominaPie] = Math.max(0, porCategoria[catNominaPie] - cajaPropinasDelMes(entry.month, 'pagada'));
+    }
+  });
+  const labels = Object.keys(porCategoria).sort((a,b)=>porCategoria[b]-porCategoria[a]);
+  return { labels, values: labels.map(k=>porCategoria[k]) };
+}
+function cajaAgregarPorSubcategoria(entries){
+  const porSubcategoria = {};
+  entries.forEach(entry=>{
+    (entry.movements||[]).filter(m=>m.amount<0).forEach(m=>{
+      const k = m.subcategory||m.category||CAJA_UNCATEGORIZED;
+      porSubcategoria[k] = (porSubcategoria[k]||0) + Math.abs(m.amount);
+    });
+  });
+  const labels = Object.keys(porSubcategoria).sort((a,b)=>porSubcategoria[b]-porSubcategoria[a]);
+  return { labels, values: labels.map(k=>porSubcategoria[k]) };
+}
+/* configuración compartida de datalabels + líneas finas para todas las tartas de Caja:
+   el % siempre se calcula sobre el total del propio gráfico, las porciones grandes lo
+   escriben por dentro, y las pequeñas lo sacan fuera con una línea fina (el plugin
+   "pieLeaderLines" de arriba se encarga de dibujar esa línea). */
+function cajaPieDatalabelsPlugins(c2){
+  const pctDe = (ctx) => {
+    const data = ctx.dataset.data;
+    const total = data.reduce((s,v)=>s+Math.abs(v),0)||1;
+    return Math.abs(data[ctx.dataIndex]||0)/total;
+  };
+  const esPequena = (ctx) => pctDe(ctx) < PIE_LEADER_LINE_THRESHOLD;
+  return {
+    pieLeaderLines: { enabled:true },
+    legend:{ position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}} },
+    datalabels:{
+      display: (ctx) => pctDe(ctx) > 0,
+      formatter: (value, ctx) => (pctDe(ctx)*100).toFixed(1)+'%',
+      color: (ctx) => esPequena(ctx) ? c2.text : '#fff',
+      font: { size: 10, weight: 'bold' },
+      anchor: (ctx) => esPequena(ctx) ? 'end' : 'center',
+      align: (ctx) => esPequena(ctx) ? 'end' : 'center',
+      offset: (ctx) => esPequena(ctx) ? 18 : 0,
+    }
+  };
+}
 function renderCajaPieCharts(){
   const c = STATE.caja;
-  const canvasCat = document.getElementById('cajaPieCategoria');
-  const canvasSub = document.getElementById('cajaPieSubcategoria');
-  if(!canvasCat || !canvasSub) return;
-  const monthKey = c.pieMonth || (c.savedMonths.length ? c.savedMonths[c.savedMonths.length-1].month : null);
-  const entry = c.savedMonths.find(m=>m.month===monthKey);
+  const contCat = document.getElementById('cajaPieCategoriaCont');
+  const contSub = document.getElementById('cajaPieSubcategoriaCont');
+  if(!contCat || !contSub) return;
   const c2 = chartColors();
-  if(!entry){ destroyChart('cajaPieCategoria'); destroyChart('cajaPieSubcategoria'); return; }
-  const gastos = (entry.movements||[]).filter(m=>m.amount<0);
 
-  const porCategoria = {};
-  gastos.forEach(m=>{ const k=m.category||CAJA_UNCATEGORIZED; porCategoria[k]=(porCategoria[k]||0)+Math.abs(m.amount); });
-  // se descuentan las propinas PAGADAS de la categoría marcada como "nóminas", si el
-  // interruptor de Caja → Tendencias está activado — igual que ya se hacía en el
-  // gráfico "Gastos totales", pero aplicado aquí también.
-  const catNominaPie = getCajaCategoriaNomina();
-  if(getExcluirPropinasNominaCaja() && catNominaPie && porCategoria[catNominaPie]!==undefined){
-    porCategoria[catNominaPie] = Math.max(0, porCategoria[catNominaPie] - cajaPropinasDelMes(entry.month, 'pagada'));
-  }
-  const catLabels = Object.keys(porCategoria).sort((a,b)=>porCategoria[b]-porCategoria[a]);
-  const catValues = catLabels.map(k=>porCategoria[k]);
-  const totalCat = catValues.reduce((s,v)=>s+v,0)||1;
+  const ordenados = [...c.savedMonths].sort((a,b)=>a.month.localeCompare(b.month));
+  const periodoTotal = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
+  const ultimos3 = ordenados.slice(-3);
+  const ultimoMes = ordenados.slice(-1);
 
-  const porSubcategoria = {};
-  gastos.forEach(m=>{ const k=m.subcategory||m.category||CAJA_UNCATEGORIZED; porSubcategoria[k]=(porSubcategoria[k]||0)+Math.abs(m.amount); });
-  const subLabels = Object.keys(porSubcategoria).sort((a,b)=>porSubcategoria[b]-porSubcategoria[a]);
-  const subValues = subLabels.map(k=>porSubcategoria[k]);
-  const totalSub = subValues.reduce((s,v)=>s+v,0)||1;
+  const periodos = [
+    { key:'total', titulo:'Periodo total', entries:periodoTotal },
+    { key:'3m', titulo:'Últimos 3 meses', entries:ultimos3 },
+    { key:'1m', titulo:'Último mes'+(ultimoMes[0]?' ('+(ultimoMes[0].title||ultimoMes[0].month)+')':''), entries:ultimoMes },
+  ];
 
-  destroyChart('cajaPieCategoria');
-  STATE.charts.cajaPieCategoria = safeNewChart('cajaPieCategoria', {
-    type:'doughnut',
-    data:{ labels:catLabels, datasets:[{ data:catValues, backgroundColor:catLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}}},
-      tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalCat*100).toFixed(1)+'%)' } },
-      datalabels:{ display:false } } }
-  });
-  destroyChart('cajaPieSubcategoria');
-  STATE.charts.cajaPieSubcategoria = safeNewChart('cajaPieSubcategoria', {
-    type:'doughnut',
-    data:{ labels:subLabels, datasets:[{ data:subValues, backgroundColor:subLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}}},
-      tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalSub*100).toFixed(1)+'%)' } },
-      datalabels:{ display:false } } }
+  contCat.innerHTML = periodos.map(p=>`
+    <div>
+      <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">${p.titulo}</div>
+      <div class="chart-wrap" style="height:240px;"><canvas id="cajaPieCategoria_${p.key}"></canvas></div>
+    </div>`).join('');
+  contSub.innerHTML = periodos.map(p=>`
+    <div>
+      <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">${p.titulo}</div>
+      <div class="chart-wrap" style="height:240px;"><canvas id="cajaPieSubcategoria_${p.key}"></canvas></div>
+    </div>`).join('');
+
+  periodos.forEach(p=>{
+    const {labels:catLabels, values:catValues} = cajaAgregarPorCategoria(p.entries);
+    const totalCat = catValues.reduce((s,v)=>s+v,0)||1;
+    destroyChart('cajaPieCategoria_'+p.key);
+    STATE.charts['cajaPieCategoria_'+p.key] = safeNewChart('cajaPieCategoria_'+p.key, {
+      type:'doughnut',
+      data:{ labels:catLabels, datasets:[{ data:catValues, backgroundColor:catLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalCat*100).toFixed(1)+'%)' } } } }
+    });
+
+    const {labels:subLabels, values:subValues} = cajaAgregarPorSubcategoria(p.entries);
+    const totalSub = subValues.reduce((s,v)=>s+v,0)||1;
+    destroyChart('cajaPieSubcategoria_'+p.key);
+    STATE.charts['cajaPieSubcategoria_'+p.key] = safeNewChart('cajaPieSubcategoria_'+p.key, {
+      type:'doughnut',
+      data:{ labels:subLabels, datasets:[{ data:subValues, backgroundColor:subLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalSub*100).toFixed(1)+'%)' } } } }
+    });
   });
 }
 function renderCajaGraficosTab(el){
@@ -11610,23 +11810,12 @@ function renderCajaGraficosTab(el){
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-        <div style="color:var(--copper);font-weight:700;font-size:14px;">Reparto de gastos del mes (categoría y subcategoría)</div>
-        <select id="cajaPieMonth" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;">
-          ${[...c.savedMonths].sort((a,b)=>b.month.localeCompare(a.month)).map(m=>'<option value="'+m.month+'" '+((c.pieMonth||c.savedMonths[c.savedMonths.length-1].month)===m.month?'selected':'')+'>'+(m.title||m.month)+'</option>').join('')}
-        </select>
-      </div>
-      <p class="hint" style="margin-bottom:14px;">Cómo se calcula: se cogen todos los gastos (importes negativos) del mes elegido, y cada porción es el % que representa esa categoría (o subcategoría) sobre el <b>total de gastos de ese mismo mes</b> — no se mezclan meses. En el de subcategoría, los movimientos que todavía no tienen subcategoría puesta se agrupan bajo el nombre de su categoría.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
-        <div>
-          <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">Por categoría</div>
-          <div class="chart-wrap" style="height:260px;"><canvas id="cajaPieCategoria"></canvas></div>
-        </div>
-        <div>
-          <div class="hint" style="text-align:center;margin-bottom:6px;font-weight:600;">Por subcategoría</div>
-          <div class="chart-wrap" style="height:260px;"><canvas id="cajaPieSubcategoria"></canvas></div>
-        </div>
-      </div>
+      <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:6px;">Reparto de gastos por categoría — cada porción es su % sobre el total de gastos de ese periodo</div>
+      <p class="hint" style="margin-bottom:14px;">Cómo se calcula: se cogen todos los gastos (importes negativos) del periodo indicado en cada tarta, y cada porción es el % que representa esa categoría (o subcategoría) sobre el <b>total de gastos de ese periodo</b> — "Periodo total" usa el filtro de fecha de abajo, las otras dos son siempre los últimos 3 meses y el último mes, independientemente del filtro. En el de subcategoría, los movimientos que todavía no tienen subcategoría puesta se agrupan bajo el nombre de su categoría.</p>
+      <div class="hint" style="font-weight:600;margin-bottom:6px;">Por categoría</div>
+      <div id="cajaPieCategoriaCont" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:20px;"></div>
+      <div class="hint" style="font-weight:600;margin-bottom:6px;">Por subcategoría</div>
+      <div id="cajaPieSubcategoriaCont" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;"></div>
     </div>
     <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
       <div style="display:flex;gap:8px;">
@@ -11653,7 +11842,6 @@ function renderCajaGraficosTab(el){
     </div>
   `;
   renderCajaPieCharts();
-  document.getElementById('cajaPieMonth').addEventListener('change', (e)=>{ c.pieMonth = e.target.value; renderCajaPieCharts(); });
 
   el.querySelectorAll('[data-detalle-mode]').forEach(btn=>btn.addEventListener('click', ()=>{
     c.detalleMode = btn.getAttribute('data-detalle-mode'); c.detalleSelected=null; c.detalleCatSelected=null; c.detalleSubcatSelected=null; renderCajaTabContent();
@@ -11679,27 +11867,32 @@ function renderCajaGraficosGrid(){
     const detalleSubcatData = cajaDetalleSubcatData();
     const search = (c.detalleSearch||'').toLowerCase();
     const subcats = detalleSubcatData.subcats.filter(sc=>!search||sc.toLowerCase().includes(search)).filter(sc=>periodMonthNames.some(m=>(detalleSubcatData.table[sc]?.[m]?.euros||0)>0));
-    const getSubcatVal = (sc,month) => {
-      const euros = detalleSubcatData.table[sc]?.[month]?.euros||0;
-      if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0? +(euros/sq*100).toFixed(1):0; }
-      return euros;
-    };
+    const getSubcatEuros = (sc,month) => detalleSubcatData.table[sc]?.[month]?.euros||0;
+    const getSubcatPct = (sc,month) => { const sq=sqByMonth[month]||0; const euros=getSubcatEuros(sc,month); return sq>0? +(euros/sq*100).toFixed(1):0; };
     let html = '';
     if(c.detalleSubcatSelected){
+      const totalDest = periodMonthNames.reduce((s,m)=>s+getSubcatEuros(c.detalleSubcatSelected,m),0);
+      const mediaDest = periodMonthNames.length ? totalDest/periodMonthNames.length : 0;
       html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleSubcatSelected}</div><button class="btn secondary" id="cajaCerrarSubcatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
-        <div class="chart-wrap" style="height:180px;"><canvas id="cajaSubcatDestacado"></canvas></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleSubcatSelected}</div><button class="btn secondary" id="cajaCerrarSubcatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
+        <div class="hint" style="margin-bottom:10px;font-size:11px;">Media mensual: <b style="color:var(--text);">${cajaFmt(mediaDest)}</b> &nbsp;·&nbsp; Total gasto en período: <b style="color:var(--text);">${cajaFmt(totalDest)}</b></div>
+        <div class="hint" style="font-size:10px;margin-bottom:2px;">En euros</div>
+        <div class="chart-wrap" style="height:150px;margin-bottom:10px;"><canvas id="cajaSubcatDestacado"></canvas></div>
+        <div class="hint" style="font-size:10px;margin-bottom:2px;">% sobre ventas (Square + efectivo) del mes</div>
+        <div class="chart-wrap" style="height:150px;"><canvas id="cajaSubcatDestacadoPct"></canvas></div>
       </div>`;
     }
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
     subcats.forEach((sc,si)=>{
-      const total = periodMonthNames.reduce((s,m)=>s+getSubcatVal(sc,m),0);
+      const total = periodMonthNames.reduce((s,m)=>s+getSubcatEuros(sc,m),0);
+      const media = periodMonthNames.length ? total/periodMonthNames.length : 0;
       html += `<div class="card" data-select-subcat="${sc.replace(/"/g,'&quot;')}" style="cursor:pointer;border:1px solid ${c.detalleSubcatSelected===sc?'var(--copper)':'var(--line)'};">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
-          <div style="color:${c.detalleSubcatSelected===sc?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;">${sc}</div>
-          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;">${cajaFmt(total)}</div>`:''}
-        </div>
-        <div class="chart-wrap" style="height:120px;"><canvas id="cajaSubcatMini_${si}"></canvas></div>
+        <div style="color:${c.detalleSubcatSelected===sc?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;margin-bottom:6px;">${sc}</div>
+        <div class="hint" style="font-size:10px;margin-bottom:8px;">Media mensual: <b style="color:var(--text);">${cajaFmt(media)}</b> · Total: <b style="color:var(--text);">${cajaFmt(total)}</b></div>
+        <div class="hint" style="font-size:9px;margin-bottom:1px;">€ en el mes</div>
+        <div class="chart-wrap" style="height:90px;margin-bottom:6px;"><canvas id="cajaSubcatMini_${si}"></canvas></div>
+        <div class="hint" style="font-size:9px;margin-bottom:1px;">% sobre ventas del mes</div>
+        <div class="chart-wrap" style="height:90px;"><canvas id="cajaSubcatMiniPct_${si}"></canvas></div>
       </div>`;
     });
     html += `</div>`;
@@ -11710,8 +11903,14 @@ function renderCajaGraficosGrid(){
       destroyChart('cajaSubcatDestacado');
       STATE.charts.cajaSubcatDestacado = safeNewChart('cajaSubcatDestacado', {
         type:'line',
-        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatVal(c.detalleSubcatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>c.tendView==='pct'?v+'%':v+'€'}, grid:{color:c2.grid} } } }
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatEuros(c.detalleSubcatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'€'}, grid:{color:c2.grid} } } }
+      });
+      destroyChart('cajaSubcatDestacadoPct');
+      STATE.charts.cajaSubcatDestacadoPct = safeNewChart('cajaSubcatDestacadoPct', {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatPct(c.detalleSubcatSelected,m)), borderColor:'#5B8C7A', backgroundColor:'#5B8C7A', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'%'}, grid:{color:c2.grid} } } }
       });
       const cerrarBtn = document.getElementById('cajaCerrarSubcatDest');
       if(cerrarBtn) cerrarBtn.addEventListener('click', ()=>{ c.detalleSubcatSelected=null; renderCajaGraficosGrid(); });
@@ -11720,8 +11919,14 @@ function renderCajaGraficosGrid(){
       destroyChart('cajaSubcatMini_'+si);
       STATE.charts['cajaSubcatMini_'+si] = safeNewChart('cajaSubcatMini_'+si, {
         type:'line',
-        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatVal(sc,m)), borderColor:CAJA_CHART_PALETTE[si%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[si%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatEuros(sc,m)), borderColor:CAJA_CHART_PALETTE[si%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[si%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}}, grid:{color:c2.grid} } } }
+      });
+      destroyChart('cajaSubcatMiniPct_'+si);
+      STATE.charts['cajaSubcatMiniPct_'+si] = safeNewChart('cajaSubcatMiniPct_'+si, {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getSubcatPct(sc,m)), borderColor:'#5B8C7A', backgroundColor:'#5B8C7A', tension:.3, pointRadius:3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}, callback:v=>v+'%'}, grid:{color:c2.grid} } } }
       });
     });
     gridEl.querySelectorAll('[data-select-subcat]').forEach(card=>{
@@ -11736,11 +11941,8 @@ function renderCajaGraficosGrid(){
     const search = (c.detalleSearch||'').toLowerCase();
     const ocultas = c.categoriasOcultasGraficos||[];
     const cats = detalleCatData.cats.filter(cat=>!search||cat.toLowerCase().includes(search)).filter(cat=>periodMonthNames.some(m=>(detalleCatData.table[cat]?.[m]?.euros||0)>0)).filter(cat=>!ocultas.includes(cat));
-    const getVal = (cat,month) => {
-      const euros = detalleCatData.table[cat]?.[month]?.euros||0;
-      if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0? +(euros/sq*100).toFixed(1):0; }
-      return euros;
-    };
+    const getEuros = (cat,month) => detalleCatData.table[cat]?.[month]?.euros||0;
+    const getPct = (cat,month) => { const sq=sqByMonth[month]||0; const euros=getEuros(cat,month); return sq>0? +(euros/sq*100).toFixed(1):0; };
     let html = '';
     if(ocultas.length>0){
       html += `<div style="margin-bottom:12px;"><button class="btn secondary" id="cajaVerOcultasBtn" style="padding:5px 12px;font-size:11px;">👁 ${ocultas.length} categoría(s) oculta(s) — ver</button></div>
@@ -11751,21 +11953,31 @@ function renderCajaGraficosGrid(){
       </div>`;
     }
     if(c.detalleCatSelected){
+      const totalDest = periodMonthNames.reduce((s,m)=>s+getEuros(c.detalleCatSelected,m),0);
+      const mediaDest = periodMonthNames.length ? totalDest/periodMonthNames.length : 0;
       html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:12px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
-        <div class="chart-wrap" style="height:180px;"><canvas id="cajaCatDestacado"></canvas></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
+        <div class="hint" style="margin-bottom:10px;font-size:11px;">Media mensual: <b style="color:var(--text);">${cajaFmt(mediaDest)}</b> &nbsp;·&nbsp; Total gasto en período: <b style="color:var(--text);">${cajaFmt(totalDest)}</b></div>
+        <div class="hint" style="font-size:10px;margin-bottom:2px;">En euros</div>
+        <div class="chart-wrap" style="height:150px;margin-bottom:10px;"><canvas id="cajaCatDestacado"></canvas></div>
+        <div class="hint" style="font-size:10px;margin-bottom:2px;">% sobre ventas (Square + efectivo) del mes</div>
+        <div class="chart-wrap" style="height:150px;"><canvas id="cajaCatDestacadoPct"></canvas></div>
       </div>`;
     }
     html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
     cats.forEach((cat,ci)=>{
-      const total = periodMonthNames.reduce((s,m)=>s+getVal(cat,m),0);
+      const total = periodMonthNames.reduce((s,m)=>s+getEuros(cat,m),0);
+      const media = periodMonthNames.length ? total/periodMonthNames.length : 0;
       html += `<div class="card" style="border:1px solid ${c.detalleCatSelected===cat?'var(--copper)':'var(--line)'};">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
           <div data-select-cat="${cat.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${c.detalleCatSelected===cat?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;flex:1;">${cat}</div>
-          ${c.tendView==='abs'?`<div class="hint" style="font-size:10px;font-weight:600;margin-right:8px;">${cajaFmt(total)}</div>`:''}
           <button class="btn secondary" data-ocultar-cat="${cat.replace(/"/g,'&quot;')}" title="Ocultar este gráfico" style="padding:1px 5px;font-size:10px;">🙈</button>
         </div>
-        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:120px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
+        <div class="hint" style="font-size:10px;margin-bottom:8px;">Media mensual: <b style="color:var(--text);">${cajaFmt(media)}</b> · Total: <b style="color:var(--text);">${cajaFmt(total)}</b></div>
+        <div class="hint" style="font-size:9px;margin-bottom:1px;">€ en el mes</div>
+        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:90px;margin-bottom:6px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
+        <div class="hint" style="font-size:9px;margin-bottom:1px;">% sobre ventas del mes</div>
+        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:90px;"><canvas id="cajaCatMiniPct_${ci}"></canvas></div>
       </div>`;
     });
     html += `</div>`;
@@ -11776,8 +11988,14 @@ function renderCajaGraficosGrid(){
       destroyChart('cajaCatDestacado');
       STATE.charts.cajaCatDestacado = safeNewChart('cajaCatDestacado', {
         type:'line',
-        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getVal(c.detalleCatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>c.tendView==='pct'?v+'%':v+'€'}, grid:{color:c2.grid} } } }
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getEuros(c.detalleCatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'€'}, grid:{color:c2.grid} } } }
+      });
+      destroyChart('cajaCatDestacadoPct');
+      STATE.charts.cajaCatDestacadoPct = safeNewChart('cajaCatDestacadoPct', {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getPct(c.detalleCatSelected,m)), borderColor:'#5B8C7A', backgroundColor:'#5B8C7A', tension:.3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'%'}, grid:{color:c2.grid} } } }
       });
       const cerrarBtn = document.getElementById('cajaCerrarCatDest');
       if(cerrarBtn) cerrarBtn.addEventListener('click', ()=>{ c.detalleCatSelected=null; renderCajaGraficosGrid(); });
@@ -11786,8 +12004,14 @@ function renderCajaGraficosGrid(){
       destroyChart('cajaCatMini_'+ci);
       STATE.charts['cajaCatMini_'+ci] = safeNewChart('cajaCatMini_'+ci, {
         type:'line',
-        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getVal(cat,m)), borderColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getEuros(cat,m)), borderColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}}, grid:{color:c2.grid} } } }
+      });
+      destroyChart('cajaCatMiniPct_'+ci);
+      STATE.charts['cajaCatMiniPct_'+ci] = safeNewChart('cajaCatMiniPct_'+ci, {
+        type:'line',
+        data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getPct(cat,m)), borderColor:'#5B8C7A', backgroundColor:'#5B8C7A', tension:.3, pointRadius:3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}, callback:v=>v+'%'}, grid:{color:c2.grid} } } }
       });
     });
     gridEl.querySelectorAll('[data-select-cat]').forEach(card=>{
@@ -13112,6 +13336,25 @@ async function doLogin(){
   // propio navegador) — si está, se muestra la pantalla de nueva contraseña en vez del
   // login normal, sea cual sea el estado de sesión que hubiera antes.
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  // si el enlace de recuperación ha caducado o ya se usó, Supabase redirige igualmente
+  // aquí, pero con un error en el hash en vez de un token — antes esto se ignoraba en
+  // silencio y la persona se quedaba en el login sin saber qué había pasado.
+  if(hashParams.get('error')){
+    const errorCode = hashParams.get('error_code');
+    const errorDesc = hashParams.get('error_description');
+    history.replaceState(null, '', window.location.pathname);
+    if(!STATE.config.url || !STATE.config.anonKey){
+      showLoginScreen();
+      document.getElementById('loginConfigFields').style.display = 'block';
+      return;
+    }
+    showLoginScreen();
+    const mensaje = errorCode==='otp_expired'
+      ? 'El enlace de recuperación ha caducado o ya se ha usado — pide uno nuevo desde "¿Olvidaste tu contraseña?" y ábrelo cuanto antes tras recibirlo.'
+      : (errorDesc || 'El enlace no es válido — pide uno nuevo.');
+    document.getElementById('loginError').textContent = mensaje;
+    return;
+  }
   if(hashParams.get('type')==='recovery' && hashParams.get('access_token')){
     if(!STATE.config.url || !STATE.config.anonKey){
       showLoginScreen();
