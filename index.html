@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.228</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.229</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8181,17 +8181,40 @@ async function ensureDefaultPnlLines(){
       }catch(e){ console.error('Error quitando "informativo" de "'+nombre+'" (no debería afectar a lo demás):', e); }
     }
     try{
-      if(!STATE.pnlLines.find(l=>l.name==='Packaging costs')){
-        // se coloca siempre al final de todas las líneas, con un número entero — antes se
-        // intentaba colocar justo detrás de "Missing stock" con un decimal (+0.5), pero
-        // la columna "orden" en la base de datos es de tipo entero, así que esa inserción
-        // se rechazaba con un error 400. Se puede mover a su sitio a mano con las flechas
-        // ↑/↓ de la fila si no queda donde se espera.
+      const lineaMissing = STATE.pnlLines.find(l=>l.name==='Missing stock');
+      const lineaPackaging = STATE.pnlLines.find(l=>l.name==='Packaging costs');
+      const ordenObjetivo = lineaMissing ? lineaMissing.orden + 1 : null;
+      if(!lineaPackaging && ordenObjetivo!==null){
+        // no existe todavía: se hace hueco justo detrás de "Missing stock" — como la
+        // columna "orden" es de tipo entero, no vale colocarla con un decimal (+0.5); en
+        // vez de eso, todas las líneas de orden igual o mayor al hueco suben una posición
+        // entera, y "Packaging costs" ocupa ese hueco.
+        const aDesplazar = STATE.pnlLines.filter(l=>l.orden>=ordenObjetivo).sort((a,b)=>b.orden-a.orden);
+        for(const l of aDesplazar){
+          const nuevoOrden = l.orden+1;
+          await sbUpdate('pnl_lines', l.id, { orden:nuevoOrden });
+          l.orden = nuevoOrden;
+        }
+        const saved = await sbInsert('pnl_lines', { name:'Packaging costs', tipo:'coste', orden:ordenObjetivo, es_auto:false, es_recurrente:false, indent:1, tipo_especial:null });
+        STATE.pnlLines.push({ id:saved.id, name:'Packaging costs', tipo:'coste', orden:ordenObjetivo, esAuto:false, esRecurrente:false, indent:1, esTitulo:false, tipoEspecial:null });
+      } else if(!lineaPackaging){
+        // caso raro: no hay "Missing stock" tampoco — se crea al final, mejor que nada.
         const ordenNuevo = STATE.pnlLines.length ? Math.max(...STATE.pnlLines.map(l=>l.orden))+1 : 0;
         const saved = await sbInsert('pnl_lines', { name:'Packaging costs', tipo:'coste', orden:ordenNuevo, es_auto:false, es_recurrente:false, indent:1, tipo_especial:null });
         STATE.pnlLines.push({ id:saved.id, name:'Packaging costs', tipo:'coste', orden:ordenNuevo, esAuto:false, esRecurrente:false, indent:1, esTitulo:false, tipoEspecial:null });
+      } else if(ordenObjetivo!==null && lineaPackaging.orden!==ordenObjetivo){
+        // ya existía, pero mal colocada (por ejemplo, al final, detrás de EBITDA, por el
+        // fallo anterior) — se mueve al sitio correcto, justo detrás de "Missing stock".
+        const aDesplazar = STATE.pnlLines.filter(l=>l.id!==lineaPackaging.id && l.orden>=ordenObjetivo).sort((a,b)=>b.orden-a.orden);
+        for(const l of aDesplazar){
+          const nuevoOrden = l.orden+1;
+          await sbUpdate('pnl_lines', l.id, { orden:nuevoOrden });
+          l.orden = nuevoOrden;
+        }
+        await sbUpdate('pnl_lines', lineaPackaging.id, { orden:ordenObjetivo, indent:1 });
+        lineaPackaging.orden = ordenObjetivo; lineaPackaging.indent = 1;
       }
-    }catch(e){ console.error('Error creando la línea "Packaging costs" (no debería afectar a lo demás):', e); }
+    }catch(e){ console.error('Error colocando la línea "Packaging costs" bajo COGS (no debería afectar a lo demás):', e); }
     for(const def of PNL_PLANTILLA_FIJA){
       if(!def.esAuto) continue;
       try{
