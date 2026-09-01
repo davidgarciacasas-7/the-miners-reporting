@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.230</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.231</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1758,6 +1758,7 @@ async function loadAllData(){
     STATE.employeeHoursWeekly = (await sbList('employee_hours_weekly', 'select=*&order=week_start.desc')).map(r=>({ id:r.id, weekStart:r.week_start, typeName:r.type_name, hours:parseFloat(r.hours) }));
     STATE.recetas = (await sbList('recetas', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre }));
     STATE.stockIngredientesLista = (await sbList('stock_ingredientes_lista', 'select=*')).map(r=>({ id:r.id, tipo:r.tipo, ingrediente:r.ingrediente, unidad:r.unidad||'' }));
+    STATE.pnlFootnotesGuardadas = (await sbList('pnl_footnotes_guardadas', 'select=*&order=texto.asc')).map(r=>({ id:r.id, texto:r.texto }));
     STATE.recetaIngredientes = (await sbList('receta_ingredientes', 'select=*')).map(r=>({ id:r.id, recetaId:r.receta_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad }));
     STATE.recetasHistorial = (await sbList('recetas_archivos_historial', 'select=*&order=fecha_subida.desc')).map(r=>({ id:r.id, nombreArchivo:r.nombre_archivo, fechaSubida:r.fecha_subida, numRecetas:r.num_recetas, numIngredientes:r.num_ingredientes }));
     STATE.inventarios = (await sbList('inventarios', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, nota:r.nota }));
@@ -7367,6 +7368,13 @@ async function renderResumenEjecutivo(){
         </div>
         <p class="hint no-print" style="margin-bottom:10px;">Este periodo es independiente del Desde/Hasta de arriba — solo afecta a esta tabla de PNL.</p>
         <div style="overflow-x:auto;" id="rePnlTabla_${w.instanceId}"></div>
+        <div id="rePnlFootnotesList_${w.instanceId}" style="margin-top:10px;">
+          ${(w.footnotes||[]).map((nota,ni)=>`<p class="hint" style="font-size:11px;margin-top:3px;">* ${escapeHtml(nota)} <button class="btn secondary no-print" data-re-pnl-del-footnote="${w.instanceId}" data-idx="${ni}" title="Quitar esta nota (solo de aquí — se queda guardada para reutilizarla luego)" style="padding:0px 4px;font-size:9px;">✕</button></p>`).join('')}
+        </div>
+        <div class="no-print" style="margin-top:8px;">
+          <button class="btn secondary" data-re-pnl-add-footnote="${w.instanceId}" style="padding:3px 10px;font-size:11px;">+ Añadir nota al pie</button>
+          <div id="rePnlFootnoteForm_${w.instanceId}"></div>
+        </div>
       </div>`;
     }
     if(w.typeId==='pnlLinea'){
@@ -7456,6 +7464,62 @@ async function renderResumenEjecutivo(){
       const widgets2 = getReWidgets();
       const w2 = widgets2.find(x=>x.instanceId===id);
       if(w2){ w2.pnlHasta = inp.value; setReWidgets(widgets2); await renderPnlWidgetInstance(w2); }
+    });
+  });
+  container.querySelectorAll('[data-re-pnl-add-footnote]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-re-pnl-add-footnote');
+      const formCont = document.getElementById('rePnlFootnoteForm_'+id);
+      if(!formCont) return;
+      if(formCont.dataset.abierto){ formCont.innerHTML=''; formCont.dataset.abierto=''; return; }
+      formCont.dataset.abierto = '1';
+      formCont.innerHTML = `<div style="display:flex;gap:6px;margin-top:6px;">
+        <input type="text" list="rePnlFootnotesDatalist" data-re-pnl-footnote-input="${id}" placeholder="Escribe la nota, o elige una ya usada antes…" style="flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;">
+        <button class="btn secondary" data-re-pnl-guardar-footnote="${id}" style="padding:4px 10px;font-size:11px;">Añadir</button>
+      </div>`;
+      if(!document.getElementById('rePnlFootnotesDatalist')){
+        const dl = document.createElement('datalist');
+        dl.id = 'rePnlFootnotesDatalist';
+        document.body.appendChild(dl);
+      }
+      document.getElementById('rePnlFootnotesDatalist').innerHTML = (STATE.pnlFootnotesGuardadas||[]).map(f=>'<option value="'+escapeHtml(f.texto)+'">').join('');
+      const input = formCont.querySelector('[data-re-pnl-footnote-input]');
+      input.focus();
+      const guardar = async () => {
+        const texto = input.value.trim();
+        if(!texto) return;
+        const widgets2 = getReWidgets();
+        const w2 = widgets2.find(x=>x.instanceId===id);
+        if(w2){
+          w2.footnotes = [...(w2.footnotes||[]), texto];
+          setReWidgets(widgets2);
+        }
+        // si es una nota nueva (no estaba ya en la lista reutilizable), se guarda ahí
+        // también, para poder elegirla en futuros informes sin volver a escribirla.
+        if(!(STATE.pnlFootnotesGuardadas||[]).some(f=>f.texto===texto)){
+          try{
+            const saved = await sbInsert('pnl_footnotes_guardadas', { texto });
+            STATE.pnlFootnotesGuardadas.push({ id:saved.id, texto });
+          }catch(e){ /* si falla el guardado para reutilizar, la nota igualmente se queda puesta en este informe */ }
+        }
+        formCont.innerHTML = ''; formCont.dataset.abierto = '';
+        await renderResumenEjecutivo();
+      };
+      formCont.querySelector('[data-re-pnl-guardar-footnote]').addEventListener('click', guardar);
+      input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); guardar(); } });
+    });
+  });
+  container.querySelectorAll('[data-re-pnl-del-footnote]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-re-pnl-del-footnote');
+      const idx = +btn.getAttribute('data-idx');
+      const widgets2 = getReWidgets();
+      const w2 = widgets2.find(x=>x.instanceId===id);
+      if(w2 && w2.footnotes){
+        w2.footnotes = w2.footnotes.filter((_,i)=>i!==idx);
+        setReWidgets(widgets2);
+        await renderResumenEjecutivo();
+      }
     });
   });
   container.querySelectorAll('[data-re-pnl-linea]').forEach(sel=>{
@@ -7812,6 +7876,16 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         });
         y += filaAlto;
       });
+      // notas al pie explicativas del widget, si tiene alguna
+      if(w.footnotes && w.footnotes.length>0){
+        y += 4;
+        doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(...GRIS);
+        w.footnotes.forEach(nota=>{
+          if(y + 4 > yLimite){ nuevaPagina(); }
+          const lineas = doc.splitTextToSize('* '+nota, W-margin*2);
+          lineas.forEach(l=>{ doc.text(l, margin, y+3); y += 4; });
+        });
+      }
       y += 10;
       continue;
     }
