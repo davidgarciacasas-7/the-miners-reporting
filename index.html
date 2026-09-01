@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.229</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.230</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8094,6 +8094,7 @@ const PNL_PLANTILLA_FIJA = [
   { name:'Gas',                    tipo:'coste',   indent:2 },
   { name:'Water',                  tipo:'coste',   indent:2 },
   { name:'Internet',               tipo:'coste',   indent:2 },
+  { name:'Software',               tipo:'coste',   indent:2 },
   { name:'Alarm',                  tipo:'coste',   indent:2 },
   { name:'Events',                 tipo:'coste',   indent:2, esAuto:true },
   { name:'Accountant',             tipo:'coste',   indent:2, esAuto:true },
@@ -8215,6 +8216,28 @@ async function ensureDefaultPnlLines(){
         lineaPackaging.orden = ordenObjetivo; lineaPackaging.indent = 1;
       }
     }catch(e){ console.error('Error colocando la línea "Packaging costs" bajo COGS (no debería afectar a lo demás):', e); }
+    try{
+      const lineaInternet = STATE.pnlLines.find(l=>l.name==='Internet');
+      const lineaSoftware = STATE.pnlLines.find(l=>l.name==='Software');
+      const ordenObjetivoSw = lineaInternet ? lineaInternet.orden + 1 : null;
+      if(!lineaSoftware && ordenObjetivoSw!==null){
+        // se hace hueco justo detrás de "Internet" — mismo mecanismo que "Packaging
+        // costs": la columna "orden" es de tipo entero, así que las líneas de orden igual
+        // o mayor suben una posición entera para dejar sitio.
+        const aDesplazar = STATE.pnlLines.filter(l=>l.orden>=ordenObjetivoSw).sort((a,b)=>b.orden-a.orden);
+        for(const l of aDesplazar){
+          const nuevoOrden = l.orden+1;
+          await sbUpdate('pnl_lines', l.id, { orden:nuevoOrden });
+          l.orden = nuevoOrden;
+        }
+        const saved = await sbInsert('pnl_lines', { name:'Software', tipo:'coste', orden:ordenObjetivoSw, es_auto:false, es_recurrente:false, indent:2, tipo_especial:null });
+        STATE.pnlLines.push({ id:saved.id, name:'Software', tipo:'coste', orden:ordenObjetivoSw, esAuto:false, esRecurrente:false, indent:2, esTitulo:false, tipoEspecial:null });
+      } else if(!lineaSoftware){
+        const ordenNuevo = STATE.pnlLines.length ? Math.max(...STATE.pnlLines.map(l=>l.orden))+1 : 0;
+        const saved = await sbInsert('pnl_lines', { name:'Software', tipo:'coste', orden:ordenNuevo, es_auto:false, es_recurrente:false, indent:2, tipo_especial:null });
+        STATE.pnlLines.push({ id:saved.id, name:'Software', tipo:'coste', orden:ordenNuevo, esAuto:false, esRecurrente:false, indent:2, esTitulo:false, tipoEspecial:null });
+      }
+    }catch(e){ console.error('Error creando la línea "Software" (no debería afectar a lo demás):', e); }
     for(const def of PNL_PLANTILLA_FIJA){
       if(!def.esAuto) continue;
       try{
