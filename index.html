@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.243</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.244</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7481,22 +7481,22 @@ async function renderResumenEjecutivo(){
       </div>`;
     }
     if(w.typeId==='cajaCategoriaLinea'){
-      const tipoLabel = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
       const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
+      const sufijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría, '+modoLabel : modoLabel;
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — ${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(${tipoLabel}, ${modoLabel})</span></h3>
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — ${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(${sufijo})</span></h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
         <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
       </div>`;
     }
     if(w.typeId==='cajaPieCategoria'){
-      const tipoLabel = w.cajaPieTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
       const periodoLabel = {total:'Periodo total', '3m':'Últimos 3 meses', '1m':'Último mes'}[w.cajaPiePeriodo||'total'];
+      const sufijo = w.cajaPieTipo==='subcategoria' ? 'Subcategoría, '+periodoLabel : periodoLabel;
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — reparto de gastos <span class="hint" style="font-weight:400;">(${tipoLabel}, ${periodoLabel})</span></h3>
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — reparto de gastos <span class="hint" style="font-weight:400;">(${sufijo})</span></h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
         <p class="hint" style="margin-bottom:6px;">Cada porción es su % sobre el total de gastos de ese periodo.</p>
@@ -7753,19 +7753,33 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const yLimite = H-margin-10;
   // mismo título dinámico que se ve en pantalla para estos 2 tipos — si no, el PDF
   // mostraba la etiqueta genérica del menú de "+ Añadir gráfico" (pensada para elegir el
-  // tipo, no como título real de un gráfico ya colocado).
+  // tipo, no como título real de un gráfico ya colocado). "Categoría" no se menciona por
+  // ser el modo por defecto — solo se aclara cuando es "Subcategoría", que sí hace falta
+  // distinguir.
   function tituloWidgetPdf(w, type){
     if(w.typeId==='cajaCategoriaLinea'){
-      const tipoLabel = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
       const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
-      return 'Caja — '+(w.cajaCategoriaNombre||'')+' ('+tipoLabel+', '+modoLabel+')';
+      const sufijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría, '+modoLabel : modoLabel;
+      return 'Caja — '+(w.cajaCategoriaNombre||'')+' ('+sufijo+')';
     }
     if(w.typeId==='cajaPieCategoria'){
-      const tipoLabel = w.cajaPieTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
       const periodoLabel = {total:'Periodo total', '3m':'Últimos 3 meses', '1m':'Último mes'}[w.cajaPiePeriodo||'total'];
-      return 'Caja — reparto de gastos ('+tipoLabel+', '+periodoLabel+')';
+      const sufijo = w.cajaPieTipo==='subcategoria' ? 'Subcategoría, '+periodoLabel : periodoLabel;
+      return 'Caja — reparto de gastos ('+sufijo+')';
     }
     return type ? type.label : '';
+  }
+  // info de tamaño que le tocará a un widget con gráfico al dibujarse — se usa tanto para
+  // dibujarlo de verdad como para calcular por adelantado cuánto sitio hay que reservarle
+  // detrás de un título (si no, el título podía quedarse solo al final de una página,
+  // dejando el resto en blanco, porque el hueco reservado no coincidía con el real).
+  function infoTamanoWidgetPdf(w){
+    const chart = STATE.charts['reW_'+w.instanceId];
+    const esCircular = !!(chart && (chart.config.type==='doughnut' || chart.config.type==='pie'));
+    const necesitaFilaCompleta = !!(chart && (esCircular || (chart.config.data?.datasets?.length>2)));
+    const chartWLocal = necesitaFilaCompleta ? (W-margin*2) : chartW;
+    const chartHLocal = necesitaFilaCompleta ? chartWLocal*(esCircular?0.62:0.48) : chartH;
+    return { chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal };
   }
 
   cabecera(paginaActual);
@@ -7900,11 +7914,16 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const altoTexto = lineas.length*9 + 10;
       // además de la altura del propio título, se reserva sitio también para lo que
       // venga justo después (gráfico o PNL) — así el título nunca se queda solo al
-      // final de una página con su contenido empezando en la siguiente.
+      // final de una página con su contenido empezando en la siguiente. Se usa la altura
+      // REAL que le va a tocar al siguiente gráfico (ancho normal o fila completa) — antes
+      // se usaba siempre la altura de "media página", así que para un gráfico que en
+      // realidad iba a ocupar la fila entera (tartas, muchas series), la reserva se
+      // quedaba corta y el título acababa solo arriba de una página casi en blanco.
       let altoSiguiente = 0;
       const siguiente = widgets[wi+1];
       if(siguiente && siguiente.typeId!=='texto'){
-        altoSiguiente = siguiente.typeId==='pnl' ? 60 : (chartH+12);
+        if(siguiente.typeId==='pnl') altoSiguiente = 60;
+        else altoSiguiente = infoTamanoWidgetPdf(siguiente).chartHLocal + 12;
       }
       if(y + altoTexto + altoSiguiente > yLimite) nuevaPagina();
       // OJO: nuevaPagina() dibuja la cabecera de la página nueva, que cambia el tamaño y
@@ -8002,14 +8021,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       continue;
     }
     const type = RE_WIDGET_TYPES[w.typeId];
-    const chart = STATE.charts['reW_'+w.instanceId];
     // los gráficos con muchas líneas/porciones (tartas, o con más de 2 series) se
     // ensanchan a todo el ancho de la página — con solo media página, las cifras y la
     // leyenda se aplastaban y se cortaban por los bordes.
-    const necesitaFilaCompleta = !!(chart && (chart.config.type==='doughnut' || chart.config.type==='pie' || (chart.config.data?.datasets?.length>2)));
+    const {chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal} = infoTamanoWidgetPdf(w);
     if(necesitaFilaCompleta && colPendiente){ y += chartH + 16; colPendiente = null; }
-    const chartWLocal = necesitaFilaCompleta ? (W-margin*2) : chartW;
-    const chartHLocal = necesitaFilaCompleta ? chartWLocal*0.48 : chartH;
     if(!colPendiente && y + chartHLocal + 12 > yLimite) nuevaPagina();
     const x = colPendiente ? colPendiente.x : margin;
     // tarjeta clara con un borde sutil, para que el gráfico quede "enmarcado"
@@ -8022,8 +8038,16 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       // se redimensiona el propio gráfico EXPLÍCITAMENTE al ancho apaisado que le toca en
       // el PDF justo antes de capturarlo (si no, sale con la proporción que tuviera en
       // pantalla en ese momento) — y se devuelve a su tamaño normal justo después.
+      // Las tartas son la excepción: se capturan siempre a una resolución fija y moderada
+      // (no proporcional al ancho de página) — si no, con un lienzo enorme, los
+      // desplazamientos en píxeles fijos de las etiquetas y las líneas finas (pensados
+      // para el tamaño normal en pantalla) se quedan diminutos en comparación con el
+      // círculo, y todo sale desproporcionado. jsPDF ya escala la imagen capturada al
+      // tamaño en mm que le indiquemos, sea cual sea su resolución de origen.
       const pxPorMm = 3.78;
-      chart.resize(Math.round(chartWLocal*pxPorMm), Math.round(chartHLocal*pxPorMm));
+      const anchoCapturaPx = esCircular ? 640 : Math.round(chartWLocal*pxPorMm);
+      const altoCapturaPx = esCircular ? Math.round(640*(chartHLocal/chartWLocal)) : Math.round(chartHLocal*pxPorMm);
+      chart.resize(anchoCapturaPx, altoCapturaPx);
       chart.update('none');
       // se espera a que el navegador termine de repintar con el tamaño nuevo antes de
       // capturar — si no, con gráficos "responsive" a veces el propio Chart.js corrige el
