@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.244</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.246</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7005,7 +7005,7 @@ document.getElementById('reAddWidgetSelect').addEventListener('change', async (e
   }
   if(typeId==='cajaPieCategoria'){
     const widgets = getReWidgets();
-    [ {periodo:'total', etiqueta:'Periodo total'}, {periodo:'3m', etiqueta:'Últimos 3 meses'}, {periodo:'1m', etiqueta:'Último mes'} ].forEach(p=>{
+    [ {periodo:'1m', etiqueta:'Último mes'}, {periodo:'3m', etiqueta:'Últimos 3 meses'}, {periodo:'total', etiqueta:'Periodo total'} ].forEach(p=>{
       widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'cajaPieCategoria', cajaPieTipo:'categoria', cajaPiePeriodo:p.periodo });
     });
     setReWidgets(widgets);
@@ -7160,7 +7160,27 @@ function datalabelsUltimoValor(){
     align: 'top', anchor: 'end', clamp: true,
     color: (context) => context.dataset.borderColor || '#F2EAD9',
     font: { size: 10.5, weight: '700' },
-    formatter: (value) => formatK(value)
+    formatter: (value) => formatK(value),
+    // cuando varias líneas terminan con un valor muy parecido, sus etiquetas quedan una
+    // encima de otra y no se pueden leer — aquí se calcula, para cada línea, cuántas
+    // otras "compiten" por el mismo sitio (con un último valor cercano al suyo dentro del
+    // rango del eje), y se van escalonando verticalmente para separarlas.
+    offset: (context) => {
+      const chart = context.chart;
+      const yScale = chart.scales?.y;
+      const datasets = chart.data.datasets.filter(ds=>ds.label!=='Tendencia');
+      const miValor = context.dataset.data[context.dataset.data.length-1];
+      if(!yScale || miValor===null || miValor===undefined) return 4;
+      const rangoEjeY = (yScale.max - yScale.min) || 1;
+      const umbral = rangoEjeY * 0.06; // valores a menos del 6% del rango del eje cuentan como "cerca"
+      const competidoras = datasets
+        .map((ds,i)=>({ i, v: ds.data[ds.data.length-1] }))
+        .filter(d => d.v!==null && d.v!==undefined && Math.abs(d.v-miValor)<=umbral)
+        .sort((a,b)=>a.i-b.i);
+      const miIndice = datasets.indexOf(context.dataset);
+      const miPosicion = competidoras.findIndex(d=>d.i===miIndice);
+      return 4 + Math.max(0,miPosicion)*11;
+    }
   };
 }
 function reLineOptions(modo, mostrarUltimoValor){
@@ -7776,8 +7796,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   function infoTamanoWidgetPdf(w){
     const chart = STATE.charts['reW_'+w.instanceId];
     const esCircular = !!(chart && (chart.config.type==='doughnut' || chart.config.type==='pie'));
-    const necesitaFilaCompleta = !!(chart && (esCircular || (chart.config.data?.datasets?.length>2)));
-    const chartWLocal = necesitaFilaCompleta ? (W-margin*2) : chartW;
+    // también necesitan fila completa los gráficos con muchos meses en el eje X (aunque
+    // solo tengan 1 ó 2 series) — con 9+ etiquetas, a media página se amontonaban tanto
+    // que igualmente salían aplastadas.
+    const muchosDatos = !!(chart && chart.data?.labels?.length>8);
+    const necesitaFilaCompleta = !!(chart && (esCircular || muchosDatos || (chart.config.data?.datasets?.length>2)));
+    const chartWLocal = necesitaFilaCompleta ? (W-margin*2)*0.9 : chartW;
     const chartHLocal = necesitaFilaCompleta ? chartWLocal*(esCircular?0.62:0.48) : chartH;
     return { chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal };
   }
@@ -7923,7 +7947,14 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const siguiente = widgets[wi+1];
       if(siguiente && siguiente.typeId!=='texto'){
         if(siguiente.typeId==='pnl') altoSiguiente = 60;
-        else altoSiguiente = infoTamanoWidgetPdf(siguiente).chartHLocal + 12;
+        else {
+          const infoSig = infoTamanoWidgetPdf(siguiente);
+          // si el gráfico del siguiente widget todavía no existe en este momento (por lo
+          // que sea), no se puede saber su tamaño real con seguridad — se reserva el
+          // máximo posible (una tarta a toda la página) en vez de arriesgarse a reservar
+          // de menos y dejar la página casi en blanco.
+          altoSiguiente = (infoSig.chart ? infoSig.chartHLocal : (W-margin*2)*0.62) + 12;
+        }
       }
       if(y + altoTexto + altoSiguiente > yLimite) nuevaPagina();
       // OJO: nuevaPagina() dibuja la cabecera de la página nueva, que cambia el tamaño y
@@ -8027,7 +8058,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     const {chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal} = infoTamanoWidgetPdf(w);
     if(necesitaFilaCompleta && colPendiente){ y += chartH + 16; colPendiente = null; }
     if(!colPendiente && y + chartHLocal + 12 > yLimite) nuevaPagina();
-    const x = colPendiente ? colPendiente.x : margin;
+    const x = colPendiente ? colPendiente.x : (necesitaFilaCompleta ? margin+((W-margin*2)-chartWLocal)/2 : margin);
     // tarjeta clara con un borde sutil, para que el gráfico quede "enmarcado"
     doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
     doc.roundedRect(x-3, y-2, chartWLocal+6, chartHLocal+15, 2, 2);
@@ -8038,13 +8069,15 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       // se redimensiona el propio gráfico EXPLÍCITAMENTE al ancho apaisado que le toca en
       // el PDF justo antes de capturarlo (si no, sale con la proporción que tuviera en
       // pantalla en ese momento) — y se devuelve a su tamaño normal justo después.
-      // Las tartas son la excepción: se capturan siempre a una resolución fija y moderada
-      // (no proporcional al ancho de página) — si no, con un lienzo enorme, los
-      // desplazamientos en píxeles fijos de las etiquetas y las líneas finas (pensados
-      // para el tamaño normal en pantalla) se quedan diminutos en comparación con el
-      // círculo, y todo sale desproporcionado. jsPDF ya escala la imagen capturada al
-      // tamaño en mm que le indiquemos, sea cual sea su resolución de origen.
-      const pxPorMm = 3.78;
+      // Se captura siempre a una resolución más alta (x1.7) que el tamaño final en mm —
+      // si no, al venir de un lienzo pequeño en pantalla y ampliarse tanto para el PDF, se
+      // veía pixelado. Las tartas van aparte, con una resolución fija y moderada (no
+      // proporcional al ancho de página): con un lienzo enorme, los desplazamientos en
+      // píxeles fijos de las etiquetas y las líneas finas (pensados para el tamaño normal
+      // en pantalla) se quedaban diminutos en comparación con el círculo, y todo salía
+      // desproporcionado. jsPDF ya escala la imagen capturada al tamaño en mm que le
+      // indiquemos, sea cual sea su resolución de origen.
+      const pxPorMm = 3.78*1.7;
       const anchoCapturaPx = esCircular ? 640 : Math.round(chartWLocal*pxPorMm);
       const altoCapturaPx = esCircular ? Math.round(640*(chartHLocal/chartWLocal)) : Math.round(chartHLocal*pxPorMm);
       chart.resize(anchoCapturaPx, altoCapturaPx);
@@ -12046,9 +12079,9 @@ function renderCajaPieCharts(){
   const ultimoMes = ordenados.slice(-1);
 
   const periodos = [
-    { key:'total', titulo:'Periodo total', entries:periodoTotal },
-    { key:'3m', titulo:'Últimos 3 meses', entries:ultimos3 },
     { key:'1m', titulo:'Último mes'+(ultimoMes[0]?' ('+(ultimoMes[0].title||ultimoMes[0].month)+')':''), entries:ultimoMes },
+    { key:'3m', titulo:'Últimos 3 meses', entries:ultimos3 },
+    { key:'total', titulo:'Periodo total', entries:periodoTotal },
   ];
 
   contCat.innerHTML = periodos.map(p=>`
