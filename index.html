@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.237</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.243</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2596,6 +2596,20 @@ function calcularLineaTendencia(valores){
 function refrescarGraficoConTendencia(){
   try{ refrescarTodosLosGraficos(); }catch(e){}
   try{ if(typeof renderCaja==='function' && STATE.caja && STATE.caja.data) renderCaja(); }catch(e){}
+}
+/* mueve el botón de tendencia (creado automáticamente por safeNewChart, flotando encima
+   del propio gráfico) a un contenedor aparte en la cabecera de la tarjeta — para sitios
+   con poco espacio donde ese botón flotante molesta o se solapa con el gráfico. */
+function moverBotonTendencia(canvasId, contenedorId){
+  const btn = document.querySelector('[data-tendencia-toggle="'+canvasId+'"]');
+  const destino = document.getElementById(contenedorId);
+  if(btn && destino){
+    btn.style.position = 'static';
+    btn.style.opacity = '1';
+    btn.style.padding = '1px 5px';
+    btn.style.fontSize = '9px';
+    destino.appendChild(btn);
+  }
 }
 
 /* crea un gráfico solo si Chart.js llegó a cargar; si no, avisa sin romper el resto de la app */
@@ -7014,7 +7028,7 @@ let reDragSrc = null;
 function attachReDragHandlers(){
   document.querySelectorAll('#reWidgetsContainer [data-re-instance]').forEach(card=>{
     card.addEventListener('dragstart', ()=>{ reDragSrc = card.getAttribute('data-re-instance'); card.style.opacity='0.4'; });
-    card.addEventListener('dragend', ()=>{ card.style.opacity=''; });
+    card.addEventListener('dragend', ()=>{ card.style.opacity=''; reDragSrc=null; pararAutoScrollRe(); });
     card.addEventListener('dragover', (e)=>{ e.preventDefault(); });
     card.addEventListener('drop', (e)=>{
       e.preventDefault();
@@ -7030,7 +7044,48 @@ function attachReDragHandlers(){
       renderResumenEjecutivo();
     });
   });
+  // botón "+ Título aquí" — se añade una sola vez, justo al lado del botón ✕ de cada
+  // gráfico (que ya existe en todos los tipos de widget), sin tener que repetir este
+  // botón en cada uno de los `if(w.typeId===...)` que construyen el HTML de cada tipo.
+  document.querySelectorAll('#reWidgetsContainer [data-re-quitar]').forEach(quitarBtn=>{
+    if(quitarBtn.dataset.tituloAquiListo) return;
+    quitarBtn.dataset.tituloAquiListo = '1';
+    const id = quitarBtn.getAttribute('data-re-quitar');
+    const btnTitulo = document.createElement('button');
+    btnTitulo.className = 'btn secondary no-print';
+    btnTitulo.title = 'Añadir un título justo después de este gráfico';
+    btnTitulo.style.cssText = 'padding:2px 8px;font-size:11px;margin-right:4px;';
+    btnTitulo.textContent = '+ Título aquí';
+    btnTitulo.addEventListener('click', ()=>{
+      const widgets = getReWidgets();
+      const idx = widgets.findIndex(x=>x.instanceId===id);
+      if(idx<0) return;
+      widgets.splice(idx+1, 0, { instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'texto', contenido:'Nuevo título — haz clic para editarlo' });
+      setReWidgets(widgets);
+      renderResumenEjecutivo();
+    });
+    quitarBtn.parentElement.insertBefore(btnTitulo, quitarBtn);
+  });
 }
+/* auto-scroll de la página mientras se arrastra un gráfico cerca del borde de arriba o de
+   abajo de la pantalla — sin esto, para mover un gráfico a una posición fuera de lo que
+   se ve en ese momento, había que soltarlo, hacer scroll a mano, y volver a arrastrar. */
+let reAutoScrollInterval = null;
+function pararAutoScrollRe(){ clearInterval(reAutoScrollInterval); reAutoScrollInterval = null; }
+document.addEventListener('dragover', (e)=>{
+  if(!reDragSrc) return;
+  const margen = 90, velocidadMax = 16;
+  pararAutoScrollRe();
+  if(e.clientY < margen){
+    const velocidad = velocidadMax * (1 - e.clientY/margen);
+    reAutoScrollInterval = setInterval(()=>{ window.scrollBy(0, -velocidad); }, 16);
+  } else if(e.clientY > window.innerHeight - margen){
+    const distancia = window.innerHeight - e.clientY;
+    const velocidad = velocidadMax * (1 - distancia/margen);
+    reAutoScrollInterval = setInterval(()=>{ window.scrollBy(0, velocidad); }, 16);
+  }
+});
+document.addEventListener('drop', pararAutoScrollRe);
 
 function calcularVentasPorFranjaPeriodo(desde, hasta){
   const franjaOrder = franjaOrderNegocioFiltrado();
@@ -7426,38 +7481,23 @@ async function renderResumenEjecutivo(){
       </div>`;
     }
     if(w.typeId==='cajaCategoriaLinea'){
+      const tipoLabel = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
+      const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — evolución de categoría/subcategoría</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — ${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(${tipoLabel}, ${modoLabel})</span></h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
-        </div>
-        <div class="field no-print" style="display:flex;gap:6px;margin-bottom:8px;">
-          <select data-re-caja-cat-tipo="${w.instanceId}" style="width:auto;">
-            <option value="categoria" ${(w.cajaCategoriaTipo||'categoria')==='categoria'?'selected':''}>Categoría</option>
-            <option value="subcategoria" ${w.cajaCategoriaTipo==='subcategoria'?'selected':''}>Subcategoría</option>
-          </select>
-          <select data-re-caja-categoria="${w.instanceId}" style="flex:1;"></select>
-          <button class="btn secondary" data-re-caja-cat-pct="${w.instanceId}" style="padding:4px 10px;font-size:11px;flex-shrink:0;">${w.cajaCategoriaEnPct?'% ventas':'€'}</button>
         </div>
         <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
       </div>`;
     }
     if(w.typeId==='cajaPieCategoria'){
+      const tipoLabel = w.cajaPieTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
+      const periodoLabel = {total:'Periodo total', '3m':'Últimos 3 meses', '1m':'Último mes'}[w.cajaPiePeriodo||'total'];
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — reparto de gastos (% del total)</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — reparto de gastos <span class="hint" style="font-weight:400;">(${tipoLabel}, ${periodoLabel})</span></h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
-        </div>
-        <div class="field no-print" style="display:flex;gap:6px;margin-bottom:8px;">
-          <select data-re-caja-pie-tipo="${w.instanceId}" style="width:auto;">
-            <option value="categoria" ${(w.cajaPieTipo||'categoria')==='categoria'?'selected':''}>Categoría</option>
-            <option value="subcategoria" ${w.cajaPieTipo==='subcategoria'?'selected':''}>Subcategoría</option>
-          </select>
-          <select data-re-caja-pie-periodo="${w.instanceId}" style="flex:1;">
-            <option value="total" ${(w.cajaPiePeriodo||'total')==='total'?'selected':''}>Periodo total (según Resumen Ejecutivo)</option>
-            <option value="3m" ${w.cajaPiePeriodo==='3m'?'selected':''}>Últimos 3 meses</option>
-            <option value="1m" ${w.cajaPiePeriodo==='1m'?'selected':''}>Último mes</option>
-          </select>
         </div>
         <p class="hint" style="margin-bottom:6px;">Cada porción es su % sobre el total de gastos de ese periodo.</p>
         <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
@@ -7566,46 +7606,6 @@ async function renderResumenEjecutivo(){
       const widgets2 = getReWidgets();
       const w2 = widgets2.find(x=>x.instanceId===id);
       if(w2){ w2.pnlLineaId = sel.value; setReWidgets(widgets2); await renderPnlLineaWidgetInstance(w2, buckets); }
-    });
-  });
-  container.querySelectorAll('[data-re-caja-categoria]').forEach(sel=>{
-    sel.addEventListener('change', async ()=>{
-      const id = sel.getAttribute('data-re-caja-categoria');
-      const widgets2 = getReWidgets();
-      const w2 = widgets2.find(x=>x.instanceId===id);
-      if(w2){ w2.cajaCategoriaNombre = sel.value; setReWidgets(widgets2); await renderCajaCategoriaLineaWidgetInstance(w2, buckets); }
-    });
-  });
-  container.querySelectorAll('[data-re-caja-cat-tipo]').forEach(sel=>{
-    sel.addEventListener('change', async ()=>{
-      const id = sel.getAttribute('data-re-caja-cat-tipo');
-      const widgets2 = getReWidgets();
-      const w2 = widgets2.find(x=>x.instanceId===id);
-      if(w2){ w2.cajaCategoriaTipo = sel.value; w2.cajaCategoriaNombre = null; setReWidgets(widgets2); await renderResumenEjecutivo(); }
-    });
-  });
-  container.querySelectorAll('[data-re-caja-cat-pct]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const id = btn.getAttribute('data-re-caja-cat-pct');
-      const widgets2 = getReWidgets();
-      const w2 = widgets2.find(x=>x.instanceId===id);
-      if(w2){ w2.cajaCategoriaEnPct = !w2.cajaCategoriaEnPct; setReWidgets(widgets2); await renderResumenEjecutivo(); }
-    });
-  });
-  container.querySelectorAll('[data-re-caja-pie-tipo]').forEach(sel=>{
-    sel.addEventListener('change', async ()=>{
-      const id = sel.getAttribute('data-re-caja-pie-tipo');
-      const widgets2 = getReWidgets();
-      const w2 = widgets2.find(x=>x.instanceId===id);
-      if(w2){ w2.cajaPieTipo = sel.value; setReWidgets(widgets2); await renderCajaPieCategoriaWidgetInstance(w2, buckets); }
-    });
-  });
-  container.querySelectorAll('[data-re-caja-pie-periodo]').forEach(sel=>{
-    sel.addEventListener('change', async ()=>{
-      const id = sel.getAttribute('data-re-caja-pie-periodo');
-      const widgets2 = getReWidgets();
-      const w2 = widgets2.find(x=>x.instanceId===id);
-      if(w2){ w2.cajaPiePeriodo = sel.value; setReWidgets(widgets2); await renderCajaPieCategoriaWidgetInstance(w2, buckets); }
     });
   });
 
@@ -7751,6 +7751,22 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const chartH = chartW*0.72;
   const yInicio = margin+24;
   const yLimite = H-margin-10;
+  // mismo título dinámico que se ve en pantalla para estos 2 tipos — si no, el PDF
+  // mostraba la etiqueta genérica del menú de "+ Añadir gráfico" (pensada para elegir el
+  // tipo, no como título real de un gráfico ya colocado).
+  function tituloWidgetPdf(w, type){
+    if(w.typeId==='cajaCategoriaLinea'){
+      const tipoLabel = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
+      const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
+      return 'Caja — '+(w.cajaCategoriaNombre||'')+' ('+tipoLabel+', '+modoLabel+')';
+    }
+    if(w.typeId==='cajaPieCategoria'){
+      const tipoLabel = w.cajaPieTipo==='subcategoria' ? 'Subcategoría' : 'Categoría';
+      const periodoLabel = {total:'Periodo total', '3m':'Últimos 3 meses', '1m':'Último mes'}[w.cajaPiePeriodo||'total'];
+      return 'Caja — reparto de gastos ('+tipoLabel+', '+periodoLabel+')';
+    }
+    return type ? type.label : '';
+  }
 
   cabecera(paginaActual);
   let y = yInicio;
@@ -7759,11 +7775,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   // --- Resumen de cifras clave del periodo (KPIs), antes de cualquier gráfico ---
   const bucketsKpi = monthBucketsInRange(desde, hasta);
   const resumenKpi = calcularResumenEjecutivo(bucketsKpi);
-  let ventasTotales=0, ticketsTotales=0;
-  bucketsKpi.forEach(b=>{ const r=resumenKpi[b.label]; ventasTotales+=r.ventas; ticketsTotales+=r.tickets; });
-  ventasTotales = ventasTotales/100;
-  const ticketMedioKpi = ticketsTotales>0 ? ventasTotales/ticketsTotales : 0;
-  let ebitdaTotal = 0;
+  const ventasPorBucket = bucketsKpi.map(b=>(resumenKpi[b.label]?.ventas||0)/100);
+  const ticketsPorBucket = bucketsKpi.map(b=>resumenKpi[b.label]?.tickets||0);
+  let ebitdaPorBucket = bucketsKpi.map(()=>0);
   try{
     await ensureDefaultPnlLines();
     const linesKpi = [...STATE.pnlLines].sort((a,b)=>a.orden-b.orden);
@@ -7771,33 +7785,93 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     const costHistoryKpi = buildCostHistoryMap();
     const otherCostHistoryKpi = buildOtherCostHistoryMap();
     const lineaEbitdaKpi = linesKpi.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
-    bucketsKpi.forEach(b=>{
-      if(lineaEbitdaKpi){ ebitdaTotal += pnlLineValueForBucket(lineaEbitdaKpi, b, allSalesLinesKpi, costHistoryKpi, otherCostHistoryKpi); }
-      else{
-        let ti=0, tc=0;
-        linesKpi.filter(l=>!l.esTitulo).forEach(l=>{ const v=pnlLineValueForBucket(l, b, allSalesLinesKpi, costHistoryKpi, otherCostHistoryKpi); if(l.tipo==='ingreso') ti+=v; else tc+=v; });
-        ebitdaTotal += ti-tc;
-      }
+    ebitdaPorBucket = bucketsKpi.map(b=>{
+      if(lineaEbitdaKpi) return pnlLineValueForBucket(lineaEbitdaKpi, b, allSalesLinesKpi, costHistoryKpi, otherCostHistoryKpi);
+      let ti=0, tc=0;
+      linesKpi.filter(l=>!l.esTitulo).forEach(l=>{ const v=pnlLineValueForBucket(l, b, allSalesLinesKpi, costHistoryKpi, otherCostHistoryKpi); if(l.tipo==='ingreso') ti+=v; else tc+=v; });
+      return ti-tc;
     });
   }catch(e){ /* si el PNL no está listo por lo que sea, se omite el EBITDA del resumen sin romper el resto */ }
 
-  const kpis = [
-    { etiqueta:'Ventas totales', valor:eur(Math.round(ventasTotales*100)) },
-    { etiqueta:'Nº de tickets', valor:String(ticketsTotales) },
-    { etiqueta:'Ticket medio', valor:eur(Math.round(ticketMedioKpi*100)) },
-    { etiqueta:'Resultado (EBITDA)', valor:eur(Math.round(ebitdaTotal*100)), color: ebitdaTotal>=0?VERDE:ROJO },
-  ];
-  const kpiW = (W-margin*2-3*6)/4;
-  kpis.forEach((k,i)=>{
-    const kx = margin + i*(kpiW+6);
-    doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
-    doc.roundedRect(kx, y, kpiW, 20, 1.5, 1.5);
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRIS);
-    doc.text(k.etiqueta.toUpperCase(), kx+5, y+7);
-    doc.setFont('times','bold'); doc.setFontSize(15); doc.setTextColor(...(k.color||NEGRO));
-    doc.text(k.valor, kx+5, y+16);
+  // balance de Caja (ingresos ajustados + gastos, que ya se guardan en negativo) — mismo
+  // cálculo exacto que usa el widget "Caja — Balance mensual", mes a mes.
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+  const balancePorBucket = bucketsKpi.map(b=>{
+    const monthStr = b.dateMin.slice(0,7);
+    const entry = STATE.caja.savedMonths.find(m=>m.month===monthStr);
+    if(!entry) return 0;
+    return cajaIngresoAjustado(entry.totalIncome, entry.month) + entry.totalExpense;
   });
-  y += 28;
+
+  const nMeses = bucketsKpi.length;
+  const sumaUltimosN = (arr,n) => nMeses>=1 ? arr.slice(-n).reduce((s,v)=>s+v,0) : null;
+  const sumaAnterioresN = (arr,n) => nMeses>=2*n ? arr.slice(-2*n,-n).reduce((s,v)=>s+v,0) : null;
+  const valorUltimoMes = (arr) => nMeses>=1 ? arr[nMeses-1] : null;
+  const valorMesAnterior = (arr) => nMeses>=2 ? arr[nMeses-2] : null;
+  // ticket medio no se promedia — se recalcula como ventas/tickets de cada periodo
+  const tm = (v,t) => (v!==null && t!==null && t>0) ? v/t : null;
+
+  const ventasUltimoMes=valorUltimoMes(ventasPorBucket), ventasMesAnterior=valorMesAnterior(ventasPorBucket), ventasUltimos3=sumaUltimosN(ventasPorBucket,3), ventas3Anteriores=sumaAnterioresN(ventasPorBucket,3), ventasTotalPeriodo=ventasPorBucket.reduce((s,v)=>s+v,0);
+  const ticketsUltimoMes=valorUltimoMes(ticketsPorBucket), ticketsMesAnterior=valorMesAnterior(ticketsPorBucket), ticketsUltimos3=sumaUltimosN(ticketsPorBucket,3), tickets3Anteriores=sumaAnterioresN(ticketsPorBucket,3), ticketsTotalPeriodo=ticketsPorBucket.reduce((s,v)=>s+v,0);
+  const ebitdaUltimoMes=valorUltimoMes(ebitdaPorBucket), ebitdaMesAnterior=valorMesAnterior(ebitdaPorBucket), ebitdaUltimos3=sumaUltimosN(ebitdaPorBucket,3), ebitda3Anteriores=sumaAnterioresN(ebitdaPorBucket,3), ebitdaTotalPeriodo=ebitdaPorBucket.reduce((s,v)=>s+v,0);
+  const balanceUltimoMes=valorUltimoMes(balancePorBucket), balanceMesAnterior=valorMesAnterior(balancePorBucket), balanceUltimos3=sumaUltimosN(balancePorBucket,3), balance3Anteriores=sumaAnterioresN(balancePorBucket,3), balanceTotalPeriodo=balancePorBucket.reduce((s,v)=>s+v,0);
+
+  const filasKpi = [
+    { etiqueta:'Ventas totales', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:ventasUltimoMes, mesAnterior:ventasMesAnterior, ultimos3:ventasUltimos3, anteriores3:ventas3Anteriores, total:ventasTotalPeriodo },
+    { etiqueta:'Nº de tickets', fmt:(v)=>String(Math.round(v)), ultimoMes:ticketsUltimoMes, mesAnterior:ticketsMesAnterior, ultimos3:ticketsUltimos3, anteriores3:tickets3Anteriores, total:ticketsTotalPeriodo },
+    { etiqueta:'Ticket medio', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:tm(ventasUltimoMes,ticketsUltimoMes), mesAnterior:tm(ventasMesAnterior,ticketsMesAnterior), ultimos3:tm(ventasUltimos3,ticketsUltimos3), anteriores3:tm(ventas3Anteriores,tickets3Anteriores), total:tm(ventasTotalPeriodo,ticketsTotalPeriodo) },
+    { etiqueta:'Resultado (EBITDA)', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:ebitdaUltimoMes, mesAnterior:ebitdaMesAnterior, ultimos3:ebitdaUltimos3, anteriores3:ebitda3Anteriores, total:ebitdaTotalPeriodo },
+    { etiqueta:'Balance de Caja', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:balanceUltimoMes, mesAnterior:balanceMesAnterior, ultimos3:balanceUltimos3, anteriores3:balance3Anteriores, total:balanceTotalPeriodo },
+  ];
+
+  // helper: diferencia en valor y % entre un periodo y el anterior — null si no hay datos
+  // suficientes para alguno de los dos (ej. el periodo elegido es demasiado corto)
+  const diferenciaKpi = (actual, anterior) => {
+    if(actual===null || anterior===null) return null;
+    const dif = actual-anterior;
+    return { dif, pct: anterior!==0 ? (dif/Math.abs(anterior)*100) : null };
+  };
+
+  const colEtiquetaW = 40;
+  const colDatoW = (W-margin*2-colEtiquetaW)/5;
+  const filaAltoKpi = 8.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
+  ['Último mes','vs mes anterior','Últimos 3 meses','vs 3 meses anteriores','Total periodo'].forEach((c,i)=>{
+    doc.text(c, margin+colEtiquetaW+i*colDatoW+colDatoW-2, y+3, {align:'right'});
+  });
+  y += 6;
+  doc.setDrawColor(...LINEA); doc.setLineWidth(0.3); doc.line(margin, y, W-margin, y);
+  y += 5;
+
+  filasKpi.forEach((f,fi)=>{
+    if(fi%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-3.5, W-margin*2+4, filaAltoKpi, 'F'); }
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...NEGRO);
+    doc.text(f.etiqueta, margin, y+1.5);
+
+    const escribirValor = (val, colIdx) => {
+      const cx = margin+colEtiquetaW+colIdx*colDatoW;
+      doc.setFont('times','bold'); doc.setFontSize(10.5); doc.setTextColor(...NEGRO);
+      doc.text(val!==null ? f.fmt(val) : '—', cx+colDatoW-2, y+1.5, {align:'right'});
+    };
+    const escribirDiferencia = (actual, anterior, colIdx) => {
+      const cx = margin+colEtiquetaW+colIdx*colDatoW;
+      const d = diferenciaKpi(actual, anterior);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      if(!d){ doc.setTextColor(...GRIS); doc.text('Sin datos suficientes', cx+colDatoW-2, y+1.5, {align:'right'}); return; }
+      const color = d.dif>=0 ? VERDE : ROJO;
+      const texto = (d.dif>=0?'+':'')+f.fmt(d.dif)+(d.pct!==null?' ('+(d.pct>=0?'+':'')+d.pct.toFixed(1)+'%)':'');
+      doc.setFont('helvetica','bold'); doc.setTextColor(...color);
+      doc.text(texto, cx+colDatoW-2, y+1.5, {align:'right'});
+    };
+
+    escribirValor(f.ultimoMes, 0);
+    escribirDiferencia(f.ultimoMes, f.mesAnterior, 1);
+    escribirValor(f.ultimos3, 2);
+    escribirDiferencia(f.ultimos3, f.anteriores3, 3);
+    escribirValor(f.total, 4);
+    y += filaAltoKpi;
+  });
+  y += 8;
 
   const introduccion = (document.getElementById('reIntroduccion').value||'').trim();
   if(introduccion){
@@ -7928,21 +8002,28 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       continue;
     }
     const type = RE_WIDGET_TYPES[w.typeId];
-    if(!colPendiente && y + chartH + 12 > yLimite) nuevaPagina();
+    const chart = STATE.charts['reW_'+w.instanceId];
+    // los gráficos con muchas líneas/porciones (tartas, o con más de 2 series) se
+    // ensanchan a todo el ancho de la página — con solo media página, las cifras y la
+    // leyenda se aplastaban y se cortaban por los bordes.
+    const necesitaFilaCompleta = !!(chart && (chart.config.type==='doughnut' || chart.config.type==='pie' || (chart.config.data?.datasets?.length>2)));
+    if(necesitaFilaCompleta && colPendiente){ y += chartH + 16; colPendiente = null; }
+    const chartWLocal = necesitaFilaCompleta ? (W-margin*2) : chartW;
+    const chartHLocal = necesitaFilaCompleta ? chartWLocal*0.48 : chartH;
+    if(!colPendiente && y + chartHLocal + 12 > yLimite) nuevaPagina();
     const x = colPendiente ? colPendiente.x : margin;
     // tarjeta clara con un borde sutil, para que el gráfico quede "enmarcado"
     doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
-    doc.roundedRect(x-3, y-2, chartW+6, chartH+15, 2, 2);
+    doc.roundedRect(x-3, y-2, chartWLocal+6, chartHLocal+15, 2, 2);
     doc.setFontSize(11); doc.setTextColor(...NEGRO); doc.setFont('helvetica','bold');
-    doc.text(type?type.label:'', x, y+5);
+    doc.text(tituloWidgetPdf(w, type), x, y+5);
     doc.setFont('helvetica','normal');
-    const chart = STATE.charts['reW_'+w.instanceId];
     if(chart){
       // se redimensiona el propio gráfico EXPLÍCITAMENTE al ancho apaisado que le toca en
       // el PDF justo antes de capturarlo (si no, sale con la proporción que tuviera en
       // pantalla en ese momento) — y se devuelve a su tamaño normal justo después.
       const pxPorMm = 3.78;
-      chart.resize(Math.round(chartW*pxPorMm), Math.round(chartH*pxPorMm));
+      chart.resize(Math.round(chartWLocal*pxPorMm), Math.round(chartHLocal*pxPorMm));
       chart.update('none');
       // se espera a que el navegador termine de repintar con el tamaño nuevo antes de
       // capturar — si no, con gráficos "responsive" a veces el propio Chart.js corrige el
@@ -7951,16 +8032,17 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const imgData = chart.toBase64Image();
       if(imgData && imgData.length > 200){
-        doc.addImage(imgData, 'PNG', x, y+9, chartW, chartH);
+        doc.addImage(imgData, 'PNG', x, y+9, chartWLocal, chartHLocal);
       } else {
-        doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartW,chartH);
+        doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartWLocal,chartHLocal);
       }
       chart.resize();
       chart.update('none');
     }
-    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartW,chartH); }
+    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartWLocal,chartHLocal); }
 
-    if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
+    if(necesitaFilaCompleta){ y += chartHLocal + 16; }
+    else if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
     else { colPendiente = null; y += chartH + 16; }
   }
 
@@ -8503,22 +8585,13 @@ async function renderPnlLineaWidgetInstance(w, buckets){
    de Resumen Ejecutivo — los mismos gráficos individuales por categoría que se ven en
    Caja → Gráficos → Por categoría, aquí eligiendo cuál en vez de verlas todas a la vez. */
 async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
-  const sel = document.querySelector('[data-re-caja-categoria="'+w.instanceId+'"]');
-  if(!sel) return;
+  const canvas = document.getElementById('chartReW_'+w.instanceId);
+  if(!canvas) return;
   if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   const cc = STATE.caja;
   const tipo = w.cajaCategoriaTipo || 'categoria';
   const fuente = tipo==='categoria' ? cajaDetalleCatData() : cajaDetalleSubcatData();
-  const claves = tipo==='categoria' ? fuente.cats : fuente.subcats;
-  // la lista de opciones se vuelve a construir si ha cambiado el tipo (categoría ↔
-  // subcategoría), ya que son listas distintas — si no, al cambiar de tipo se seguiría
-  // mostrando el desplegable con las opciones del tipo anterior.
-  if(sel.dataset.tipoCargado !== tipo){
-    sel.innerHTML = claves.map(k=>'<option value="'+escapeHtml(k)+'">'+escapeHtml(k)+'</option>').join('');
-    sel.value = (w.cajaCategoriaNombre && claves.includes(w.cajaCategoriaNombre)) ? w.cajaCategoriaNombre : (claves[0] || '');
-    sel.dataset.tipoCargado = tipo;
-  }
-  const claveElegida = sel.value;
+  const claveElegida = w.cajaCategoriaNombre || '';
   const c = chartColors();
   if(!claveElegida){ destroyChart('reW_'+w.instanceId); return; }
   const desde = buckets[0]?.dateMin, hasta = buckets[buckets.length-1]?.dateMax;
@@ -12145,7 +12218,8 @@ function renderCajaGraficosGrid(){
       const totalDest = periodMonthNames.reduce((s,m)=>s+getEuros(c.detalleCatSelected,m),0);
       const mediaDest = periodMonthNames.length ? totalDest/periodMonthNames.length : 0;
       html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div>
+        <div style="display:flex;gap:6px;align-items:center;"><span id="cajaCatDestTendBtns" style="display:flex;gap:4px;"></span><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div></div>
         <div class="hint" style="margin-bottom:10px;font-size:11px;">Media mensual: <b style="color:var(--text);">${cajaFmt(mediaDest)}</b> &nbsp;·&nbsp; Total gasto en período: <b style="color:var(--text);">${cajaFmt(totalDest)}</b></div>
         <div class="hint" style="font-size:10px;margin-bottom:2px;">En euros</div>
         <div class="chart-wrap" style="height:150px;margin-bottom:10px;"><canvas id="cajaCatDestacado"></canvas></div>
@@ -12153,20 +12227,21 @@ function renderCajaGraficosGrid(){
         <div class="chart-wrap" style="height:150px;"><canvas id="cajaCatDestacadoPct"></canvas></div>
       </div>`;
     }
-    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">`;
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:18px;">`;
     cats.forEach((cat,ci)=>{
       const total = periodMonthNames.reduce((s,m)=>s+getEuros(cat,m),0);
       const media = periodMonthNames.length ? total/periodMonthNames.length : 0;
       html += `<div class="card" style="border:1px solid ${c.detalleCatSelected===cat?'var(--copper)':'var(--line)'};">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
           <div data-select-cat="${cat.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${c.detalleCatSelected===cat?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;flex:1;">${cat}</div>
+          <span id="cajaCatTendBtns_${ci}" style="display:flex;gap:4px;margin-right:6px;"></span>
           <button class="btn secondary" data-ocultar-cat="${cat.replace(/"/g,'&quot;')}" title="Ocultar este gráfico" style="padding:1px 5px;font-size:10px;">🙈</button>
         </div>
         <div class="hint" style="font-size:10px;margin-bottom:8px;">Media mensual: <b style="color:var(--text);">${cajaFmt(media)}</b> · Total: <b style="color:var(--text);">${cajaFmt(total)}</b></div>
         <div class="hint" style="font-size:9px;margin-bottom:1px;">€ en el mes</div>
-        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:90px;margin-bottom:6px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
+        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:140px;margin-bottom:6px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
         <div class="hint" style="font-size:9px;margin-bottom:1px;">% sobre ventas del mes</div>
-        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:90px;"><canvas id="cajaCatMiniPct_${ci}"></canvas></div>
+        <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:140px;"><canvas id="cajaCatMiniPct_${ci}"></canvas></div>
       </div>`;
     });
     html += `</div>`;
@@ -12180,12 +12255,14 @@ function renderCajaGraficosGrid(){
         data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getEuros(c.detalleCatSelected,m)), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3 }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'€'}, grid:{color:c2.grid} } } }
       });
+      moverBotonTendencia('cajaCatDestacado', 'cajaCatDestTendBtns');
       destroyChart('cajaCatDestacadoPct');
       STATE.charts.cajaCatDestacadoPct = safeNewChart('cajaCatDestacadoPct', {
         type:'line',
         data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getPct(c.detalleCatSelected,m)), borderColor:'#5B8C7A', backgroundColor:'#5B8C7A', tension:.3 }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'%'}, grid:{color:c2.grid} } } }
       });
+      moverBotonTendencia('cajaCatDestacadoPct', 'cajaCatDestTendBtns');
       const cerrarBtn = document.getElementById('cajaCerrarCatDest');
       if(cerrarBtn) cerrarBtn.addEventListener('click', ()=>{ c.detalleCatSelected=null; renderCajaGraficosGrid(); });
     }
@@ -12196,12 +12273,14 @@ function renderCajaGraficosGrid(){
         data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getEuros(cat,m)), borderColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}}, grid:{color:c2.grid} } } }
       });
+      moverBotonTendencia('cajaCatMini_'+ci, 'cajaCatTendBtns_'+ci);
       destroyChart('cajaCatMiniPct_'+ci);
       STATE.charts['cajaCatMiniPct_'+ci] = safeNewChart('cajaCatMiniPct_'+ci, {
         type:'line',
         data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getPct(cat,m)), borderColor:'#5B8C7A', backgroundColor:'#5B8C7A', tension:.3, pointRadius:3 }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}, callback:v=>v+'%'}, grid:{color:c2.grid} } } }
       });
+      moverBotonTendencia('cajaCatMiniPct_'+ci, 'cajaCatTendBtns_'+ci);
     });
     gridEl.querySelectorAll('[data-select-cat]').forEach(card=>{
       card.addEventListener('click', ()=>{
