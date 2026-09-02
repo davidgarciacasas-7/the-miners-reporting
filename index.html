@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.246</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.247</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7796,11 +7796,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   function infoTamanoWidgetPdf(w){
     const chart = STATE.charts['reW_'+w.instanceId];
     const esCircular = !!(chart && (chart.config.type==='doughnut' || chart.config.type==='pie'));
-    // también necesitan fila completa los gráficos con muchos meses en el eje X (aunque
-    // solo tengan 1 ó 2 series) — con 9+ etiquetas, a media página se amontonaban tanto
-    // que igualmente salían aplastadas.
-    const muchosDatos = !!(chart && chart.data?.labels?.length>8);
-    const necesitaFilaCompleta = !!(chart && (esCircular || muchosDatos || (chart.config.data?.datasets?.length>2)));
+    // solo las tartas y los gráficos con más de 2 series (muchas líneas con leyenda) pasan
+    // a fila completa — el número de meses en el eje NO cuenta por sí solo: eso hacía que
+    // casi cualquier gráfico del informe (que casi siempre cubre varios meses) acabara
+    // ocupando toda la fila, cuando la mayoría se veían bien a media página.
+    const necesitaFilaCompleta = !!(chart && (esCircular || (chart.config.data?.datasets?.length>2)));
     const chartWLocal = necesitaFilaCompleta ? (W-margin*2)*0.9 : chartW;
     const chartHLocal = necesitaFilaCompleta ? chartWLocal*(esCircular?0.62:0.48) : chartH;
     return { chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal };
