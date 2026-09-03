@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.247</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.248</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2757,7 +2757,7 @@ document.getElementById('pnlPrintBtn').addEventListener('click', ()=>window.prin
 function setChartTrendType(v){ localStorage.setItem('miners_trend_chart_type', v); }
 function trendChartType(){ return getChartTrendType()==='lineas' ? 'line' : 'bar'; }
 function trendDataset(label, data, color){
-  if(getChartTrendType()==='lineas') return { label, data, borderColor:color, backgroundColor:color, tension:.3, fill:false };
+  if(getChartTrendType()==='lineas') return { label, data, borderColor:color, backgroundColor:color, borderWidth:2.5, pointRadius:3, pointHoverRadius:4, tension:.3, fill:false };
   return { label, data, backgroundColor:color, borderRadius:4 };
 }
 
@@ -7188,13 +7188,13 @@ function reLineOptions(modo, mostrarUltimoValor){
   const callback = v => modo==='pct' ? v+'%' : (modo ? v+'€' : v);
   const plugins = {legend:{display:false}};
   if(mostrarUltimoValor) plugins.datalabels = datalabelsUltimoValor();
-  return { responsive:true, maintainAspectRatio:false, layout:{padding:{top:mostrarUltimoValor?18:0}}, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } };
+  return { responsive:true, maintainAspectRatio:false, layout:{padding:{top:mostrarUltimoValor?18:0}}, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45, font:{size:11}}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback, font:{size:11}}, grid:{color:c.grid} } } };
 }
 function reLineOptionsLegend(esPct, mostrarUltimoValor){
   const c = chartColors();
-  const plugins = {legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:10.5}}}};
+  const plugins = {legend:{position:'bottom', labels:{color:c.muted, boxWidth:12, font:{size:11}}}};
   if(mostrarUltimoValor) plugins.datalabels = datalabelsUltimoValor();
-  return { responsive:true, maintainAspectRatio:false, layout:{padding:{top:mostrarUltimoValor?18:0}}, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v}, grid:{color:c.grid} } } };
+  return { responsive:true, maintainAspectRatio:false, layout:{padding:{top:mostrarUltimoValor?18:0}}, plugins, scales:{ x:{ ticks:{color:c.muted, maxRotation:45, font:{size:11}}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>esPct?v+'%':v, font:{size:11}}, grid:{color:c.grid} } } };
 }
 function calcularTicketsPorFranjaPeriodo(desde, hasta){
   const franjaOrder = franjaOrderNegocioFiltrado();
@@ -7246,18 +7246,18 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[trendDataset('Ticket medio', labels.map(l=>{ const r=resultado[l]; return r.tickets? +((r.ventas/r.tickets)/100).toFixed(2):0; }), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='clientesTickets'){
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[
-      { label:'Nuevo', data:labels.map(l=>resultado[l].segCount.nuevo), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
-      { label:'Repetido sin fidelidad', data:labels.map(l=>resultado[l].segCount.repetido), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
-      { label:'Con fidelidad', data:labels.map(l=>resultado[l].segCount.fidelidad), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
-      { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 },
-      { label:'Total', data:labels.map(l=>{ const s=resultado[l].segCount; return s.nuevo+s.repetido+s.fidelidad+s.noident; }), borderColor:c.text, backgroundColor:c.text, tension:.3 }
+      { label:'Nuevo', data:labels.map(l=>resultado[l].segCount.nuevo), borderColor:c.verdigris, backgroundColor:c.verdigris, borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'Repetido sin fidelidad', data:labels.map(l=>resultado[l].segCount.repetido), borderColor:c.muted, backgroundColor:c.muted, borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'Con fidelidad', data:labels.map(l=>resultado[l].segCount.fidelidad), borderColor:c.copper, backgroundColor:c.copper, borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'No identificable (efectivo)', data:labels.map(l=>resultado[l].segCount.noident), borderColor:'#8B6A46', backgroundColor:'#8B6A46', borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'Total', data:labels.map(l=>{ const s=resultado[l].segCount; return s.nuevo+s.repetido+s.fidelidad+s.noident; }), borderColor:c.text, backgroundColor:c.text, borderWidth:2.5, pointRadius:3, tension:.3 }
     ]}, options:reLineOptionsLegend(false, mostrarUltimoValor) });
   } else if(typeId==='clientesVentas'){
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels, datasets:[
-      { label:'Nuevo', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.nuevo/r.ventas*100).toFixed(1):0; }), borderColor:c.verdigris, backgroundColor:c.verdigris, tension:.3 },
-      { label:'Repetido sin fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.repetido/r.ventas*100).toFixed(1):0; }), borderColor:c.muted, backgroundColor:c.muted, tension:.3 },
-      { label:'Con fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.fidelidad/r.ventas*100).toFixed(1):0; }), borderColor:c.copper, backgroundColor:c.copper, tension:.3 },
-      { label:'No identificable (efectivo)', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.noident/r.ventas*100).toFixed(1):0; }), borderColor:'#8B6A46', backgroundColor:'#8B6A46', tension:.3 }
+      { label:'Nuevo', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.nuevo/r.ventas*100).toFixed(1):0; }), borderColor:c.verdigris, backgroundColor:c.verdigris, borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'Repetido sin fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.repetido/r.ventas*100).toFixed(1):0; }), borderColor:c.muted, backgroundColor:c.muted, borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'Con fidelidad', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.fidelidad/r.ventas*100).toFixed(1):0; }), borderColor:c.copper, backgroundColor:c.copper, borderWidth:2.5, pointRadius:3, tension:.3 },
+      { label:'No identificable (efectivo)', data:labels.map(l=>{ const r=resultado[l]; return r.ventas? +(r.segVentas.noident/r.ventas*100).toFixed(1):0; }), borderColor:'#8B6A46', backgroundColor:'#8B6A46', borderWidth:2.5, pointRadius:3, tension:.3 }
     ]}, options:reLineOptionsLegend(true, mostrarUltimoValor) });
   } else if(typeId==='cogsTotal'){
     const buckets = monthBucketsInRange(desde, hasta);
@@ -7301,7 +7301,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const d = calcularCategoriasPeriodo(desde, hasta);
     const paleta = ['#C17F3C','#4C8272','#A79A85','#7CA97A','#C1613F','#8B6A46','#5E7A6E','#D9B37C','#3A5A4E','#B08968'];
     const valoresPorEtiqueta = Object.fromEntries(d.labels.map((l,i)=>[l,d.data[i]]));
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'doughnut', data:{ labels:d.labels, datasets:[{ data:d.data, backgroundColor:paleta }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:legendConLeyendaValores('bottom', {color:c.muted, boxWidth:11, font:{size:10}}, valoresPorEtiqueta, v=>eur(Math.round(v*100)))} } });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'doughnut', data:{ labels:d.labels, datasets:[{ data:d.data, backgroundColor:paleta }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:legendConLeyendaValores('bottom', {color:c.muted, boxWidth:11, font:{size:11}}, valoresPorEtiqueta, v=>eur(Math.round(v*100)))} } });
   } else if(typeId==='ticketsFranja'){
     const { franjaOrder, byFranja } = calcularTicketsPorFranjaPeriodo(desde, hasta);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Tickets', franjaOrder.map(f=>byFranja[f].n), c.verdigris)] }, options:reLineOptions(false, mostrarUltimoValor) });
@@ -7311,7 +7311,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
   } else if(typeId==='rentabilidadFranja'){
     const { franjaOrder, resultado:res } = await calcularRentabilidadPeriodo(desde, hasta);
     const valores = franjaOrder.map(f=>(res[f].ventas-res[f].cogs-res[f].laboral)/100);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType()==='lineas'?'line':'bar', data:{ labels:franjaOrder, datasets:[{ label:'Resultado', data:valores, backgroundColor:valores.map(v=>v>=0?c.verdigris:'#C1613F'), borderColor:'#C1613F', borderRadius:4, tension:.3 }] }, options:reLineOptions(true, mostrarUltimoValor) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType()==='lineas'?'line':'bar', data:{ labels:franjaOrder, datasets:[{ label:'Resultado', data:valores, backgroundColor:valores.map(v=>v>=0?c.verdigris:'#C1613F'), borderColor:'#C1613F', borderWidth:2.5, pointRadius:3, borderRadius:4, tension:.3 }] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='rendBebidasBarista'){
     const { franjaOrder, resultado:res } = await calcularRendimientoPeriodo(desde, hasta);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:franjaOrder, datasets:[trendDataset('Bebidas/barista/h', franjaOrder.map(f=>{ const r=res[f]; return r.baristaHoras>0? +(r.bebidas/r.baristaHoras).toFixed(1):0; }), c.copper)] }, options:reLineOptions(false, mostrarUltimoValor) });
@@ -7327,7 +7327,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Coste de mermas', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#C1613F')] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='mermasTop'){
     const d = calcularMermasTopProductos(desde, hasta, 10);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'bar', data:{ labels:d.labels, datasets:[{ label:'Coste', data:d.data, backgroundColor:'#C1613F', borderRadius:4 }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} }, y:{ ticks:{color:c.muted}, grid:{display:false} } } } });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'bar', data:{ labels:d.labels, datasets:[{ label:'Coste', data:d.data, backgroundColor:'#C1613F', borderRadius:4 }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, callback:v=>v+'€', font:{size:11}}, grid:{color:c.grid} }, y:{ ticks:{color:c.muted, font:{size:11}}, grid:{display:false} } } } });
   } else if(typeId==='cajaGastosCategoria' || typeId==='cajaGastosSubcategoria' || typeId==='cajaGastosProveedor'){
     const cc = STATE.caja;
     const enPct = !!(w && w.verEnPct);
@@ -8064,22 +8064,22 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     doc.roundedRect(x-3, y-2, chartWLocal+6, chartHLocal+15, 2, 2);
     doc.setFontSize(11); doc.setTextColor(...NEGRO); doc.setFont('helvetica','bold');
     doc.text(tituloWidgetPdf(w, type), x, y+5);
-    doc.setFont('helvetica','normal');
     if(chart){
       // se redimensiona el propio gráfico EXPLÍCITAMENTE al ancho apaisado que le toca en
       // el PDF justo antes de capturarlo (si no, sale con la proporción que tuviera en
       // pantalla en ese momento) — y se devuelve a su tamaño normal justo después.
-      // Se captura siempre a una resolución más alta (x1.7) que el tamaño final en mm —
-      // si no, al venir de un lienzo pequeño en pantalla y ampliarse tanto para el PDF, se
-      // veía pixelado. Las tartas van aparte, con una resolución fija y moderada (no
-      // proporcional al ancho de página): con un lienzo enorme, los desplazamientos en
-      // píxeles fijos de las etiquetas y las líneas finas (pensados para el tamaño normal
-      // en pantalla) se quedaban diminutos en comparación con el círculo, y todo salía
-      // desproporcionado. jsPDF ya escala la imagen capturada al tamaño en mm que le
-      // indiquemos, sea cual sea su resolución de origen.
-      const pxPorMm = 3.78*1.7;
+      // Para que la captura salga nítida sin volverse pixelada, se sube el
+      // "devicePixelRatio" del propio gráfico en vez de agrandar el lienzo lógico — así
+      // se capturan más píxeles de verdad, pero el grosor de las líneas y el tamaño de
+      // letra se mantienen en las mismas proporciones de siempre (si se agranda el
+      // lienzo en vez de esto, todo lo que no se hubiera fijado explícitamente en píxeles
+      // — líneas, letras de los ejes — se queda relativamente más fino/pequeño cuanto
+      // más grande sea el lienzo, que es justo lo que pasaba antes).
+      const pxPorMm = 3.78;
       const anchoCapturaPx = esCircular ? 640 : Math.round(chartWLocal*pxPorMm);
       const altoCapturaPx = esCircular ? Math.round(640*(chartHLocal/chartWLocal)) : Math.round(chartHLocal*pxPorMm);
+      const dprOriginal = chart.options.devicePixelRatio;
+      chart.options.devicePixelRatio = 3;
       chart.resize(anchoCapturaPx, altoCapturaPx);
       chart.update('none');
       // se espera a que el navegador termine de repintar con el tamaño nuevo antes de
@@ -8093,6 +8093,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       } else {
         doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartWLocal,chartHLocal);
       }
+      chart.options.devicePixelRatio = dprOriginal;
       chart.resize();
       chart.update('none');
     }
@@ -8633,7 +8634,7 @@ async function renderPnlLineaWidgetInstance(w, buckets){
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type: trendChartType(),
     data:{ labels: buckets.map(b=>b.label), datasets:[ trendDataset(sel.options[sel.selectedIndex]?.text||'', datos.map(v=>+v.toFixed(2)), c.copper) ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45, font:{size:11}}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100)), font:{size:11}}, grid:{color:c.grid} } } }
   });
 }
 /* widget "Caja — evolución de una categoría de gasto" — deja elegir UNA categoría
@@ -8666,7 +8667,7 @@ async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type: trendChartType(),
     data:{ labels: labelsRango, datasets:[ trendDataset(claveElegida, datos, color) ] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback: v => enPct ? v+'%' : eur(Math.round(v*100))}, grid:{color:c.grid} } } }
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45, font:{size:11}}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback: v => enPct ? v+'%' : eur(Math.round(v*100)), font:{size:11}}, grid:{color:c.grid} } } }
   });
 }
 /* widget "Caja — reparto de gastos (% del total)" — la misma tarta con datalabels y
@@ -12048,7 +12049,7 @@ function cajaPieDatalabelsPlugins(c2){
   const esPequena = (ctx) => pctDe(ctx) < PIE_LEADER_LINE_THRESHOLD;
   return {
     pieLeaderLines: { enabled:true },
-    legend:{ position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:10}} },
+    legend:{ position:'bottom', labels:{color:c2.muted, boxWidth:10, font:{size:11}} },
     datalabels:{
       display: (ctx) => pctDe(ctx) >= PIE_HIDE_LABEL_THRESHOLD,
       formatter: (value, ctx) => (pctDe(ctx)*100).toFixed(1)+'%',
