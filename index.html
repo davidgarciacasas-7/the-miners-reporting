@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.251</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.254</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -6864,8 +6864,9 @@ const RE_WIDGET_TYPES = {
   clientesVentas:  { label:'Clientes por tipo — % de ventas', tipo:'trend' },
   cogsTotal:       { label:'Evolución del COGS total', tipo:'trend' },
   otrosCostesTotal:    { label:'Evolución de Otros costes (total)', tipo:'trend' },
-  cogsPctSquare:       { label:'COGS como % de Ventas Square+Efectivo', tipo:'snapshot-async' },
-  otrosCostesPctSquare:{ label:'Otros costes como % de Ventas Square+Efectivo', tipo:'snapshot-async' },
+  cogsPctSquare:       { label:'COGS como % de Ventas netas', tipo:'snapshot-async' },
+  inventoryStockUp:    { label:'PNL — Inventory stock up (mensual)', tipo:'trend' },
+  otrosCostesPctSquare:{ label:'Otros costes como % de Ventas netas', tipo:'snapshot-async' },
   franjaVentas:    { label:'Ventas por franja horaria', tipo:'snapshot' },
   diaSemanaVentas: { label:'Ventas por día de la semana', tipo:'snapshot' },
   categorias:      { label:'Categorías por ventas', tipo:'snapshot' },
@@ -7105,10 +7106,33 @@ function calcularCategoriasPeriodo(desde, hasta){
   const entries = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
   return { labels:entries.map(e=>e[0]), data:entries.map(e=>e[1]/100) };
 }
-function calcularCogsTotalMensual(buckets){
+/* COGS "de este informe" = el mismo COGS que se ve en PNL (Production Costs + Write-off
+   Total + Missing stock + Packaging costs, tal cual esas 4 líneas están definidas ahí) —
+   antes esta función solo calculaba el coste teórico de producción (cantidad × coste de
+   receta), que es solo una de las 4 líneas; ahora usa el motor de cálculo del propio PNL
+   para que coincida exactamente con lo que se ve en esa pestaña, mes a mes. */
+async function calcularCogsTotalMensual(buckets){
+  await ensureDefaultPnlLines();
+  const lines = STATE.pnlLines||[];
+  const allSalesLines = getAllSalesLinesRaw();
   const costHistory = buildCostHistoryMap();
-  const porBucket = {}; buckets.forEach(b=>porBucket[b.label]=0);
-  getAllSalesLinesRaw().forEach(l=>{ const b=buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax); if(b) porBucket[b.label]+=l.cant*costAtDate(costHistory,l.articulo,l.fecha); });
+  const otherCostHistory = buildOtherCostHistoryMap();
+  const lineaCogs = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='cogs');
+  const porBucket = {};
+  buckets.forEach(b=>{
+    if(lineaCogs){
+      porBucket[b.label] = Math.abs(pnlLineValueForBucket(lineaCogs, b, allSalesLines, costHistory, otherCostHistory));
+    } else {
+      // respaldo, por si por lo que sea la línea "COGS" no existiera todavía: se suman a
+      // mano sus 4 líneas de siempre.
+      let suma = 0;
+      ['Production Costs','Write-off Total','Missing stock','Packaging costs'].forEach(nombre=>{
+        const l = lines.find(x=>!x.esTitulo && x.name.trim()===nombre);
+        if(l) suma += Math.abs(pnlLineValueForBucket(l, b, allSalesLines, costHistory, otherCostHistory));
+      });
+      porBucket[b.label] = suma;
+    }
+  });
   return porBucket;
 }
 function calcularOtrosCostesTotalMensual(buckets){
@@ -7121,15 +7145,15 @@ function calcularOtrosCostesTotalMensual(buckets){
   });
   return porBucket;
 }
-/* convierte un mapa de importes € por bucket mensual a % sobre los ingresos Square+Efectivo
-   de ese mismo mes en Caja (si no hay balance guardado para ese mes, sale 0) */
-async function calcularPctSobreSquareMensual(buckets, porBucketEuros){
-  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+/* convierte un mapa de importes € por bucket mensual a % sobre las ventas netas del POS de
+   ese mismo mes — antes usaba el ingreso real de Caja, pero Square suele depositar en el
+   banco unos días después de la venta real, así que el % de un mes concreto podía subir o
+   bajar solo por ese desfase de cobro, sin que el coste real hubiera cambiado. */
+function calcularPctSobreVentasMensual(buckets, porBucketEuros){
   const resultado = {};
   buckets.forEach(b=>{
-    const mesCaja = STATE.caja.savedMonths.find(m=>m.month===b.label);
-    const ingresos = mesCaja ? cajaSquareIncomeDeMes(mesCaja) : 0;
-    resultado[b.label] = ingresos>0 ? +(porBucketEuros[b.label]/ingresos*100).toFixed(1) : 0;
+    const ventas = ventasNetasDelMes({month:b.label});
+    resultado[b.label] = ventas>0 ? +(porBucketEuros[b.label]/ventas*100).toFixed(1) : 0;
   });
   return resultado;
 }
@@ -7261,8 +7285,31 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     ]}, options:reLineOptionsLegend(true, mostrarUltimoValor) });
   } else if(typeId==='cogsTotal'){
     const buckets = monthBucketsInRange(desde, hasta);
-    const porBucket = calcularCogsTotalMensual(buckets);
+    const porBucket = await calcularCogsTotalMensual(buckets);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS total', buckets.map(b=>+porBucket[b.label].toFixed(2)), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
+  } else if(typeId==='inventoryStockUp'){
+    // misma fórmula que la tabla de PNL: COGS real de Caja (alimentos+bebidas) menos
+    // Production Costs + Write-off Total + Missing stock + Packaging costs — negativo
+    // significa que se ha consumido stock ese mes, positivo que se ha generado.
+    const buckets = monthBucketsInRange(desde, hasta);
+    await ensureDefaultPnlLines();
+    const lines = STATE.pnlLines||[];
+    const allSalesLines = getAllSalesLinesRaw();
+    const costHistory = buildCostHistoryMap();
+    const otherCostHistory = buildOtherCostHistoryMap();
+    const lineaProdCosts = lines.find(l=>!l.esTitulo && l.name==='Production Costs');
+    const lineaWriteOff = lines.find(l=>!l.esTitulo && l.name==='Write-off Total');
+    const lineaMissingStock = lines.find(l=>!l.esTitulo && l.name==='Missing stock');
+    const lineaPackaging = lines.find(l=>!l.esTitulo && l.name==='Packaging costs');
+    const datos = buckets.map(b=>{
+      const cogsTotal = cogsDesdeCaja(b);
+      const prodCosts = lineaProdCosts ? pnlLineValueForBucket(lineaProdCosts, b, allSalesLines, costHistory, otherCostHistory) : 0;
+      const writeOff = lineaWriteOff ? pnlLineValueForBucket(lineaWriteOff, b, allSalesLines, costHistory, otherCostHistory) : 0;
+      const missingStock = lineaMissingStock ? pnlLineValueForBucket(lineaMissingStock, b, allSalesLines, costHistory, otherCostHistory) : 0;
+      const packaging = lineaPackaging ? pnlLineValueForBucket(lineaPackaging, b, allSalesLines, costHistory, otherCostHistory) : 0;
+      return +(Math.abs(cogsTotal) - (Math.abs(prodCosts)+Math.abs(writeOff)+Math.abs(missingStock)+Math.abs(packaging))).toFixed(2);
+    });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Inventory stock up', datos, '#5B8C7A')] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='categoriasTendencia'){
     const buckets = monthBucketsInRange(desde, hasta);
     const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta);
@@ -7283,14 +7330,14 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes', buckets.map(b=>+porBucket[b.label].toFixed(2)), '#8B6A46')] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='cogsPctSquare'){
     const buckets = monthBucketsInRange(desde, hasta);
-    const porBucket = calcularCogsTotalMensual(buckets);
-    const porBucketPct = await calcularPctSobreSquareMensual(buckets, porBucket);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), c.copper)] }, options:reLineOptions('pct', mostrarUltimoValor) });
+    const porBucket = await calcularCogsTotalMensual(buckets);
+    const porBucketPct = await calcularPctSobreVentasMensual(buckets, porBucket);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('COGS (% ventas netas)', buckets.map(b=>porBucketPct[b.label]), c.copper)] }, options:reLineOptions('pct', mostrarUltimoValor) });
   } else if(typeId==='otrosCostesPctSquare'){
     const buckets = monthBucketsInRange(desde, hasta);
     const porBucket = calcularOtrosCostesTotalMensual(buckets);
-    const porBucketPct = await calcularPctSobreSquareMensual(buckets, porBucket);
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes (% Square+Efectivo)', buckets.map(b=>porBucketPct[b.label]), '#8B6A46')] }, options:reLineOptions('pct', mostrarUltimoValor) });
+    const porBucketPct = await calcularPctSobreVentasMensual(buckets, porBucket);
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Otros costes (% ventas netas)', buckets.map(b=>porBucketPct[b.label]), '#8B6A46')] }, options:reLineOptions('pct', mostrarUltimoValor) });
   } else if(typeId==='franjaVentas'){
     const d = calcularVentasPorFranjaPeriodo(desde, hasta);
     STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset('Ventas', d.data, c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
@@ -7333,7 +7380,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const enPct = !!(w && w.verEnPct);
     const mesesEnRango = cc.savedMonths.filter(m=>m.month>=desde.slice(0,7) && m.month<=hasta.slice(0,7));
     const labelsRango = mesesEnRango.map(m=>m.title||m.month);
-    const sqByMonth = {}; mesesEnRango.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+    const sqByMonth = {}; mesesEnRango.forEach(m=>{ sqByMonth[m.title||m.month] = ventasNetasDelMes(m); });
     const fuente = typeId==='cajaGastosCategoria' ? cajaDetalleCatData() : (typeId==='cajaGastosSubcategoria' ? cajaDetalleSubcatData() : cajaDetalleProvData());
     const claves = typeId==='cajaGastosCategoria' ? fuente.cats : (typeId==='cajaGastosSubcategoria' ? fuente.subcats : fuente.providers);
     const seleccionadas = claves.filter(k=>labelsRango.some(mes=>(fuente.table[k]?.[mes]?.euros||0)>0));
@@ -8103,8 +8150,15 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       chart.update('none');
       // se espera a que el navegador termine de repintar con el tamaño nuevo antes de
       // capturar — si no, con gráficos "responsive" a veces el propio Chart.js corrige el
-      // tamaño solo justo después de este cambio manual, y la captura sale en blanco o con
-      // el tamaño antiguo. Doble requestAnimationFrame = "después del próximo repintado".
+      // tamaño solo justo después de este cambio manual, y la captura sale en blanco, con
+      // el tamaño antiguo, o con las líneas/letras deformadas (a algunos gráficos concretos
+      // no les bastaba con una sola vuelta de espera, así que se repite dos veces seguidas
+      // — fuerza un segundo redibujado ya con el tamaño asentado del todo, no solo el
+      // primero, que a veces coincidía con el momento en que el navegador aún seguía
+      // ajustando el layout).
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      chart.resize(anchoCapturaPx, altoCapturaPx);
+      chart.update('none');
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const imgData = chart.toBase64Image();
       if(imgData && imgData.length > 200){
@@ -8679,7 +8733,7 @@ async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
   const labelsRango = mesesEnRango.map(m=>m.title||m.month);
   const enPct = !!w.cajaCategoriaEnPct;
   const sqByMonth = {};
-  if(enPct) mesesEnRango.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  if(enPct) mesesEnRango.forEach(m=>{ sqByMonth[m.title||m.month] = ventasNetasDelMes(m); });
   const datos = labelsRango.map(mes => {
     const euros = fuente.table[claveElegida]?.[mes]?.euros || 0;
     if(enPct){ const sq = sqByMonth[mes]||0; return sq>0 ? +(euros/sq*100).toFixed(1) : 0; }
@@ -8715,7 +8769,7 @@ async function renderCajaPieCategoriaWidgetInstance(w, buckets){
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type:'doughnut',
     data:{ labels, datasets:[{ data:values, backgroundColor:labels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-    options:{ responsive:true, maintainAspectRatio:false, layout:{padding:32}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+    options:{ responsive:true, maintainAspectRatio:false, layout:{padding:56}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
       tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)' } } } }
   });
 }
@@ -9193,20 +9247,20 @@ async function renderCostesExtra(desde, hasta){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'€'}, grid:{color:c.grid} } } }
   });
 
-  const porBucketCogs = calcularCogsTotalMensual(buckets);
-  const porBucketCogsPct = await calcularPctSobreSquareMensual(buckets, porBucketCogs);
+  const porBucketCogs = await calcularCogsTotalMensual(buckets);
+  const porBucketCogsPct = await calcularPctSobreVentasMensual(buckets, porBucketCogs);
   destroyChart('cogsPctSquare');
   STATE.charts.cogsPctSquare = safeNewChart('chartCogsPctSquare', {
     type: trendChartType(),
-    data:{ labels, datasets:[ trendDataset('COGS (% Square+Efectivo)', labels.map(l=>porBucketCogsPct[l]), c.copper) ] },
+    data:{ labels, datasets:[ trendDataset('COGS (% ventas netas)', labels.map(l=>porBucketCogsPct[l]), c.copper) ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
   });
 
-  const porBucketOtrosPct = await calcularPctSobreSquareMensual(buckets, porBucketOtros);
+  const porBucketOtrosPct = await calcularPctSobreVentasMensual(buckets, porBucketOtros);
   destroyChart('otrosCostesPctSquare');
   STATE.charts.otrosCostesPctSquare = safeNewChart('chartOtrosCostesPctSquare', {
     type: trendChartType(),
-    data:{ labels, datasets:[ trendDataset('Otros costes (% Square+Efectivo)', labels.map(l=>porBucketOtrosPct[l]), '#8B6A46') ] },
+    data:{ labels, datasets:[ trendDataset('Otros costes (% ventas netas)', labels.map(l=>porBucketOtrosPct[l]), '#8B6A46') ] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>v+'%'}, grid:{color:c.grid} } } }
   });
 }
@@ -11814,6 +11868,30 @@ function cajaPeriodoFiltrado(grafPeriod, grafFrom, grafTo){
     return true;
   });
 }
+/* ventas netas del POS para un mes de Caja (mismo formato {month:'YYYY-MM'} que usa Caja)
+   — se usa como denominador del "% sobre ventas" en vez del ingreso real de Caja, porque
+   Square suele depositar en el banco unos días después de la venta real (desfase de
+   fechas) — con la venta real del POS ese desfase desaparece, y es la cifra estándar que
+   se usa para este tipo de ratios de coste. */
+function ventasNetasDelMes(m){
+  const desde = m.month+'-01';
+  const d = new Date(m.month+'-01T00:00:00'); d.setMonth(d.getMonth()+1); d.setDate(0);
+  const hasta = fechaLocalISO(d);
+  let total = 0;
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const porTicket = {};
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
+      if(fecha<desde || fecha>hasta) return;
+      if(!porTicket[ticketIdx]) porTicket[ticketIdx] = { neto:0, tienePago:false };
+      porTicket[ticketIdx].neto += neto;
+      if(esPago) porTicket[ticketIdx].tienePago = true;
+    });
+    Object.values(porTicket).forEach(t=>{ if(t.tienePago) total += t.neto; });
+  }
+  return total;
+}
 function cajaSquareIncomeDeMes(m){
   const bruto = (m.movements||[]).filter(mv=>{
     if(mv.amount<0) return false;
@@ -11848,7 +11926,7 @@ function renderCajaTendenciasTab(el){
 
   const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod||'all', c.grafFrom, c.grafTo);
   const sqByMonth = {};
-  tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = ventasNetasDelMes(m); });
   const excludedCats = c.excludedCats||[];
   const toVal = (rawVal, month) => {
     if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0 ? +(rawVal/sq*100).toFixed(1) : 0; }
@@ -12127,7 +12205,7 @@ function renderCajaPieCharts(){
     STATE.charts['cajaPieCategoria_'+p.key] = safeNewChart('cajaPieCategoria_'+p.key, {
       type:'doughnut',
       data:{ labels:catLabels, datasets:[{ data:catValues, backgroundColor:catLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:24}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:56}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
         tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalCat*100).toFixed(1)+'%)' } } } }
     });
 
@@ -12138,7 +12216,7 @@ function renderCajaPieCharts(){
     STATE.charts['cajaPieSubcategoria_'+p.key] = safeNewChart('cajaPieSubcategoria_'+p.key, {
       type:'doughnut',
       data:{ labels:subLabels, datasets:[{ data:subValues, backgroundColor:subLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:24}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:56}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
         tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalSub*100).toFixed(1)+'%)' } } } }
     });
   });
@@ -12202,7 +12280,7 @@ function renderCajaGraficosGrid(){
   if(!gridEl) return;
   const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
   const periodMonthNames = tendPeriod.map(m=>m.title||m.month);
-  const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = ventasNetasDelMes(m); });
   const c2 = chartColors();
 
   if(c.detalleMode==='subcategoria'){
@@ -12497,7 +12575,7 @@ function renderCajaGruposSection(){
 
   const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
   const periodMonthNames = tendPeriod.map(m=>m.title||m.month);
-  const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
+  const sqByMonth = {}; tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = ventasNetasDelMes(m); });
   const c2 = chartColors();
 
   chartsEl.innerHTML = c.savedGroups.map(group=>`
