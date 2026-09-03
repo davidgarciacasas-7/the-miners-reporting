@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.254</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.255</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -6865,7 +6865,7 @@ const RE_WIDGET_TYPES = {
   cogsTotal:       { label:'Evolución del COGS total', tipo:'trend' },
   otrosCostesTotal:    { label:'Evolución de Otros costes (total)', tipo:'trend' },
   cogsPctSquare:       { label:'COGS como % de Ventas netas', tipo:'snapshot-async' },
-  inventoryStockUp:    { label:'PNL — Inventory stock up (mensual)', tipo:'trend' },
+  inventoryStockUp:    { label:'Balance de inventario (€)', tipo:'trend' },
   otrosCostesPctSquare:{ label:'Otros costes como % de Ventas netas', tipo:'snapshot-async' },
   franjaVentas:    { label:'Ventas por franja horaria', tipo:'snapshot' },
   diaSemanaVentas: { label:'Ventas por día de la semana', tipo:'snapshot' },
@@ -7309,7 +7309,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
       const packaging = lineaPackaging ? pnlLineValueForBucket(lineaPackaging, b, allSalesLines, costHistory, otherCostHistory) : 0;
       return +(Math.abs(cogsTotal) - (Math.abs(prodCosts)+Math.abs(writeOff)+Math.abs(missingStock)+Math.abs(packaging))).toFixed(2);
     });
-    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Inventory stock up', datos, '#5B8C7A')] }, options:reLineOptions(true, mostrarUltimoValor) });
+    STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:buckets.map(b=>b.label), datasets:[trendDataset('Balance de inventario', datos, '#5B8C7A')] }, options:reLineOptions(true, mostrarUltimoValor) });
   } else if(typeId==='categoriasTendencia'){
     const buckets = monthBucketsInRange(desde, hasta);
     const allLines = getAllSalesLinesRaw().filter(l=>l.fecha>=desde && l.fecha<=hasta);
