@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.259</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.261</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -6894,6 +6894,7 @@ const RE_WIDGET_TYPES = {
   cajaGastos:    { label:'Caja — Gastos totales por mes', tipo:'snapshot-async' },
   cajaIngresos:  { label:'Caja — Ingresos Square + Efectivo por mes', tipo:'snapshot-async' },
   cajaBalance:   { label:'Flujo de caja mensual', tipo:'snapshot-async' },
+  cajaBalancePct:{ label:'Flujo de caja mensual (% de Ventas netas)', tipo:'snapshot-async' },
   pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
   pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
   cajaCategoriaLinea: { label:'Caja — evolución de gasto por categoría (añade de golpe todas las que no tengas ocultas en Caja, en €)', tipo:'cajaCategoriaLinea' },
@@ -7164,6 +7165,11 @@ async function calcularCajaSerieMensual(desde, hasta, tipo){
   const data = mesesFiltrados.map(m=>{
     if(tipo==='gastos') return +Math.abs(m.totalExpense).toFixed(2);
     if(tipo==='ingresos') return +cajaSquareIncomeDeMes(m).toFixed(2);
+    if(tipo==='balancePct'){
+      const balance = cajaIngresoAjustado(m.totalIncome,m.month) + m.totalExpense;
+      const ventasNetas = ventasNetasDelMes(m);
+      return ventasNetas>0 ? +(balance/ventasNetas*100).toFixed(1) : 0;
+    }
     return +(cajaIngresoAjustado(m.totalIncome,m.month) + m.totalExpense).toFixed(2);
   });
   return { labels, data };
@@ -7460,14 +7466,14 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
         trendDataset('Con algo más', franjaOrder.map(f=>byFranja[f].noBebida), c.copper)
       ]}, options:reLineOptionsLegend(false, mostrarUltimoValor) });
     }
-  } else if(typeId==='cajaGastos' || typeId==='cajaIngresos' || typeId==='cajaBalance'){
-    const tipo = typeId==='cajaGastos'?'gastos':(typeId==='cajaIngresos'?'ingresos':'balance');
+  } else if(typeId==='cajaGastos' || typeId==='cajaIngresos' || typeId==='cajaBalance' || typeId==='cajaBalancePct'){
+    const tipo = typeId==='cajaGastos'?'gastos':(typeId==='cajaIngresos'?'ingresos':(typeId==='cajaBalancePct'?'balancePct':'balance'));
     const d = await calcularCajaSerieMensual(desde, hasta, tipo);
     const color = tipo==='gastos' ? '#C1613F' : (tipo==='ingresos' ? c.verdigris : c.copper);
     if(d.labels.length===0){
       destroyChart(chartKey);
     } else {
-      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(true, mostrarUltimoValor) });
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(tipo==='balancePct'?'pct':true, mostrarUltimoValor) });
     }
   }
 }
@@ -7548,11 +7554,13 @@ async function renderResumenEjecutivo(){
       </div>`;
     }
     if(w.typeId==='cajaCategoriaLinea'){
-      const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
-      const sufijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría, '+modoLabel : modoLabel;
+      const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : '';
+      const titulo = w.cajaCategoriaEnPct
+        ? `Flujo de Caja coste de ${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(% ventas netas)</span>`
+        : `Caja — ${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(€)</span>`;
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — ${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(${sufijo})</span></h3>
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${titulo}</h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
         ${w.cajaCategoriaEnPct ? '' : `<div id="cajaCatLineaStats_${w.instanceId}" class="hint" style="font-size:10.5px;margin-bottom:6px;"></div>`}
@@ -7826,9 +7834,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   // distinguir.
   function tituloWidgetPdf(w, type){
     if(w.typeId==='cajaCategoriaLinea'){
-      const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
-      const sufijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría, '+modoLabel : modoLabel;
-      return 'Caja — '+(w.cajaCategoriaNombre||'')+' ('+sufijo+')';
+      const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : '';
+      if(w.cajaCategoriaEnPct) return 'Flujo de Caja coste de '+tipoPrefijo+(w.cajaCategoriaNombre||'')+' (% ventas netas)';
+      return 'Caja — '+tipoPrefijo+(w.cajaCategoriaNombre||'')+' (€)';
     }
     if(w.typeId==='cajaPieCategoria'){
       const periodoLabel = {total:'Periodo total', '3m':'Últimos 3 meses', '1m':'Último mes'}[w.cajaPiePeriodo||'total'];
@@ -7890,7 +7898,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   });
   // ventas netas del POS por mes — se usan como denominador de los % de EBITDA y de Flujo
   // de caja de aquí abajo (distinto de "Ventas brutas totales", que es antes de descuentos)
-  const ventasNetasPorBucket = bucketsKpi.map(b => ventasNetasDelMes({month:b.label})/100);
+  const ventasNetasPorBucket = bucketsKpi.map(b => ventasNetasDelMes({month:b.label}));
 
   const nMeses = bucketsKpi.length;
   const sumaUltimosN = (arr,n) => nMeses>=1 ? arr.slice(-n).reduce((s,v)=>s+v,0) : null;
@@ -10516,6 +10524,8 @@ STATE.caja = {
   confirmDelete: null,
   showManualForm: false,
   manualForm: { concept:'', amount:'', category:'' },
+  showManualMovForm: false,
+  manualMovForm: { tipo:'gasto', concept:'', amount:'', fecha:'', category:'', subcategory:'' },
   tendView: 'abs',
   grafPeriod: 'all',
   grafFrom: '',
@@ -11134,6 +11144,48 @@ async function cajaApplyPending(){
   }
   renderCaja();
 }
+/* crea un movimiento manual completo (ingreso o gasto, con su propia fecha valor,
+   categoría y subcategoría) — pensado para gastos o ingresos que nunca van a aparecer en
+   el extracto del banco (una propina en efectivo, un ajuste, etc.) pero que sí quieres
+   que cuenten en el balance de ese mes. Usa fechaDia+month igual que cualquier otro
+   movimiento, así que cajaSaveMonth() ya lo reparte solo al balance que le corresponda —
+   no hace falta ninguna lógica nueva para "moverlo" al mes correcto. */
+async function cajaAddManualMovement(){
+  const c = STATE.caja;
+  const f = c.manualMovForm;
+  const amt = parseFloat(String(f.amount).replace(',','.'));
+  if(!f.concept.trim() || isNaN(amt) || amt===0 || !f.fecha || !f.category){
+    toast('Rellena concepto, importe, fecha y categoría.', true);
+    return;
+  }
+  if(!c.data){ toast('Primero sube o abre un balance en el que añadir este movimiento.', true); return; }
+  const newMov = {
+    id: 'manual_'+Date.now()+Math.random().toString(36).slice(2,6),
+    concept: f.concept.trim(),
+    amount: f.tipo==='ingreso' ? Math.abs(amt) : -Math.abs(amt),
+    fechaDia: f.fecha,
+    month: f.fecha.slice(0,7),
+    category: f.category,
+    subcategory: f.subcategory.trim()||undefined,
+    autoCat: false,
+    isManual: true,
+    needsManualCat: false,
+  };
+  const updated = [...(c.data.movements||[]), newMov];
+  c.data = { ...c.data, movements:updated, ...cajaRecompute(updated) };
+  c.manualMovForm = { tipo:'gasto', concept:'', amount:'', fecha:'', category:'', subcategory:'' };
+  c.showManualMovForm = false;
+  // igual que editar fecha/borrar: si se está editando un balance ya guardado, se guarda
+  // al momento — si es una subida nueva pendiente de guardar, se queda en local hasta que
+  // el usuario pulse "Guardar" explícitamente, como el resto de cambios de esa pantalla.
+  if(c.data.esEdicionExistente){
+    await cajaSaveMonth();
+    toast('Movimiento añadido y guardado ✓');
+  } else {
+    toast('Movimiento añadido — recuerda pulsar "Guardar" para que quede fijo.');
+    renderCaja();
+  }
+}
 function cajaAddManualCost(){
   const c = STATE.caja;
   const amt = parseFloat(String(c.manualForm.amount).replace(',','.'));
@@ -11447,7 +11499,29 @@ function renderCajaMovimientosTab(el){
   const totalFiltrado = filtered.reduce((s,m)=>s+m.amount,0);
   const totalIngresosFiltrado = filtered.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0);
   const totalGastosFiltrado = filtered.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
-  el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+  const f = c.manualMovForm;
+  const formManualHtml = !c.showManualMovForm
+    ? `<button class="btn secondary" id="cajaMostrarManualMovBtn" style="border:2px dashed var(--copper);width:100%;padding:10px 20px;margin-bottom:12px;">+ Añadir movimiento manual</button>`
+    : `<div class="card" style="border:2px solid var(--copper);margin-bottom:12px;">
+        <h3 style="margin-bottom:10px;">Añadir movimiento manual</h3>
+        <p class="hint" style="margin-bottom:10px;">Para un ingreso o gasto que nunca va a salir en el extracto del banco (una propina en efectivo, un ajuste…) pero que quieres que cuente en el balance de ese mes.</p>
+        <div style="display:flex;gap:10px;margin-bottom:10px;">
+          <button class="btn ${f.tipo==='gasto'?'':'secondary'}" data-manualmov-tipo="gasto" style="flex:1;">Gasto</button>
+          <button class="btn ${f.tipo==='ingreso'?'':'secondary'}" data-manualmov-tipo="ingreso" style="flex:1;">Ingreso</button>
+        </div>
+        <div class="grid two" style="margin-bottom:10px;">
+          <div class="config-field"><label>Concepto *</label><input type="text" id="cajaManualMovConcepto" value="${escapeHtml(f.concept)}" placeholder="Descripción…"></div>
+          <div class="config-field"><label>Importe (€) *</label><input type="text" id="cajaManualMovImporte" value="${f.amount}" placeholder="150,00"></div>
+          <div class="config-field"><label>Fecha valor *</label><input type="date" id="cajaManualMovFecha" value="${f.fecha}"></div>
+          <div class="config-field"><label>Categoría *</label><select id="cajaManualMovCategoria">
+            <option value="">— seleccionar —</option>${(f.tipo==='ingreso'?cajaIncCatOpts():cajaGasCatOpts()).map(o=>`<option value="${o}" ${o===f.category?'selected':''}>${o}</option>`).join('')}
+          </select></div>
+        </div>
+        <div class="config-field" style="margin-bottom:10px;"><label>Subcategoría (opcional)</label><input type="text" list="cajaSubcatDatalist" id="cajaManualMovSubcat" value="${escapeHtml(f.subcategory)}" placeholder="—"></div>
+        <button class="btn" id="cajaManualMovGuardarBtn">Añadir movimiento</button>
+        <button class="btn secondary" id="cajaManualMovCancelarBtn">Cancelar</button>
+      </div>`;
+  el.innerHTML = formManualHtml + `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="text" id="cajaBuscarInput" placeholder="Buscar…" value="${c.search}" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;width:100%;max-width:340px;">
         <select id="cajaTipoFiltro" style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;">
@@ -11489,6 +11563,39 @@ function renderCajaMovimientosTab(el){
       ${filtered.length===0?`<p class="hint" style="padding:40px 0;text-align:center;">Sin resultados</p>`:''}
     </div>`;
   attachCajaCatSelectHandlers(el);
+  const mostrarManualMovBtn = document.getElementById('cajaMostrarManualMovBtn');
+  if(mostrarManualMovBtn) mostrarManualMovBtn.addEventListener('click', ()=>{ c.showManualMovForm=true; renderCajaTabContent(); });
+  const cancelarManualMovBtn = document.getElementById('cajaManualMovCancelarBtn');
+  if(cancelarManualMovBtn) cancelarManualMovBtn.addEventListener('click', ()=>{ c.showManualMovForm=false; renderCajaTabContent(); });
+  el.querySelectorAll('[data-manualmov-tipo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      // se guarda lo que se hubiera escrito ya en el formulario antes de redibujar, para
+      // no perderlo al cambiar entre "Gasto"/"Ingreso" (la categoría se limpia, porque la
+      // lista de categorías disponibles cambia según el tipo)
+      c.manualMovForm = {
+        ...c.manualMovForm,
+        tipo: btn.getAttribute('data-manualmov-tipo'),
+        concept: document.getElementById('cajaManualMovConcepto')?.value ?? c.manualMovForm.concept,
+        amount: document.getElementById('cajaManualMovImporte')?.value ?? c.manualMovForm.amount,
+        fecha: document.getElementById('cajaManualMovFecha')?.value ?? c.manualMovForm.fecha,
+        subcategory: document.getElementById('cajaManualMovSubcat')?.value ?? c.manualMovForm.subcategory,
+        category: '',
+      };
+      renderCajaTabContent();
+    });
+  });
+  const guardarManualMovBtn = document.getElementById('cajaManualMovGuardarBtn');
+  if(guardarManualMovBtn) guardarManualMovBtn.addEventListener('click', ()=>{
+    c.manualMovForm = {
+      ...c.manualMovForm,
+      concept: document.getElementById('cajaManualMovConcepto').value,
+      amount: document.getElementById('cajaManualMovImporte').value,
+      fecha: document.getElementById('cajaManualMovFecha').value,
+      category: document.getElementById('cajaManualMovCategoria').value,
+      subcategory: document.getElementById('cajaManualMovSubcat').value,
+    };
+    cajaAddManualMovement();
+  });
   document.getElementById('cajaBuscarInput').addEventListener('input', (e)=>{
     c.search=e.target.value;
     const cursorPos = e.target.selectionStart;
@@ -11935,7 +12042,11 @@ function ventasNetasDelMes(m){
     });
     Object.values(porTicket).forEach(t=>{ if(t.tienePago) total += t.neto; });
   }
-  return total;
+  // los importes de las líneas de venta vienen en céntimos (igual que bruto/neto en el
+  // resto de la app) — se devuelve ya convertido a euros, para no tener que acordarse de
+  // dividir entre 100 en cada uno de los sitios donde se usa esta función como
+  // denominador de un %.
+  return total/100;
 }
 function cajaSquareIncomeDeMes(m){
   const bruto = (m.movements||[]).filter(mv=>{
@@ -11970,8 +12081,15 @@ function renderCajaTendenciasTab(el){
   if(c.savedMonths.length<2){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Necesitas al menos 2 balances guardados. Tienes '+c.savedMonths.length+'.</p>'; return; }
 
   const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod||'all', c.grafFrom, c.grafTo);
+  // ventas netas del POS — denominador del % en las 3 series (Gastos, Ingresos, Flujo de caja)
   const sqByMonth = {};
   tendPeriod.forEach(m=>{ sqByMonth[m.title||m.month] = ventasNetasDelMes(m); });
+  // ingreso REAL de Caja (Square+Efectivo, tal cual entra en el banco) — esto es distinto
+  // de las ventas netas de arriba (que es lo que dice el POS, sin el desfase de cuándo se
+  // deposita de verdad) — se usa para el VALOR de la propia serie "Ingresos", no como
+  // denominador de nada.
+  const ingresosCajaByMonth = {};
+  tendPeriod.forEach(m=>{ ingresosCajaByMonth[m.title||m.month] = cajaSquareIncomeDeMes(m); });
   const excludedCats = c.excludedCats||[];
   const toVal = (rawVal, month) => {
     if(c.tendView==='pct'){ const sq=sqByMonth[month]||0; return sq>0 ? +(rawVal/sq*100).toFixed(1) : 0; }
@@ -11990,8 +12108,8 @@ function renderCajaTendenciasTab(el){
     { title:'Gastos totales'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':'')+nominaTitleSuffix, color:'var(--negative)', colorHex:'#C1613F',
       data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(gastosDeMes(m), m.title||m.month) })) },
     { title:'Ingresos Square + Efectivo', color:'var(--positive)', colorHex:'#3DD68C',
-      data: tendPeriod.map(m=>({ month:m.title||m.month, value: c.tendView==='pct' ? 100 : (sqByMonth[m.title||m.month]||0) })) },
-    { title:'Balance mensual'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':'')+nominaTitleSuffix, color:'var(--copper)', colorHex:'#C17F3C',
+      data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(ingresosCajaByMonth[m.title||m.month]||0, m.title||m.month) })) },
+    { title:'Flujo de caja'+(excludedCats.length>0?' (excl. '+excludedCats.length+' cat.)':'')+nominaTitleSuffix, color:'var(--copper)', colorHex:'#C17F3C',
       data: tendPeriod.map(m=>({ month:m.title||m.month, value: toVal(cajaIngresoAjustado(m.totalIncome,m.month)-gastosDeMes(m), m.title||m.month) })) },
   ];
 
@@ -12000,7 +12118,7 @@ function renderCajaTendenciasTab(el){
     <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
       <span class="hint">Ver como:</span>
       <button class="btn ${c.tendView!=='pct'?'':'secondary'}" data-tend-view="abs" style="padding:6px 14px;font-size:12px;">€ Euros</button>
-      <button class="btn ${c.tendView==='pct'?'':'secondary'}" data-tend-view="pct" style="padding:6px 14px;font-size:12px;">% sobre Square</button>
+      <button class="btn ${c.tendView==='pct'?'':'secondary'}" data-tend-view="pct" style="padding:6px 14px;font-size:12px;">% sobre ventas netas</button>
     </div>
     <div class="card" style="margin-bottom:16px;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <span class="hint">Categoría de nóminas:</span>
