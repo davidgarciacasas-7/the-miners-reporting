@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.249</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.251</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7802,7 +7802,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     // ocupando toda la fila, cuando la mayoría se veían bien a media página.
     const necesitaFilaCompleta = !!(chart && (esCircular || (chart.config.data?.datasets?.length>2)));
     const chartWLocal = necesitaFilaCompleta ? (W-margin*2)*0.9 : chartW;
-    const chartHLocal = necesitaFilaCompleta ? chartWLocal*(esCircular?0.62:0.48) : chartH;
+    const chartHLocal = necesitaFilaCompleta ? chartWLocal*(esCircular?0.58:0.48) : chartH;
     return { chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal };
   }
 
@@ -8094,8 +8094,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const canvasEl = chart.canvas, wrapEl = canvasEl.parentElement;
       const canvasMaxWidthOriginal = canvasEl.style.maxWidth;
       const wrapHeightOriginal = wrapEl ? wrapEl.style.height : null;
+      const wrapWidthOriginal = wrapEl ? wrapEl.style.width : null;
       canvasEl.style.maxWidth = 'none';
-      if(wrapEl) wrapEl.style.height = altoCapturaPx+'px';
+      if(wrapEl){ wrapEl.style.height = altoCapturaPx+'px'; wrapEl.style.width = anchoCapturaPx+'px'; }
       chart.options.devicePixelRatio = 3;
       chart.options.responsive = false;
       chart.resize(anchoCapturaPx, altoCapturaPx);
@@ -8114,7 +8115,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       chart.options.devicePixelRatio = dprOriginal;
       chart.options.responsive = responsiveOriginal;
       canvasEl.style.maxWidth = canvasMaxWidthOriginal;
-      if(wrapEl) wrapEl.style.height = wrapHeightOriginal;
+      if(wrapEl){ wrapEl.style.height = wrapHeightOriginal; wrapEl.style.width = wrapWidthOriginal; }
       chart.resize();
       chart.update('none');
     }
@@ -8714,7 +8715,7 @@ async function renderCajaPieCategoriaWidgetInstance(w, buckets){
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type:'doughnut',
     data:{ labels, datasets:[{ data:values, backgroundColor:labels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+    options:{ responsive:true, maintainAspectRatio:false, layout:{padding:32}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
       tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)' } } } }
   });
 }
@@ -12126,7 +12127,7 @@ function renderCajaPieCharts(){
     STATE.charts['cajaPieCategoria_'+p.key] = safeNewChart('cajaPieCategoria_'+p.key, {
       type:'doughnut',
       data:{ labels:catLabels, datasets:[{ data:catValues, backgroundColor:catLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:24}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
         tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalCat*100).toFixed(1)+'%)' } } } }
     });
 
@@ -12137,7 +12138,7 @@ function renderCajaPieCharts(){
     STATE.charts['cajaPieSubcategoria_'+p.key] = safeNewChart('cajaPieSubcategoria_'+p.key, {
       type:'doughnut',
       data:{ labels:subLabels, datasets:[{ data:subValues, backgroundColor:subLabels.map((_,i)=>CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length]) }] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ ...cajaPieDatalabelsPlugins(c2),
+      options:{ responsive:true, maintainAspectRatio:false, layout:{padding:24}, plugins:{ ...cajaPieDatalabelsPlugins(c2),
         tooltip:{ callbacks:{ label:(ctx)=> ctx.label+': '+cajaFmt(-ctx.parsed)+' ('+(ctx.parsed/totalSub*100).toFixed(1)+'%)' } } } }
     });
   });
