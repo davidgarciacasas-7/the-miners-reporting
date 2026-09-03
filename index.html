@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.255</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.259</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -515,10 +515,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card"><div class="chart-wrap"><canvas id="chartPnlLinea"></canvas></div></div>
 
         <div class="section-title">Evolución del EBITDA (siempre mensual)</div>
-        <p class="hint" style="margin-bottom:10px;">Si tienes una línea llamada exactamente "EBITDA" (por ejemplo, subida a mano con "Importar mi propio PNL"), se usa esa. Si no, se calcula como Total ingresos − Total costes de cada mes (el "Resultado"). El % se calcula sobre la línea "Ventas" del mismo mes. Usa siempre el mismo periodo Desde/Hasta que la tabla de arriba, en mensual, aunque la tabla esté en vista semanal.</p>
+        <p class="hint" style="margin-bottom:10px;">Si tienes una línea llamada exactamente "EBITDA" (por ejemplo, subida a mano con "Importar mi propio PNL"), se usa esa. Si no, se calcula como Total ingresos − Total costes de cada mes (el "Resultado"). El % se calcula sobre las ventas netas (después de descuentos) del mismo mes. Usa siempre el mismo periodo Desde/Hasta que la tabla de arriba, en mensual, aunque la tabla esté en vista semanal.</p>
         <div class="grid split" style="margin-bottom:26px;">
           <div class="card"><h3>EBITDA mensual (€)</h3><div class="chart-wrap"><canvas id="chartEbitdaEuros"></canvas></div></div>
-          <div class="card"><h3>EBITDA mensual (% de Ventas)</h3><div class="chart-wrap"><canvas id="chartEbitdaPct"></canvas></div></div>
+          <div class="card"><h3>EBITDA mensual (% de Ventas netas)</h3><div class="chart-wrap"><canvas id="chartEbitdaPct"></canvas></div></div>
         </div>
       </div>
 
@@ -6885,7 +6885,7 @@ const RE_WIDGET_TYPES = {
   cajaTartaCategoria:     { label:'Caja — Reparto de gastos por categoría (mes)', tipo:'snapshot' },
   cajaTartaSubcategoria:  { label:'Caja — Reparto de gastos por subcategoría (mes)', tipo:'snapshot' },
   ebitdaEuros: { label:'EBITDA mensual (€)', tipo:'trend' },
-  ebitdaPct:   { label:'EBITDA mensual (% de Ventas)', tipo:'trend' },
+  ebitdaPct:   { label:'EBITDA mensual (% de Ventas netas)', tipo:'trend' },
   perfFidelidadNueva:  { label:'Performance — Tarjetas de fidelidad nuevas', tipo:'trend' },
   perfNoBebidaLVAbs:   { label:'Performance — Tickets con algo más, L-V (nº)', tipo:'snapshot' },
   perfNoBebidaLVPct:   { label:'Performance — Tickets con algo más, L-V (%)', tipo:'snapshot' },
@@ -6893,7 +6893,7 @@ const RE_WIDGET_TYPES = {
   perfNoBebidaSDPct:   { label:'Performance — Tickets con algo más, S-D (%)', tipo:'snapshot' },
   cajaGastos:    { label:'Caja — Gastos totales por mes', tipo:'snapshot-async' },
   cajaIngresos:  { label:'Caja — Ingresos Square + Efectivo por mes', tipo:'snapshot-async' },
-  cajaBalance:   { label:'Caja — Balance mensual', tipo:'snapshot-async' },
+  cajaBalance:   { label:'Flujo de caja mensual', tipo:'snapshot-async' },
   pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
   pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
   cajaCategoriaLinea: { label:'Caja — evolución de gasto por categoría (añade de golpe todas las que no tengas ocultas en Caja, en €)', tipo:'cajaCategoriaLinea' },
@@ -7418,7 +7418,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     const allSalesLinesPnl = getAllSalesLinesRaw();
     const bucketsMes = monthBucketsInRange(desde, hasta);
     const lineaEbitda = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
-    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Gross Sales');
+    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Net Sales');
     let ebitdaPorMes;
     if(lineaEbitda){
       ebitdaPorMes = bucketsMes.map(b=>pnlLineValueForBucket(lineaEbitda, b, allSalesLinesPnl, costHistory, otherCostHistory));
@@ -7437,7 +7437,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     } else {
       const ventasPorMes = bucketsMes.map(b=> lineaVentas ? pnlLineValueForBucket(lineaVentas, b, allSalesLinesPnl, costHistory, otherCostHistory) : 0);
       const pctPorMes = ebitdaPorMes.map((v,i)=> ventasPorMes[i]>0 ? +(v/ventasPorMes[i]*100).toFixed(1) : 0);
-      STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:bucketsMes.map(b=>b.label), datasets:[trendDataset('EBITDA (% de Ventas)', pctPorMes, '#4C8272')] }, options:reLineOptions('pct', mostrarUltimoValor) });
+      STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:bucketsMes.map(b=>b.label), datasets:[trendDataset('EBITDA (% de Ventas netas)', pctPorMes, '#4C8272')] }, options:reLineOptions('pct', mostrarUltimoValor) });
     }
   } else if(typeId==='perfFidelidadNueva'){
     const buckets = monthBucketsInRange(desde, hasta);
@@ -7551,10 +7551,11 @@ async function renderResumenEjecutivo(){
       const modoLabel = w.cajaCategoriaEnPct ? '% de ventas' : '€';
       const sufijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría, '+modoLabel : modoLabel;
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
           <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — ${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(${sufijo})</span></h3>
           <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
+        ${w.cajaCategoriaEnPct ? '' : `<div id="cajaCatLineaStats_${w.instanceId}" class="hint" style="font-size:10.5px;margin-bottom:6px;"></div>`}
         <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
       </div>`;
     }
@@ -7887,6 +7888,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     if(!entry) return 0;
     return cajaIngresoAjustado(entry.totalIncome, entry.month) + entry.totalExpense;
   });
+  // ventas netas del POS por mes — se usan como denominador de los % de EBITDA y de Flujo
+  // de caja de aquí abajo (distinto de "Ventas brutas totales", que es antes de descuentos)
+  const ventasNetasPorBucket = bucketsKpi.map(b => ventasNetasDelMes({month:b.label})/100);
 
   const nMeses = bucketsKpi.length;
   const sumaUltimosN = (arr,n) => nMeses>=1 ? arr.slice(-n).reduce((s,v)=>s+v,0) : null;
@@ -7895,18 +7899,24 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const valorMesAnterior = (arr) => nMeses>=2 ? arr[nMeses-2] : null;
   // ticket medio no se promedia — se recalcula como ventas/tickets de cada periodo
   const tm = (v,t) => (v!==null && t!==null && t>0) ? v/t : null;
+  // % de un valor sobre las ventas netas de ese mismo periodo (para EBITDA % y Flujo de caja %)
+  const pctSobreVentasNetas = (v,ventasNetas) => (v!==null && ventasNetas!==null && ventasNetas!==0) ? (v/ventasNetas*100) : null;
 
   const ventasUltimoMes=valorUltimoMes(ventasPorBucket), ventasMesAnterior=valorMesAnterior(ventasPorBucket), ventasUltimos3=sumaUltimosN(ventasPorBucket,3), ventas3Anteriores=sumaAnterioresN(ventasPorBucket,3), ventasTotalPeriodo=ventasPorBucket.reduce((s,v)=>s+v,0);
   const ticketsUltimoMes=valorUltimoMes(ticketsPorBucket), ticketsMesAnterior=valorMesAnterior(ticketsPorBucket), ticketsUltimos3=sumaUltimosN(ticketsPorBucket,3), tickets3Anteriores=sumaAnterioresN(ticketsPorBucket,3), ticketsTotalPeriodo=ticketsPorBucket.reduce((s,v)=>s+v,0);
   const ebitdaUltimoMes=valorUltimoMes(ebitdaPorBucket), ebitdaMesAnterior=valorMesAnterior(ebitdaPorBucket), ebitdaUltimos3=sumaUltimosN(ebitdaPorBucket,3), ebitda3Anteriores=sumaAnterioresN(ebitdaPorBucket,3), ebitdaTotalPeriodo=ebitdaPorBucket.reduce((s,v)=>s+v,0);
   const balanceUltimoMes=valorUltimoMes(balancePorBucket), balanceMesAnterior=valorMesAnterior(balancePorBucket), balanceUltimos3=sumaUltimosN(balancePorBucket,3), balance3Anteriores=sumaAnterioresN(balancePorBucket,3), balanceTotalPeriodo=balancePorBucket.reduce((s,v)=>s+v,0);
+  const ventasNetasUltimoMes=valorUltimoMes(ventasNetasPorBucket), ventasNetasMesAnterior=valorMesAnterior(ventasNetasPorBucket), ventasNetasUltimos3=sumaUltimosN(ventasNetasPorBucket,3), ventasNetas3Anteriores=sumaAnterioresN(ventasNetasPorBucket,3), ventasNetasTotalPeriodo=ventasNetasPorBucket.reduce((s,v)=>s+v,0);
 
+  const fmtPct = (v)=>v.toFixed(1)+'%';
   const filasKpi = [
-    { etiqueta:'Ventas totales', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:ventasUltimoMes, mesAnterior:ventasMesAnterior, ultimos3:ventasUltimos3, anteriores3:ventas3Anteriores, total:ventasTotalPeriodo },
+    { etiqueta:'Ventas brutas totales', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:ventasUltimoMes, mesAnterior:ventasMesAnterior, ultimos3:ventasUltimos3, anteriores3:ventas3Anteriores, total:ventasTotalPeriodo },
     { etiqueta:'Nº de tickets', fmt:(v)=>String(Math.round(v)), ultimoMes:ticketsUltimoMes, mesAnterior:ticketsMesAnterior, ultimos3:ticketsUltimos3, anteriores3:tickets3Anteriores, total:ticketsTotalPeriodo },
     { etiqueta:'Ticket medio', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:tm(ventasUltimoMes,ticketsUltimoMes), mesAnterior:tm(ventasMesAnterior,ticketsMesAnterior), ultimos3:tm(ventasUltimos3,ticketsUltimos3), anteriores3:tm(ventas3Anteriores,tickets3Anteriores), total:tm(ventasTotalPeriodo,ticketsTotalPeriodo) },
     { etiqueta:'Resultado (EBITDA)', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:ebitdaUltimoMes, mesAnterior:ebitdaMesAnterior, ultimos3:ebitdaUltimos3, anteriores3:ebitda3Anteriores, total:ebitdaTotalPeriodo },
-    { etiqueta:'Balance de Caja', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:balanceUltimoMes, mesAnterior:balanceMesAnterior, ultimos3:balanceUltimos3, anteriores3:balance3Anteriores, total:balanceTotalPeriodo },
+    { etiqueta:'EBITDA (% de ventas netas)', fmt:fmtPct, ultimoMes:pctSobreVentasNetas(ebitdaUltimoMes,ventasNetasUltimoMes), mesAnterior:pctSobreVentasNetas(ebitdaMesAnterior,ventasNetasMesAnterior), ultimos3:pctSobreVentasNetas(ebitdaUltimos3,ventasNetasUltimos3), anteriores3:pctSobreVentasNetas(ebitda3Anteriores,ventasNetas3Anteriores), total:pctSobreVentasNetas(ebitdaTotalPeriodo,ventasNetasTotalPeriodo) },
+    { etiqueta:'Flujo de caja', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:balanceUltimoMes, mesAnterior:balanceMesAnterior, ultimos3:balanceUltimos3, anteriores3:balance3Anteriores, total:balanceTotalPeriodo },
+    { etiqueta:'Flujo de caja (% de Ventas netas)', fmt:fmtPct, ultimoMes:pctSobreVentasNetas(balanceUltimoMes,ventasNetasUltimoMes), mesAnterior:pctSobreVentasNetas(balanceMesAnterior,ventasNetasMesAnterior), ultimos3:pctSobreVentasNetas(balanceUltimos3,ventasNetasUltimos3), anteriores3:pctSobreVentasNetas(balance3Anteriores,ventasNetas3Anteriores), total:pctSobreVentasNetas(balanceTotalPeriodo,ventasNetasTotalPeriodo) },
   ];
 
   // helper: diferencia en valor y % entre un periodo y el anterior — null si no hay datos
@@ -7996,11 +8006,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         if(siguiente.typeId==='pnl') altoSiguiente = 60;
         else {
           const infoSig = infoTamanoWidgetPdf(siguiente);
+          const extraSig = (siguiente.typeId==='cajaCategoriaLinea' && !siguiente.cajaCategoriaEnPct) ? 5 : 0;
           // si el gráfico del siguiente widget todavía no existe en este momento (por lo
           // que sea), no se puede saber su tamaño real con seguridad — se reserva el
           // máximo posible (una tarta a toda la página) en vez de arriesgarse a reservar
           // de menos y dejar la página casi en blanco.
-          altoSiguiente = (infoSig.chart ? infoSig.chartHLocal : (W-margin*2)*0.62) + 12;
+          altoSiguiente = (infoSig.chart ? infoSig.chartHLocal : (W-margin*2)*0.62) + extraSig + 12;
         }
       }
       if(y + altoTexto + altoSiguiente > yLimite) nuevaPagina();
@@ -8103,14 +8114,27 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     // ensanchan a todo el ancho de la página — con solo media página, las cifras y la
     // leyenda se aplastaban y se cortaban por los bordes.
     const {chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal} = infoTamanoWidgetPdf(w);
+    // en los gráficos de línea de Caja en € (no en %), se añade un renglón con la media
+    // del periodo, la media de los últimos 3 meses y el valor del último mes — como texto
+    // aparte, nunca tocando la imagen del propio gráfico.
+    let statsCajaTexto = null;
+    if(w.typeId==='cajaCategoriaLinea' && !w.cajaCategoriaEnPct && chart){
+      const s = statsLineaCajaEuros(chart.data.datasets[0]?.data||[]);
+      if(s) statsCajaTexto = `Media periodo: ${eur(Math.round(s.mediaPeriodo*100))}   ·   Media últ. 3 meses: ${eur(Math.round(s.media3m*100))}   ·   Último mes: ${eur(Math.round(s.ultimoMes*100))}`;
+    }
+    const altoExtra = statsCajaTexto ? 5 : 0;
     if(necesitaFilaCompleta && colPendiente){ y += chartH + 16; colPendiente = null; }
-    if(!colPendiente && y + chartHLocal + 12 > yLimite) nuevaPagina();
+    if(!colPendiente && y + chartHLocal + altoExtra + 12 > yLimite) nuevaPagina();
     const x = colPendiente ? colPendiente.x : (necesitaFilaCompleta ? margin+((W-margin*2)-chartWLocal)/2 : margin);
     // tarjeta clara con un borde sutil, para que el gráfico quede "enmarcado"
     doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
-    doc.roundedRect(x-3, y-2, chartWLocal+6, chartHLocal+15, 2, 2);
+    doc.roundedRect(x-3, y-2, chartWLocal+6, chartHLocal+15+altoExtra, 2, 2);
     doc.setFontSize(11); doc.setTextColor(...NEGRO); doc.setFont('helvetica','bold');
     doc.text(tituloWidgetPdf(w, type), x, y+5);
+    if(statsCajaTexto){
+      doc.setFontSize(8); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
+      doc.text(statsCajaTexto, x, y+9.5);
+    }
     if(chart){
       // se redimensiona el propio gráfico EXPLÍCITAMENTE al ancho apaisado que le toca en
       // el PDF justo antes de capturarlo (si no, sale con la proporción que tuviera en
@@ -8162,9 +8186,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const imgData = chart.toBase64Image();
       if(imgData && imgData.length > 200){
-        doc.addImage(imgData, 'PNG', x, y+9, chartWLocal, chartHLocal);
+        doc.addImage(imgData, 'PNG', x, y+9+altoExtra, chartWLocal, chartHLocal);
       } else {
-        doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartWLocal,chartHLocal);
+        doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoExtra,chartWLocal,chartHLocal);
       }
       chart.options.devicePixelRatio = dprOriginal;
       chart.options.responsive = responsiveOriginal;
@@ -8173,11 +8197,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       chart.resize();
       chart.update('none');
     }
-    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartWLocal,chartHLocal); }
+    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoExtra,chartWLocal,chartHLocal); }
 
-    if(necesitaFilaCompleta){ y += chartHLocal + 16; }
-    else if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
-    else { colPendiente = null; y += chartH + 16; }
+    if(necesitaFilaCompleta){ y += chartHLocal + altoExtra + 16; }
+    else if(!colPendiente){ colPendiente = { x: margin+chartW+8, altoExtra }; }
+    else { const altoExtraFila = Math.max(colPendiente.altoExtra||0, altoExtra); colPendiente = null; y += chartH + altoExtraFila + 16; }
   }
 
   doc.putTotalPages('{total_pages_count_string}');
@@ -8718,6 +8742,20 @@ async function renderPnlLineaWidgetInstance(w, buckets){
    todas juntas en el mismo gráfico) y muestra solo esa, en el mismo periodo que el resto
    de Resumen Ejecutivo — los mismos gráficos individuales por categoría que se ven en
    Caja → Gráficos → Por categoría, aquí eligiendo cuál en vez de verlas todas a la vez. */
+/* media periodo total / media últimos 3 meses / valor último mes, a partir de un array de
+   valores mensuales en euros (en el mismo orden que aparecen en el gráfico) — se usa como
+   texto de apoyo en los gráficos de línea de Caja en €, para dar una lectura rápida sin
+   tener que leer todo el gráfico punto a punto. Solo tiene sentido en € (en %, promediar
+   porcentajes de meses con bases distintas no da una cifra útil). */
+function statsLineaCajaEuros(valores){
+  if(!valores || valores.length===0) return null;
+  const n = valores.length;
+  const mediaPeriodo = valores.reduce((s,v)=>s+v,0)/n;
+  const ultimos3 = valores.slice(-3);
+  const media3m = ultimos3.reduce((s,v)=>s+v,0)/ultimos3.length;
+  const ultimoMes = valores[n-1];
+  return { mediaPeriodo, media3m, ultimoMes };
+}
 async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
   const canvas = document.getElementById('chartReW_'+w.instanceId);
   if(!canvas) return;
@@ -8740,6 +8778,13 @@ async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
     return +euros.toFixed(2);
   });
   const color = enPct ? '#5B8C7A' : c.copper;
+  if(!enPct){
+    const statsEl = document.getElementById('cajaCatLineaStats_'+w.instanceId);
+    if(statsEl){
+      const s = statsLineaCajaEuros(datos);
+      statsEl.textContent = s ? `Media periodo: ${eur(Math.round(s.mediaPeriodo*100))} · Media últ. 3 meses: ${eur(Math.round(s.media3m*100))} · Último mes: ${eur(Math.round(s.ultimoMes*100))}` : '';
+    }
+  }
   STATE.charts['reW_'+w.instanceId] = safeNewChart('chartReW_'+w.instanceId, {
     type: trendChartType(),
     data:{ labels: labelsRango, datasets:[ trendDataset(claveElegida, datos, color) ] },
@@ -9146,7 +9191,7 @@ async function renderPnl(){
   if(ebitdaCanvas){
     const bucketsMes = monthBucketsInRange(desde, hasta);
     const lineaEbitda = lines.find(l=>!l.esTitulo && l.name.trim().toLowerCase()==='ebitda');
-    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Gross Sales');
+    const lineaVentas = lines.find(l=>l.esAuto && l.name==='Net Sales');
     let ebitdaPorMes;
     if(lineaEbitda){
       // hay una línea llamada exactamente "EBITDA" (ej. subida a mano con "Importar mi
@@ -9177,7 +9222,7 @@ async function renderPnl(){
     destroyChart('ebitdaPct');
     STATE.charts.ebitdaPct = safeNewChart('chartEbitdaPct', {
       type: trendChartType(),
-      data:{ labels:bucketsMes.map(b=>b.label), datasets:[ trendDataset('EBITDA (% de Ventas)', pctPorMes, '#4C8272') ] },
+      data:{ labels:bucketsMes.map(b=>b.label), datasets:[ trendDataset('EBITDA (% de Ventas netas)', pctPorMes, '#4C8272') ] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:cEbitda.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:cEbitda.muted, callback:v=>v+'%'}, grid:{color:cEbitda.grid} } } }
     });
   }
@@ -12293,10 +12338,12 @@ function renderCajaGraficosGrid(){
     if(c.detalleSubcatSelected){
       const totalDest = periodMonthNames.reduce((s,m)=>s+getSubcatEuros(c.detalleSubcatSelected,m),0);
       const mediaDest = periodMonthNames.length ? totalDest/periodMonthNames.length : 0;
+      const statsDest = statsLineaCajaEuros(periodMonthNames.map(m=>getSubcatEuros(c.detalleSubcatSelected,m)));
       html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleSubcatSelected}</div><button class="btn secondary" id="cajaCerrarSubcatDest" style="padding:3px 8px;font-size:11px;">✕</button></div>
         <div class="hint" style="margin-bottom:10px;font-size:11px;">Media mensual: <b style="color:var(--text);">${cajaFmt(mediaDest)}</b> &nbsp;·&nbsp; Total gasto en período: <b style="color:var(--text);">${cajaFmt(totalDest)}</b></div>
         <div class="hint" style="font-size:10px;margin-bottom:2px;">En euros</div>
+        ${statsDest ? `<div class="hint" style="font-size:10px;margin-bottom:4px;">Media periodo: <b style="color:var(--text);">${cajaFmt(statsDest.mediaPeriodo)}</b> · Media últ. 3 meses: <b style="color:var(--text);">${cajaFmt(statsDest.media3m)}</b> · Último mes: <b style="color:var(--text);">${cajaFmt(statsDest.ultimoMes)}</b></div>` : ''}
         <div class="chart-wrap" style="height:150px;margin-bottom:10px;"><canvas id="cajaSubcatDestacado"></canvas></div>
         <div class="hint" style="font-size:10px;margin-bottom:2px;">% sobre ventas (Square + efectivo) del mes</div>
         <div class="chart-wrap" style="height:150px;"><canvas id="cajaSubcatDestacadoPct"></canvas></div>
@@ -12306,10 +12353,12 @@ function renderCajaGraficosGrid(){
     subcats.forEach((sc,si)=>{
       const total = periodMonthNames.reduce((s,m)=>s+getSubcatEuros(sc,m),0);
       const media = periodMonthNames.length ? total/periodMonthNames.length : 0;
+      const statsMini = statsLineaCajaEuros(periodMonthNames.map(m=>getSubcatEuros(sc,m)));
       html += `<div class="card" data-select-subcat="${sc.replace(/"/g,'&quot;')}" style="cursor:pointer;border:1px solid ${c.detalleSubcatSelected===sc?'var(--copper)':'var(--line)'};">
         <div style="color:${c.detalleSubcatSelected===sc?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;margin-bottom:6px;">${sc}</div>
         <div class="hint" style="font-size:10px;margin-bottom:8px;">Media mensual: <b style="color:var(--text);">${cajaFmt(media)}</b> · Total: <b style="color:var(--text);">${cajaFmt(total)}</b></div>
         <div class="hint" style="font-size:9px;margin-bottom:1px;">€ en el mes</div>
+        ${statsMini ? `<div class="hint" style="font-size:8.5px;margin-bottom:3px;">Periodo: ${cajaFmt(statsMini.mediaPeriodo)} · 3m: ${cajaFmt(statsMini.media3m)} · Últ.: ${cajaFmt(statsMini.ultimoMes)}</div>` : ''}
         <div class="chart-wrap" style="height:90px;margin-bottom:6px;"><canvas id="cajaSubcatMini_${si}"></canvas></div>
         <div class="hint" style="font-size:9px;margin-bottom:1px;">% sobre ventas del mes</div>
         <div class="chart-wrap" style="height:90px;"><canvas id="cajaSubcatMiniPct_${si}"></canvas></div>
@@ -12375,11 +12424,13 @@ function renderCajaGraficosGrid(){
     if(c.detalleCatSelected){
       const totalDest = periodMonthNames.reduce((s,m)=>s+getEuros(c.detalleCatSelected,m),0);
       const mediaDest = periodMonthNames.length ? totalDest/periodMonthNames.length : 0;
+      const statsDest = statsLineaCajaEuros(periodMonthNames.map(m=>getEuros(c.detalleCatSelected,m)));
       html += `<div class="card" style="border:1px solid var(--copper)55;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><div style="color:var(--copper);font-weight:700;font-size:13px;">${c.detalleCatSelected}</div>
         <div style="display:flex;gap:6px;align-items:center;"><span id="cajaCatDestTendBtns" style="display:flex;gap:4px;"></span><button class="btn secondary" id="cajaCerrarCatDest" style="padding:3px 8px;font-size:11px;">✕</button></div></div>
         <div class="hint" style="margin-bottom:10px;font-size:11px;">Media mensual: <b style="color:var(--text);">${cajaFmt(mediaDest)}</b> &nbsp;·&nbsp; Total gasto en período: <b style="color:var(--text);">${cajaFmt(totalDest)}</b></div>
         <div class="hint" style="font-size:10px;margin-bottom:2px;">En euros</div>
+        ${statsDest ? `<div class="hint" style="font-size:10px;margin-bottom:4px;">Media periodo: <b style="color:var(--text);">${cajaFmt(statsDest.mediaPeriodo)}</b> · Media últ. 3 meses: <b style="color:var(--text);">${cajaFmt(statsDest.media3m)}</b> · Último mes: <b style="color:var(--text);">${cajaFmt(statsDest.ultimoMes)}</b></div>` : ''}
         <div class="chart-wrap" style="height:150px;margin-bottom:10px;"><canvas id="cajaCatDestacado"></canvas></div>
         <div class="hint" style="font-size:10px;margin-bottom:2px;">% sobre ventas (Square + efectivo) del mes</div>
         <div class="chart-wrap" style="height:150px;"><canvas id="cajaCatDestacadoPct"></canvas></div>
@@ -12389,6 +12440,7 @@ function renderCajaGraficosGrid(){
     cats.forEach((cat,ci)=>{
       const total = periodMonthNames.reduce((s,m)=>s+getEuros(cat,m),0);
       const media = periodMonthNames.length ? total/periodMonthNames.length : 0;
+      const statsMini = statsLineaCajaEuros(periodMonthNames.map(m=>getEuros(cat,m)));
       html += `<div class="card" style="border:1px solid ${c.detalleCatSelected===cat?'var(--copper)':'var(--line)'};">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
           <div data-select-cat="${cat.replace(/"/g,'&quot;')}" style="cursor:pointer;color:${c.detalleCatSelected===cat?'var(--copper)':'var(--text)'};font-weight:600;font-size:12px;flex:1;">${cat}</div>
@@ -12397,6 +12449,7 @@ function renderCajaGraficosGrid(){
         </div>
         <div class="hint" style="font-size:10px;margin-bottom:8px;">Media mensual: <b style="color:var(--text);">${cajaFmt(media)}</b> · Total: <b style="color:var(--text);">${cajaFmt(total)}</b></div>
         <div class="hint" style="font-size:9px;margin-bottom:1px;">€ en el mes</div>
+        ${statsMini ? `<div class="hint" style="font-size:8.5px;margin-bottom:3px;">Periodo: ${cajaFmt(statsMini.mediaPeriodo)} · 3m: ${cajaFmt(statsMini.media3m)} · Últ.: ${cajaFmt(statsMini.ultimoMes)}</div>` : ''}
         <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:140px;margin-bottom:6px;"><canvas id="cajaCatMini_${ci}"></canvas></div>
         <div class="hint" style="font-size:9px;margin-bottom:1px;">% sobre ventas del mes</div>
         <div data-select-cat="${cat.replace(/"/g,'&quot;')}" class="chart-wrap" style="cursor:pointer;height:140px;"><canvas id="cajaCatMiniPct_${ci}"></canvas></div>
