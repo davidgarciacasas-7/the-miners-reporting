@@ -223,7 +223,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.248</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.249</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8079,7 +8079,25 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const anchoCapturaPx = esCircular ? 640 : Math.round(chartWLocal*pxPorMm);
       const altoCapturaPx = esCircular ? Math.round(640*(chartHLocal/chartWLocal)) : Math.round(chartHLocal*pxPorMm);
       const dprOriginal = chart.options.devicePixelRatio;
+      const responsiveOriginal = chart.options.responsive;
+      // mientras el gráfico sea "responsive", Chart.js vigila el tamaño de su contenedor
+      // en pantalla con un ResizeObserver — si ese contenedor sigue teniendo el tamaño
+      // pequeño de pantalla (no ha cambiado, solo el propio lienzo), Chart.js puede
+      // "corregir" el redimensionado manual de vuelta al tamaño antiguo justo en medio de
+      // la captura (de ahí que unos gráficos salieran bien y otros mal, sin un patrón
+      // claro: dependía de en qué momento exacto se disparara esa corrección). Se
+      // desactiva "responsive" mientras se captura, para que no compita con esto.
+      // Además, el propio <canvas> de Chart.js suele llevar "max-width:100%" en su estilo,
+      // y el contenedor ".chart-wrap" tiene una altura fija en el CSS de la app (280px) —
+      // ambas cosas pueden seguir recortando visualmente el lienzo aunque se redimensione
+      // por JS, así que también se ajustan aquí mientras dura la captura.
+      const canvasEl = chart.canvas, wrapEl = canvasEl.parentElement;
+      const canvasMaxWidthOriginal = canvasEl.style.maxWidth;
+      const wrapHeightOriginal = wrapEl ? wrapEl.style.height : null;
+      canvasEl.style.maxWidth = 'none';
+      if(wrapEl) wrapEl.style.height = altoCapturaPx+'px';
       chart.options.devicePixelRatio = 3;
+      chart.options.responsive = false;
       chart.resize(anchoCapturaPx, altoCapturaPx);
       chart.update('none');
       // se espera a que el navegador termine de repintar con el tamaño nuevo antes de
@@ -8094,6 +8112,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         doc.setDrawColor(...LINEA); doc.rect(x,y+9,chartWLocal,chartHLocal);
       }
       chart.options.devicePixelRatio = dprOriginal;
+      chart.options.responsive = responsiveOriginal;
+      canvasEl.style.maxWidth = canvasMaxWidthOriginal;
+      if(wrapEl) wrapEl.style.height = wrapHeightOriginal;
       chart.resize();
       chart.update('none');
     }
