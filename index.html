@@ -145,6 +145,9 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
 .empty-state h3{color:var(--text);font-size:18px;margin-bottom:8px;font-family:'Fraunces',serif;}
 .chart-wrap{position:relative;height:280px;}
+[contenteditable][data-placeholder]:empty::before{content:attr(data-placeholder);color:var(--text-muted);pointer-events:none;}
+[contenteditable] ul{margin:0 0 0 20px;padding:0;}
+[contenteditable] li{margin-bottom:2px;}
 .chart-wrap.tall{height:340px;}
 .section-title{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin:22px 0 10px 0;font-weight:600;}
 .subfilter{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
@@ -223,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.261</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.266</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -503,6 +506,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <table id="tablaPnl" class="mono"><thead><tr></tr></thead><tbody></tbody><tfoot></tfoot></table>
         </div>
         <div id="pnlInventoryStockUpTabla"></div>
+        <p class="hint" style="margin-top:6px;margin-bottom:10px;">El signo indica si ese mes se ha consumido o generado stock: <b style="color:var(--negative);">negativo</b> = se ha consumido stock (el coste teórico de lo vendido supera lo que de verdad se compró en Caja ese mes); <b style="color:var(--positive);">positivo</b> = se ha generado stock (se compró más de lo que se consumió). Fórmula: COGS real de Caja (alimentos+bebidas) menos la suma de Production Costs, Write-off Total, Missing stock y Packaging costs.</p>
         <p class="hint" style="margin-top:10px;">El periodo Desde/Hasta se ajusta siempre a meses completos (en vista Mensual) o semanas completas (en vista Semanal) — elige cualquier día dentro del primer y el último mes/semana que quieras ver.</p>
         <p class="hint">Formato de importación CSV (una fila por importe/periodo): columnas <code>Nombre,Tipo,Fecha_inicio,Fecha_fin,Importe</code> — Tipo debe ser <code>ingreso</code> o <code>coste</code>, fechas en formato AAAA-MM-DD.</p>
         <p class="hint">Formato "Importar mi propio PNL" (tu hoja habitual, una columna por mes): cabecera <code>Nombre,Tipo,2026-01,2026-02,2026-03...</code> (los meses en formato AAAA-MM) y una fila por cada línea de tu PNL, con el importe de cada mes en su columna. Se crean las líneas que falten automáticamente.</p>
@@ -1225,7 +1229,11 @@ Bowl de acai,Acai,150,g</pre>
         <p class="hint" style="margin-bottom:14px;">Todos los gráficos usan el mismo periodo elegido arriba. Arrastra una tarjeta por su cabecera (✥) para reordenarla.</p>
         <div class="card" style="margin-bottom:16px;">
           <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Resumen ejecutivo (opcional — solo aparece en el PDF si escribes algo aquí)</label>
-          <textarea id="reIntroduccion" placeholder="Añade aquí un párrafo de introducción, contexto o resumen antes de las cifras — por ejemplo, para explicar qué periodo se cubre o destacar algo concreto..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+          <div class="no-print" style="display:flex;gap:6px;margin-bottom:8px;">
+            <button type="button" class="btn secondary" id="reIntroBoldBtn" title="Negrita" style="padding:3px 10px;font-weight:700;">N</button>
+            <button type="button" class="btn secondary" id="reIntroListaBtn" title="Viñetas" style="padding:3px 10px;">• Lista</button>
+          </div>
+          <div id="reIntroduccion" contenteditable="true" data-placeholder="Añade aquí un párrafo de introducción, contexto o resumen antes de las cifras — por ejemplo, para explicar qué periodo se cubre o destacar algo concreto..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-family:inherit;font-size:14px;"></div>
         </div>
         <div id="reWidgetsContainer" class="grid split"></div>
       </div>
@@ -7068,6 +7076,29 @@ function attachReDragHandlers(){
     });
     quitarBtn.parentElement.insertBefore(btnTitulo, quitarBtn);
   });
+  // sección de "notas al pie" — se añade a todos los widgets con gráfico (no a los
+  // títulos sueltos, que no tienen sentido anotar), sin tener que repetirla en cada uno
+  // de los `if(w.typeId===...)` que construyen el HTML de cada tipo.
+  document.querySelectorAll('#reWidgetsContainer [data-re-instance]').forEach(card=>{
+    if(card.querySelector('[data-re-footnotes-seccion]')) return;
+    const instanceId = card.getAttribute('data-re-instance');
+    const widgets = getReWidgets();
+    const w = widgets.find(x=>x.instanceId===instanceId);
+    if(!w || w.typeId==='texto') return;
+    const seccion = document.createElement('div');
+    seccion.setAttribute('data-re-footnotes-seccion', '1');
+    seccion.style.marginTop = '8px';
+    seccion.innerHTML = `
+      <div id="reFootnotesList_${instanceId}">
+        ${(w.footnotes||[]).map((nota,ni)=>`<p class="hint" style="font-size:10.5px;margin-top:3px;" data-re-footnote-linea="${ni}">* <span data-re-footnote-texto="${ni}">${escapeHtml(nota)}</span> <button class="btn secondary no-print" data-re-edit-footnote="${instanceId}" data-idx="${ni}" title="Editar esta nota" style="padding:0px 4px;font-size:9px;">✏️</button> <button class="btn secondary no-print" data-re-del-footnote="${instanceId}" data-idx="${ni}" title="Quitar esta nota (solo de aquí — se queda guardada para reutilizarla luego)" style="padding:0px 4px;font-size:9px;">✕</button></p>`).join('')}
+      </div>
+      <div class="no-print" style="margin-top:4px;">
+        <button class="btn secondary" data-re-add-footnote="${instanceId}" style="padding:2px 8px;font-size:10px;">+ Nota al pie</button>
+        <div id="reFootnoteForm_${instanceId}"></div>
+      </div>
+    `;
+    card.appendChild(seccion);
+  });
 }
 /* auto-scroll de la página mientras se arrastra un gráfico cerca del borde de arriba o de
    abajo de la pantalla — sin esto, para mover un gráfico a una posición fuera de lo que
@@ -7440,10 +7471,12 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
     }
     if(typeId==='ebitdaEuros'){
       STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:bucketsMes.map(b=>b.label), datasets:[trendDataset('EBITDA', ebitdaPorMes.map(v=>+v.toFixed(2)), c.copper)] }, options:reLineOptions(true, mostrarUltimoValor) });
+      pintarStatsGenericas(w.instanceId, ebitdaPorMes, (v)=>eur(Math.round(v*100)));
     } else {
       const ventasPorMes = bucketsMes.map(b=> lineaVentas ? pnlLineValueForBucket(lineaVentas, b, allSalesLinesPnl, costHistory, otherCostHistory) : 0);
       const pctPorMes = ebitdaPorMes.map((v,i)=> ventasPorMes[i]>0 ? +(v/ventasPorMes[i]*100).toFixed(1) : 0);
       STATE.charts[chartKey] = safeNewChart(canvasId, { type:'line', data:{ labels:bucketsMes.map(b=>b.label), datasets:[trendDataset('EBITDA (% de Ventas netas)', pctPorMes, '#4C8272')] }, options:reLineOptions('pct', mostrarUltimoValor) });
+      pintarStatsGenericas(w.instanceId, pctPorMes, (v)=>v.toFixed(1)+'%');
     }
   } else if(typeId==='perfFidelidadNueva'){
     const buckets = monthBucketsInRange(desde, hasta);
@@ -7474,6 +7507,8 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
       destroyChart(chartKey);
     } else {
       STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(tipo==='balancePct'?'pct':true, mostrarUltimoValor) });
+      if(typeId==='cajaBalance') pintarStatsGenericas(w.instanceId, d.data, (v)=>eur(Math.round(v*100)));
+      if(typeId==='cajaBalancePct') pintarStatsGenericas(w.instanceId, d.data, (v)=>v.toFixed(1)+'%');
     }
   }
 }
@@ -7499,9 +7534,37 @@ async function renderResumenEjecutivo(){
   renderReTemplateSelect();
   const introEl = document.getElementById('reIntroduccion');
   if(introEl && !introEl.dataset.wired){
-    introEl.value = localStorage.getItem('miners_re_introduccion') || '';
-    introEl.addEventListener('change', ()=>localStorage.setItem('miners_re_introduccion', introEl.value));
+    // se guarda como HTML ahora (para poder tener negrita/viñetas) — si había algo escrito
+    // con el formato antiguo (texto plano, sin formato), se recupera esa primera vez para
+    // no perder lo que ya se hubiera escrito.
+    let contenidoGuardado = localStorage.getItem('miners_re_introduccion_html');
+    if(contenidoGuardado===null){
+      const textoAntiguo = localStorage.getItem('miners_re_introduccion');
+      contenidoGuardado = textoAntiguo ? escapeHtml(textoAntiguo).replace(/\n/g,'<br>') : '';
+    }
+    introEl.innerHTML = contenidoGuardado;
+    introEl.addEventListener('input', ()=>localStorage.setItem('miners_re_introduccion_html', introEl.innerHTML));
     introEl.dataset.wired = '1';
+  }
+  const boldBtn = document.getElementById('reIntroBoldBtn');
+  if(boldBtn && !boldBtn.dataset.wired){
+    boldBtn.dataset.wired = '1';
+    boldBtn.addEventListener('mousedown', (e)=>e.preventDefault()); // no perder la selección al hacer clic en el botón
+    boldBtn.addEventListener('click', ()=>{
+      introEl.focus();
+      document.execCommand('bold');
+      localStorage.setItem('miners_re_introduccion_html', introEl.innerHTML);
+    });
+  }
+  const listaBtn = document.getElementById('reIntroListaBtn');
+  if(listaBtn && !listaBtn.dataset.wired){
+    listaBtn.dataset.wired = '1';
+    listaBtn.addEventListener('mousedown', (e)=>e.preventDefault());
+    listaBtn.addEventListener('click', ()=>{
+      introEl.focus();
+      document.execCommand('insertUnorderedList');
+      localStorage.setItem('miners_re_introduccion_html', introEl.innerHTML);
+    });
   }
   const buckets = monthBucketsInRange(desde, hasta);
   const resultado = calcularResumenEjecutivo(buckets);
@@ -7534,13 +7597,6 @@ async function renderResumenEjecutivo(){
         </div>
         <p class="hint no-print" style="margin-bottom:10px;">Este periodo es independiente del Desde/Hasta de arriba — solo afecta a esta tabla de PNL.</p>
         <div style="overflow-x:auto;" id="rePnlTabla_${w.instanceId}"></div>
-        <div id="rePnlFootnotesList_${w.instanceId}" style="margin-top:10px;">
-          ${(w.footnotes||[]).map((nota,ni)=>`<p class="hint" style="font-size:11px;margin-top:3px;">* ${escapeHtml(nota)} <button class="btn secondary no-print" data-re-pnl-del-footnote="${w.instanceId}" data-idx="${ni}" title="Quitar esta nota (solo de aquí — se queda guardada para reutilizarla luego)" style="padding:0px 4px;font-size:9px;">✕</button></p>`).join('')}
-        </div>
-        <div class="no-print" style="margin-top:8px;">
-          <button class="btn secondary" data-re-pnl-add-footnote="${w.instanceId}" style="padding:3px 10px;font-size:11px;">+ Añadir nota al pie</button>
-          <div id="rePnlFootnoteForm_${w.instanceId}"></div>
-        </div>
       </div>`;
     }
     if(w.typeId==='pnlLinea'){
@@ -7557,7 +7613,7 @@ async function renderResumenEjecutivo(){
       const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : '';
       const titulo = w.cajaCategoriaEnPct
         ? `Flujo de Caja coste de ${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(% ventas netas)</span>`
-        : `Caja — ${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(€)</span>`;
+        : `${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(€)</span>`;
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
           <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${titulo}</h3>
@@ -7581,8 +7637,9 @@ async function renderResumenEjecutivo(){
     }
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!type) return '';
+    const mostrarStatsGenericas = ['ebitdaEuros','ebitdaPct','cajaBalance','cajaBalancePct'].includes(w.typeId);
     return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;flex-wrap:wrap;gap:6px;">
         <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
         <div class="no-print" style="display:flex;align-items:center;gap:8px;">
           ${w.typeId==='categoriasTendencia' ? '<button class="btn secondary" data-re-elegir-categorias="'+w.instanceId+'" style="padding:2px 8px;font-size:11px;">Elegir categorías</button>' : ''}
@@ -7591,6 +7648,7 @@ async function renderResumenEjecutivo(){
           <button class="btn danger" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
         </div>
       </div>
+      ${mostrarStatsGenericas ? `<div id="reStats_${w.instanceId}" class="hint" style="font-size:10.5px;margin-bottom:6px;"></div>` : ''}
       <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
     </div>`;
   }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
@@ -7620,24 +7678,24 @@ async function renderResumenEjecutivo(){
       if(w2){ w2.pnlHasta = inp.value; setReWidgets(widgets2); await renderPnlWidgetInstance(w2); }
     });
   });
-  container.querySelectorAll('[data-re-pnl-add-footnote]').forEach(btn=>{
+  container.querySelectorAll('[data-re-add-footnote]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const id = btn.getAttribute('data-re-pnl-add-footnote');
-      const formCont = document.getElementById('rePnlFootnoteForm_'+id);
+      const id = btn.getAttribute('data-re-add-footnote');
+      const formCont = document.getElementById('reFootnoteForm_'+id);
       if(!formCont) return;
       if(formCont.dataset.abierto){ formCont.innerHTML=''; formCont.dataset.abierto=''; return; }
       formCont.dataset.abierto = '1';
       formCont.innerHTML = `<div style="display:flex;gap:6px;margin-top:6px;">
-        <input type="text" list="rePnlFootnotesDatalist" data-re-pnl-footnote-input="${id}" placeholder="Escribe la nota, o elige una ya usada antes…" style="flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;">
-        <button class="btn secondary" data-re-pnl-guardar-footnote="${id}" style="padding:4px 10px;font-size:11px;">Añadir</button>
+        <input type="text" list="reFootnotesDatalist" data-re-footnote-input="${id}" placeholder="Escribe la nota, o elige una ya usada antes…" style="flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;">
+        <button class="btn secondary" data-re-guardar-footnote="${id}" style="padding:4px 10px;font-size:11px;">Añadir</button>
       </div>`;
-      if(!document.getElementById('rePnlFootnotesDatalist')){
+      if(!document.getElementById('reFootnotesDatalist')){
         const dl = document.createElement('datalist');
-        dl.id = 'rePnlFootnotesDatalist';
+        dl.id = 'reFootnotesDatalist';
         document.body.appendChild(dl);
       }
-      document.getElementById('rePnlFootnotesDatalist').innerHTML = (STATE.pnlFootnotesGuardadas||[]).map(f=>'<option value="'+escapeHtml(f.texto)+'">').join('');
-      const input = formCont.querySelector('[data-re-pnl-footnote-input]');
+      document.getElementById('reFootnotesDatalist').innerHTML = (STATE.pnlFootnotesGuardadas||[]).map(f=>'<option value="'+escapeHtml(f.texto)+'">').join('');
+      const input = formCont.querySelector('[data-re-footnote-input]');
       input.focus();
       const guardar = async () => {
         const texto = input.value.trim();
@@ -7659,13 +7717,56 @@ async function renderResumenEjecutivo(){
         formCont.innerHTML = ''; formCont.dataset.abierto = '';
         await renderResumenEjecutivo();
       };
-      formCont.querySelector('[data-re-pnl-guardar-footnote]').addEventListener('click', guardar);
+      formCont.querySelector('[data-re-guardar-footnote]').addEventListener('click', guardar);
       input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); guardar(); } });
     });
   });
-  container.querySelectorAll('[data-re-pnl-del-footnote]').forEach(btn=>{
+  container.querySelectorAll('[data-re-edit-footnote]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-re-edit-footnote');
+      const idx = +btn.getAttribute('data-idx');
+      const lineaEl = btn.closest('[data-re-footnote-linea]');
+      const textoEl = lineaEl?.querySelector('[data-re-footnote-texto]');
+      if(!lineaEl || !textoEl) return;
+      if(lineaEl.dataset.editando) return; // ya está en modo edición, no volver a abrir
+      lineaEl.dataset.editando = '1';
+      const textoActual = textoEl.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = textoActual;
+      input.style.cssText = 'flex:1;background:var(--surface-2);border:1px solid var(--copper);border-radius:6px;padding:3px 6px;color:var(--text);font-size:11px;min-width:200px;';
+      textoEl.replaceWith(input);
+      input.focus();
+      input.select();
+      const guardarEdicion = async () => {
+        const nuevoTexto = input.value.trim();
+        if(!nuevoTexto || nuevoTexto===textoActual){ renderResumenEjecutivo(); return; }
+        const widgets2 = getReWidgets();
+        const w2 = widgets2.find(x=>x.instanceId===id);
+        if(w2 && w2.footnotes){
+          w2.footnotes = w2.footnotes.map((f,i)=>i===idx?nuevoTexto:f);
+          setReWidgets(widgets2);
+        }
+        // igual que al añadir una nota nueva: si el texto editado no existía ya en la
+        // lista reutilizable, se guarda ahí también para poder elegirlo en el futuro.
+        if(!(STATE.pnlFootnotesGuardadas||[]).some(f=>f.texto===nuevoTexto)){
+          try{
+            const saved = await sbInsert('pnl_footnotes_guardadas', { texto:nuevoTexto });
+            STATE.pnlFootnotesGuardadas.push({ id:saved.id, texto:nuevoTexto });
+          }catch(e){ /* si falla el guardado para reutilizar, el cambio en este informe se aplica igualmente */ }
+        }
+        await renderResumenEjecutivo();
+      };
+      input.addEventListener('keydown', (e)=>{
+        if(e.key==='Enter'){ e.preventDefault(); guardarEdicion(); }
+        if(e.key==='Escape'){ e.preventDefault(); renderResumenEjecutivo(); }
+      });
+      input.addEventListener('blur', guardarEdicion);
+    });
+  });
+  container.querySelectorAll('[data-re-del-footnote]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const id = btn.getAttribute('data-re-pnl-del-footnote');
+      const id = btn.getAttribute('data-re-del-footnote');
       const idx = +btn.getAttribute('data-idx');
       const widgets2 = getReWidgets();
       const w2 = widgets2.find(x=>x.instanceId===id);
@@ -7827,6 +7928,75 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const chartH = chartW*0.72;
   const yInicio = margin+24;
   const yLimite = H-margin-10;
+  /* convierte el HTML del editor de introducción (negrita, viñetas) a una lista de líneas
+     simples — cada una con sus "segmentos" de texto (cada segmento sabe si va en
+     negrita), para poder dibujarlo en el PDF, que no entiende HTML directamente. */
+  function parseRichTextParaPdf(rootEl){
+    const lineas = [];
+    let lineaActual = { esVinyeta:false, segmentos:[] };
+    function terminarLinea(){
+      if(lineaActual.segmentos.some(s=>s.texto.trim()!=='')) lineas.push(lineaActual);
+      lineaActual = { esVinyeta:false, segmentos:[] };
+    }
+    function walk(nodo, negrita){
+      nodo.childNodes.forEach(hijo=>{
+        if(hijo.nodeType===3){ // nodo de texto
+          if(hijo.textContent) lineaActual.segmentos.push({ texto:hijo.textContent, negrita });
+        } else if(hijo.nodeType===1){ // nodo elemento
+          const tag = hijo.tagName.toLowerCase();
+          if(tag==='br'){ terminarLinea(); }
+          else if(tag==='ul' || tag==='ol'){
+            Array.from(hijo.children).forEach(li=>{
+              terminarLinea();
+              lineaActual.esVinyeta = true;
+              walk(li, negrita);
+              terminarLinea();
+            });
+          } else if(tag==='div' || tag==='p' || tag==='li'){
+            if(lineaActual.segmentos.length>0) terminarLinea();
+            const eraVinyeta = lineaActual.esVinyeta;
+            walk(hijo, negrita);
+            lineaActual.esVinyeta = eraVinyeta;
+            terminarLinea();
+          } else if(tag==='b' || tag==='strong'){ walk(hijo, true); }
+          else { walk(hijo, negrita); }
+        }
+      });
+    }
+    walk(rootEl, false);
+    terminarLinea();
+    return lineas.filter(l=>l.segmentos.some(s=>s.texto.trim()!==''));
+  }
+  /* dibuja esas líneas en el PDF palabra a palabra (para poder mezclar negrita y texto
+     normal dentro de la misma línea, y para que el ajuste de línea sea el correcto) —
+     devuelve la posición Y donde se ha quedado, para seguir dibujando debajo. */
+  function dibujarTextoConFormatoPdf(lineas, x, yInicio, anchoMax, tamañoFuente){
+    let y = yInicio;
+    const lineHeight = tamañoFuente*0.52;
+    const sangriaVinyeta = 5;
+    lineas.forEach(linea=>{
+      const xBase = x + (linea.esVinyeta ? sangriaVinyeta : 0);
+      let xActual = xBase;
+      if(linea.esVinyeta){ doc.setFont('helvetica','normal'); doc.setFontSize(tamañoFuente); doc.text('•', x, y); }
+      const palabras = [];
+      linea.segmentos.forEach(seg=>{
+        seg.texto.split(/(\s+)/).forEach(palabra=>{ if(palabra!=='') palabras.push({ texto:palabra, negrita:seg.negrita }); });
+      });
+      palabras.forEach(p=>{
+        doc.setFont('helvetica', p.negrita?'bold':'normal');
+        doc.setFontSize(tamañoFuente);
+        const anchoPalabra = doc.getTextWidth(p.texto);
+        if(xActual + anchoPalabra > x + anchoMax && xActual > xBase){
+          y += lineHeight;
+          xActual = xBase;
+        }
+        if(p.texto.trim()!=='') doc.text(p.texto, xActual, y);
+        xActual += anchoPalabra;
+      });
+      y += lineHeight;
+    });
+    return y;
+  }
   // mismo título dinámico que se ve en pantalla para estos 2 tipos — si no, el PDF
   // mostraba la etiqueta genérica del menú de "+ Añadir gráfico" (pensada para elegir el
   // tipo, no como título real de un gráfico ya colocado). "Categoría" no se menciona por
@@ -7836,7 +8006,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     if(w.typeId==='cajaCategoriaLinea'){
       const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : '';
       if(w.cajaCategoriaEnPct) return 'Flujo de Caja coste de '+tipoPrefijo+(w.cajaCategoriaNombre||'')+' (% ventas netas)';
-      return 'Caja — '+tipoPrefijo+(w.cajaCategoriaNombre||'')+' (€)';
+      return tipoPrefijo+(w.cajaCategoriaNombre||'')+' (€)';
     }
     if(w.typeId==='cajaPieCategoria'){
       const periodoLabel = {total:'Periodo total', '3m':'Últimos 3 meses', '1m':'Último mes'}[w.cajaPiePeriodo||'total'];
@@ -7976,12 +8146,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   });
   y += 8;
 
-  const introduccion = (document.getElementById('reIntroduccion').value||'').trim();
-  if(introduccion){
-    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...NEGRO);
-    const lineasIntro = doc.splitTextToSize(introduccion, W-margin*2);
-    doc.text(lineasIntro, margin, y+4);
-    y += lineasIntro.length*5.5 + 10;
+  const introEl = document.getElementById('reIntroduccion');
+  const lineasIntro = introEl ? parseRichTextParaPdf(introEl) : [];
+  if(lineasIntro.length>0){
+    doc.setTextColor(...NEGRO);
+    y = dibujarTextoConFormatoPdf(lineasIntro, margin, y+4, W-margin*2, 10.5);
+    y += 6;
   }
 
   function nuevaPagina(){
@@ -8014,7 +8184,8 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         if(siguiente.typeId==='pnl') altoSiguiente = 60;
         else {
           const infoSig = infoTamanoWidgetPdf(siguiente);
-          const extraSig = (siguiente.typeId==='cajaCategoriaLinea' && !siguiente.cajaCategoriaEnPct) ? 5 : 0;
+          const tieneStatsGenericas = ['ebitdaEuros','ebitdaPct','cajaBalance','cajaBalancePct'].includes(siguiente.typeId);
+          const extraSig = ((siguiente.typeId==='cajaCategoriaLinea' && !siguiente.cajaCategoriaEnPct) || tieneStatsGenericas) ? 5 : 0;
           // si el gráfico del siguiente widget todavía no existe en este momento (por lo
           // que sea), no se puede saber su tamaño real con seguridad — se reserva el
           // máximo posible (una tarta a toda la página) en vez de arriesgarse a reservar
@@ -8122,15 +8293,31 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     // ensanchan a todo el ancho de la página — con solo media página, las cifras y la
     // leyenda se aplastaban y se cortaban por los bordes.
     const {chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal} = infoTamanoWidgetPdf(w);
-    // en los gráficos de línea de Caja en € (no en %), se añade un renglón con la media
-    // del periodo, la media de los últimos 3 meses y el valor del último mes — como texto
-    // aparte, nunca tocando la imagen del propio gráfico.
+    // en los gráficos de línea de un solo valor por mes (Caja en €, EBITDA €/%, Flujo de
+    // caja €/%), se añade un renglón con la media del periodo, la media de los últimos 3
+    // meses y el valor del último mes — como texto aparte, nunca tocando la imagen del
+    // propio gráfico.
     let statsCajaTexto = null;
     if(w.typeId==='cajaCategoriaLinea' && !w.cajaCategoriaEnPct && chart){
       const s = statsLineaCajaEuros(chart.data.datasets[0]?.data||[]);
       if(s) statsCajaTexto = `Media periodo: ${eur(Math.round(s.mediaPeriodo*100))}   ·   Media últ. 3 meses: ${eur(Math.round(s.media3m*100))}   ·   Último mes: ${eur(Math.round(s.ultimoMes*100))}`;
+    } else if(['ebitdaEuros','cajaBalance'].includes(w.typeId) && chart){
+      const s = statsLineaCajaEuros(chart.data.datasets[0]?.data||[]);
+      if(s) statsCajaTexto = `Media periodo: ${eur(Math.round(s.mediaPeriodo*100))}   ·   Media últ. 3 meses: ${eur(Math.round(s.media3m*100))}   ·   Último mes: ${eur(Math.round(s.ultimoMes*100))}`;
+    } else if(['ebitdaPct','cajaBalancePct'].includes(w.typeId) && chart){
+      const s = statsLineaCajaEuros(chart.data.datasets[0]?.data||[]);
+      if(s) statsCajaTexto = `Media periodo: ${s.mediaPeriodo.toFixed(1)}%   ·   Media últ. 3 meses: ${s.media3m.toFixed(1)}%   ·   Último mes: ${s.ultimoMes.toFixed(1)}%`;
     }
-    const altoExtra = statsCajaTexto ? 5 : 0;
+    const altoStats = statsCajaTexto ? 5 : 0;
+    // notas al pie del widget (si tiene alguna) — se envuelven ANTES de dibujar nada, para
+    // saber cuánta altura extra hace falta reservarle a la tarjeta.
+    let footnotesLineas = [];
+    if(w.footnotes && w.footnotes.length>0){
+      doc.setFontSize(7);
+      w.footnotes.forEach(nota=>{ footnotesLineas.push(...doc.splitTextToSize('* '+nota, chartWLocal)); });
+    }
+    const altoFootnotes = footnotesLineas.length>0 ? footnotesLineas.length*3.5+2 : 0;
+    const altoExtra = altoStats + altoFootnotes;
     if(necesitaFilaCompleta && colPendiente){ y += chartH + 16; colPendiente = null; }
     if(!colPendiente && y + chartHLocal + altoExtra + 12 > yLimite) nuevaPagina();
     const x = colPendiente ? colPendiente.x : (necesitaFilaCompleta ? margin+((W-margin*2)-chartWLocal)/2 : margin);
@@ -8194,9 +8381,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const imgData = chart.toBase64Image();
       if(imgData && imgData.length > 200){
-        doc.addImage(imgData, 'PNG', x, y+9+altoExtra, chartWLocal, chartHLocal);
+        doc.addImage(imgData, 'PNG', x, y+9+altoStats, chartWLocal, chartHLocal);
       } else {
-        doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoExtra,chartWLocal,chartHLocal);
+        doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoStats,chartWLocal,chartHLocal);
       }
       chart.options.devicePixelRatio = dprOriginal;
       chart.options.responsive = responsiveOriginal;
@@ -8205,7 +8392,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       chart.resize();
       chart.update('none');
     }
-    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoExtra,chartWLocal,chartHLocal); }
+    else { doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoStats,chartWLocal,chartHLocal); }
+    if(footnotesLineas.length>0){
+      doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(...GRIS);
+      let yFoot = y+9+altoStats+chartHLocal+3;
+      footnotesLineas.forEach(l=>{ doc.text(l, x, yFoot); yFoot += 3.5; });
+    }
 
     if(necesitaFilaCompleta){ y += chartHLocal + altoExtra + 16; }
     else if(!colPendiente){ colPendiente = { x: margin+chartW+8, altoExtra }; }
@@ -8751,10 +8943,9 @@ async function renderPnlLineaWidgetInstance(w, buckets){
    de Resumen Ejecutivo — los mismos gráficos individuales por categoría que se ven en
    Caja → Gráficos → Por categoría, aquí eligiendo cuál en vez de verlas todas a la vez. */
 /* media periodo total / media últimos 3 meses / valor último mes, a partir de un array de
-   valores mensuales en euros (en el mismo orden que aparecen en el gráfico) — se usa como
-   texto de apoyo en los gráficos de línea de Caja en €, para dar una lectura rápida sin
-   tener que leer todo el gráfico punto a punto. Solo tiene sentido en € (en %, promediar
-   porcentajes de meses con bases distintas no da una cifra útil). */
+   valores mensuales (en el mismo orden que aparecen en el gráfico) — se usa como texto de
+   apoyo en gráficos de línea de un solo valor por mes (Caja en €, EBITDA, Flujo de caja),
+   para dar una lectura rápida sin tener que leer todo el gráfico punto a punto. */
 function statsLineaCajaEuros(valores){
   if(!valores || valores.length===0) return null;
   const n = valores.length;
@@ -8763,6 +8954,15 @@ function statsLineaCajaEuros(valores){
   const media3m = ultimos3.reduce((s,v)=>s+v,0)/ultimos3.length;
   const ultimoMes = valores[n-1];
   return { mediaPeriodo, media3m, ultimoMes };
+}
+/* rellena el renglón de "Media periodo / Media últ. 3 meses / Último mes" de la tarjeta
+   genérica de Resumen Ejecutivo (EBITDA €/%, Flujo de caja €/%) — recibe el formateador
+   adecuado (euros o %) para cada caso. */
+function pintarStatsGenericas(instanceId, valores, formatter){
+  const statsEl = document.getElementById('reStats_'+instanceId);
+  if(!statsEl) return;
+  const s = statsLineaCajaEuros(valores);
+  statsEl.textContent = s ? `Media periodo: ${formatter(s.mediaPeriodo)}   ·   Media últ. 3 meses: ${formatter(s.media3m)}   ·   Último mes: ${formatter(s.ultimoMes)}` : '';
 }
 async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
   const canvas = document.getElementById('chartReW_'+w.instanceId);
