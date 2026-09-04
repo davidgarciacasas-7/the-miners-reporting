@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.266</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.268</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -3044,6 +3044,22 @@ if(window.Chart){
       ctx.restore();
     }
   });
+  // fondo blanco antes de dibujar nada más — solo mientras se genera el PDF (el lienzo es
+  // transparente por defecto; en pantalla eso está bien porque se ve el fondo oscuro de la
+  // app detrás, pero al capturar como JPEG para el PDF, sin esto las zonas transparentes
+  // saldrían en negro, ya que JPEG no soporta transparencia).
+  Chart.register({
+    id: 'fondoBlancoPdf',
+    beforeDraw(chart){
+      if(!STATE_pdfLightMode) return;
+      const {ctx, width, height} = chart;
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+  });
 }
 /* vuelve a dibujar todo lo que esté cargado, para que el cambio de preferencia se note al momento */
 function refrescarTodosLosGraficos(){
@@ -4376,7 +4392,7 @@ document.getElementById('perfExportPdfBtn').addEventListener('click', ()=>{
     doc.text(type?type.label:'', x, y+4);
     doc.setFont('helvetica','normal');
     const chart = STATE.charts['perfW_'+w.instanceId];
-    if(chart){ doc.addImage(chart.toBase64Image(), 'PNG', x, y+7, chartW, chartH); }
+    if(chart){ doc.addImage(chart.toBase64Image('image/jpeg', 0.9), 'JPEG', x, y+7, chartW, chartH); }
     else { doc.setDrawColor(58,47,36); doc.rect(x,y+7,chartW,chartH); }
 
     if(!colPendiente){ colPendiente = { x: margin+chartW+8 }; }
@@ -8270,7 +8286,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         bucketsW.forEach((b,i)=>{
           const vSigno = conSigno(valoresPorBucketW[i][line.id]||0);
           const esLineaEbitda = line.name.trim().toLowerCase()==='ebitda';
-          doc.setTextColor(...(esLineaEbitda ? (vSigno<0?ROJO:VERDE) : NEGRO));
+          // los números de una línea principal (con el título en rojo/verde) llevan el
+          // mismo color que su título — EBITDA es la excepción: se colorea según si el
+          // resultado de ese mes es positivo o negativo de verdad, no según si la línea
+          // está clasificada como "ingreso" (un EBITDA negativo en verde sería engañoso).
+          const colorNumero = esLineaEbitda ? (vSigno<0?ROJO:VERDE) : (esLineaPrincipal ? (line.tipo==='ingreso'?VERDE:ROJO) : NEGRO);
+          doc.setTextColor(...colorNumero);
           doc.text(pnlFmtPdf(vSigno), margin+colNombreAncho+i*colAncho+colAncho, y+3.5, {align:'right'});
         });
         y += filaAlto;
@@ -8379,9 +8400,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       chart.resize(anchoCapturaPx, altoCapturaPx);
       chart.update('none');
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const imgData = chart.toBase64Image();
+      const imgData = chart.toBase64Image('image/jpeg', 0.9);
       if(imgData && imgData.length > 200){
-        doc.addImage(imgData, 'PNG', x, y+9+altoStats, chartWLocal, chartHLocal);
+        doc.addImage(imgData, 'JPEG', x, y+9+altoStats, chartWLocal, chartHLocal);
       } else {
         doc.setDrawColor(...LINEA); doc.rect(x,y+9+altoStats,chartWLocal,chartHLocal);
       }
