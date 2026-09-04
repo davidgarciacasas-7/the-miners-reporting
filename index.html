@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.268</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.269</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -6915,7 +6915,7 @@ const RE_WIDGET_TYPES = {
   perfNoBebidaLVPct:   { label:'Performance — Tickets con algo más, L-V (%)', tipo:'snapshot' },
   perfNoBebidaSDAbs:   { label:'Performance — Tickets con algo más, S-D (nº)', tipo:'snapshot' },
   perfNoBebidaSDPct:   { label:'Performance — Tickets con algo más, S-D (%)', tipo:'snapshot' },
-  cajaGastos:    { label:'Caja — Gastos totales por mes', tipo:'snapshot-async' },
+  cajaGastos:    { label:'Costes totales', tipo:'snapshot-async' },
   cajaIngresos:  { label:'Caja — Ingresos Square + Efectivo por mes', tipo:'snapshot-async' },
   cajaBalance:   { label:'Flujo de caja mensual', tipo:'snapshot-async' },
   cajaBalancePct:{ label:'Flujo de caja mensual (% de Ventas netas)', tipo:'snapshot-async' },
@@ -7523,6 +7523,7 @@ async function pintarWidgetRe(typeId, canvasId, chartKey, resultado, labels, des
       destroyChart(chartKey);
     } else {
       STATE.charts[chartKey] = safeNewChart(canvasId, { type:trendChartType(), data:{ labels:d.labels, datasets:[trendDataset(RE_WIDGET_TYPES[typeId].label, d.data, color)] }, options:reLineOptions(tipo==='balancePct'?'pct':true, mostrarUltimoValor) });
+      if(typeId==='cajaGastos') pintarStatsGenericas(w.instanceId, d.data, (v)=>eur(Math.round(v*100)));
       if(typeId==='cajaBalance') pintarStatsGenericas(w.instanceId, d.data, (v)=>eur(Math.round(v*100)));
       if(typeId==='cajaBalancePct') pintarStatsGenericas(w.instanceId, d.data, (v)=>v.toFixed(1)+'%');
     }
@@ -7653,7 +7654,7 @@ async function renderResumenEjecutivo(){
     }
     const type = RE_WIDGET_TYPES[w.typeId];
     if(!type) return '';
-    const mostrarStatsGenericas = ['ebitdaEuros','ebitdaPct','cajaBalance','cajaBalancePct'].includes(w.typeId);
+    const mostrarStatsGenericas = ['ebitdaEuros','ebitdaPct','cajaGastos','cajaBalance','cajaBalancePct'].includes(w.typeId);
     return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;flex-wrap:wrap;gap:6px;">
         <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>${type.label}</h3>
@@ -8200,7 +8201,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         if(siguiente.typeId==='pnl') altoSiguiente = 60;
         else {
           const infoSig = infoTamanoWidgetPdf(siguiente);
-          const tieneStatsGenericas = ['ebitdaEuros','ebitdaPct','cajaBalance','cajaBalancePct'].includes(siguiente.typeId);
+          const tieneStatsGenericas = ['ebitdaEuros','ebitdaPct','cajaGastos','cajaBalance','cajaBalancePct'].includes(siguiente.typeId);
           const extraSig = ((siguiente.typeId==='cajaCategoriaLinea' && !siguiente.cajaCategoriaEnPct) || tieneStatsGenericas) ? 5 : 0;
           // si el gráfico del siguiente widget todavía no existe en este momento (por lo
           // que sea), no se puede saber su tamaño real con seguridad — se reserva el
@@ -8322,7 +8323,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     if(w.typeId==='cajaCategoriaLinea' && !w.cajaCategoriaEnPct && chart){
       const s = statsLineaCajaEuros(chart.data.datasets[0]?.data||[]);
       if(s) statsCajaTexto = `Media periodo: ${eur(Math.round(s.mediaPeriodo*100))}   ·   Media últ. 3 meses: ${eur(Math.round(s.media3m*100))}   ·   Último mes: ${eur(Math.round(s.ultimoMes*100))}`;
-    } else if(['ebitdaEuros','cajaBalance'].includes(w.typeId) && chart){
+    } else if(['ebitdaEuros','cajaGastos','cajaBalance'].includes(w.typeId) && chart){
       const s = statsLineaCajaEuros(chart.data.datasets[0]?.data||[]);
       if(s) statsCajaTexto = `Media periodo: ${eur(Math.round(s.mediaPeriodo*100))}   ·   Media últ. 3 meses: ${eur(Math.round(s.media3m*100))}   ·   Último mes: ${eur(Math.round(s.ultimoMes*100))}`;
     } else if(['ebitdaPct','cajaBalancePct'].includes(w.typeId) && chart){
