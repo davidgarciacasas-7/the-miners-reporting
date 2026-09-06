@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.274</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.276</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -3176,7 +3176,11 @@ function renderVentas(lines, tickets){
   try{
     const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
     if(tablaVentasEl){ const { filas } = calcularSeguimientoVentas(); tablaVentasEl.innerHTML = construirTablaSeguimientoVentasHtml(filas); }
-  }catch(e){ console.error('Error en calcularSeguimientoVentas:', e); }
+  }catch(e){
+    console.error('Error en calcularSeguimientoVentas:', e);
+    const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
+    if(tablaVentasEl) tablaVentasEl.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de ventas. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
+  }
 }
 document.getElementById('ventasTendenciaGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderVentasTendenciaDia(lines); renderVentasTendenciaFranja(lines); renderVentasCombo(lines); });
 
@@ -8152,53 +8156,67 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     return { chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal };
   }
 
-  // --- Página de portada --- fondo blanco, título grande, y la foto subida (si hay) —
-  // se dibuja en la página inicial del documento (jsPDF ya crea una en blanco al empezar),
-  // y luego se pasa a una página nueva para el resto del informe, que sí lleva cabecera().
+  // --- Página de portada --- fondo blanco, foto a sangre completa en el lateral
+  // izquierdo (si se subió alguna) y el título a la derecha — se dibuja en la página
+  // inicial del documento (jsPDF ya crea una en blanco al empezar), y luego se pasa a una
+  // página nueva para el resto del informe, que sí lleva cabecera().
   doc.setFillColor(255,255,255);
   doc.rect(0,0,W,H,'F');
-  doc.setFillColor(...COBRE);
-  doc.rect(0,0,W,3,'F');
-  doc.setFillColor(...COBRE);
-  doc.rect(0,H-3,W,3,'F');
 
   const fotoPortada = localStorage.getItem('miners_re_portada_foto');
-  let yPortada = H*0.28;
+  const mesGeneracionRaw = new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const mesGeneracion = mesGeneracionRaw.charAt(0).toUpperCase()+mesGeneracionRaw.slice(1);
 
-  doc.setFont('times','normal'); doc.setFontSize(15); doc.setTextColor(...GRIS);
-  const etiquetaSuperior = 'R E S U M E N   E J E C U T I V O';
-  doc.text(etiquetaSuperior, W/2, yPortada, {align:'center'});
-  yPortada += 14;
-
-  doc.setFont('times','bold'); doc.setFontSize(34); doc.setTextColor(...NEGRO);
-  doc.text('The Miners', W/2, yPortada, {align:'center'});
-  yPortada += 13;
-  doc.setTextColor(...COBRE);
-  doc.text('Plaza de España', W/2, yPortada, {align:'center'});
-  yPortada += 10;
-
-  doc.setDrawColor(...COBRE); doc.setLineWidth(0.6);
-  doc.line(W/2-18, yPortada, W/2+18, yPortada);
-  yPortada += 14;
-
+  let anchoFotoPortada = 0;
   if(fotoPortada){
     try{
+      // a sangre completa: desde el borde izquierdo y superior de la página, sin margen —
+      // se recorta (no se deforma) para llenar exactamente ese ancho por toda la altura.
+      anchoFotoPortada = W*0.5;
       const propsFoto = doc.getImageProperties(fotoPortada);
-      const cajaAnchoMax = W*0.55, cajaAltoMax = H-yPortada-margin-14;
-      let anchoFoto = cajaAnchoMax, altoFoto = anchoFoto*(propsFoto.height/propsFoto.width);
-      if(altoFoto>cajaAltoMax){ altoFoto = cajaAltoMax; anchoFoto = altoFoto*(propsFoto.width/propsFoto.height); }
-      const xFoto = (W-anchoFoto)/2;
-      doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
-      doc.rect(xFoto-1.5, yPortada-1.5, anchoFoto+3, altoFoto+3);
-      doc.addImage(fotoPortada, 'JPEG', xFoto, yPortada, anchoFoto, altoFoto);
-      yPortada += altoFoto+14;
-    }catch(e){ console.error('No se pudo dibujar la foto de portada:', e); }
+      const ratioCaja = anchoFotoPortada/H;
+      const ratioFoto = propsFoto.width/propsFoto.height;
+      let sx=0, sy=0, sw=propsFoto.width, sh=propsFoto.height;
+      if(ratioFoto>ratioCaja){ sw = sh*ratioCaja; sx = (propsFoto.width-sw)/2; }
+      else { sh = sw/ratioCaja; sy = (propsFoto.height-sh)/2; }
+      // jsPDF no recorta directamente al insertar, así que el recorte se hace aparte, en
+      // un canvas, antes de pasarle la imagen ya recortada a addImage.
+      const canvasRecorte = document.createElement('canvas');
+      const pxPorMm = 4; // resolución de recorte suficiente para que no se vea pixelado
+      canvasRecorte.width = anchoFotoPortada*pxPorMm;
+      canvasRecorte.height = H*pxPorMm;
+      const ctxRecorte = canvasRecorte.getContext('2d');
+      const imgTmp = new Image();
+      await new Promise((resolve,reject)=>{ imgTmp.onload=resolve; imgTmp.onerror=reject; imgTmp.src=fotoPortada; });
+      ctxRecorte.drawImage(imgTmp, sx, sy, sw, sh, 0, 0, canvasRecorte.width, canvasRecorte.height);
+      const fotoRecortada = canvasRecorte.toDataURL('image/jpeg', 0.9);
+      doc.addImage(fotoRecortada, 'JPEG', 0, 0, anchoFotoPortada, H);
+    }catch(e){ console.error('No se pudo dibujar la foto de portada:', e); anchoFotoPortada = 0; }
   }
 
-  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...GRIS);
-  doc.text('Periodo: '+desde+' a '+hasta, W/2, H-margin-8, {align:'center'});
-  doc.setFontSize(8.5); doc.setTextColor(...GRIS_CLARO);
-  doc.text('Generado el '+hoy, W/2, H-margin-3, {align:'center'});
+  // el título va centrado en el hueco que quede a la derecha de la foto (o en toda la
+  // página si no hay foto)
+  const xTextoDesde = anchoFotoPortada>0 ? anchoFotoPortada : 0;
+  const centroTexto = xTextoDesde + (W-xTextoDesde)/2;
+  let yPortada = H*0.4;
+
+  doc.setFont('times','normal'); doc.setFontSize(14); doc.setTextColor(...GRIS);
+  doc.text('R E S U M E N   E J E C U T I V O', centroTexto, yPortada, {align:'center'});
+  yPortada += 15;
+
+  doc.setFont('times','bold'); doc.setFontSize(30); doc.setTextColor(...NEGRO);
+  doc.text('The Miners', centroTexto, yPortada, {align:'center'});
+  yPortada += 12;
+  doc.setTextColor(...COBRE);
+  doc.text('Plaza de España', centroTexto, yPortada, {align:'center'});
+  yPortada += 11;
+
+  doc.setDrawColor(...COBRE); doc.setLineWidth(0.6);
+  doc.line(centroTexto-16, yPortada, centroTexto+16, yPortada);
+  yPortada += 11;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.setTextColor(...GRIS);
+  doc.text(mesGeneracion, centroTexto, yPortada, {align:'center'});
 
   doc.addPage();
   cabecera(paginaActual);
@@ -8463,6 +8481,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       continue;
     }
     if(w.typeId==='seguimientoCostes'){
+     try{
       if(colPendiente){ y += chartH + 16; colPendiente = null; }
       if(!STATE.caja.storageLoaded) await cajaLoadStorage();
       const { categorias:categoriasW, mesReferencia:mesRefW } = await calcularSeguimientoCostes();
@@ -8546,9 +8565,16 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         (cat.subLineas||[]).forEach(sl=>dibujarFilasDeLineaSc(sl, true));
       });
       y += 10;
+     }catch(e){
+      console.error('Error dibujando Seguimiento de costes en el PDF:', e);
+      doc.setTextColor(...ROJO); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.text('No se pudo generar la tabla de Seguimiento de costes.', margin, y+5);
+      y += 10;
+     }
       continue;
     }
     if(w.typeId==='seguimientoVentas'){
+     try{
       if(colPendiente){ y += chartH + 16; colPendiente = null; }
       const { filas:filasW, mesReferencia:mesRefVW } = calcularSeguimientoVentas();
       if(filasW.length===0) continue;
@@ -8627,6 +8653,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         filaIdxSv++;
       });
       y += 10;
+     }catch(e){
+      console.error('Error dibujando Seguimiento de ventas en el PDF:', e);
+      doc.setTextColor(...ROJO); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.text('No se pudo generar la tabla de Seguimiento de ventas.', margin, y+5);
+      y += 10;
+     }
       continue;
     }
     const type = RE_WIDGET_TYPES[w.typeId];
@@ -9192,15 +9224,25 @@ async function ensureDefaultPnlLines(){
 async function renderSeguimientoCostesWidgetInstance(w){
   const tableEl = document.getElementById('reSeguimientoCostesTabla_'+w.instanceId);
   if(!tableEl) return;
-  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
-  const { categorias } = await calcularSeguimientoCostes();
-  tableEl.innerHTML = construirTablaSeguimientoCostesHtml(categorias);
+  try{
+    if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+    const { categorias } = await calcularSeguimientoCostes();
+    tableEl.innerHTML = construirTablaSeguimientoCostesHtml(categorias);
+  }catch(e){
+    console.error('Error en renderSeguimientoCostesWidgetInstance:', e);
+    tableEl.innerHTML = '<p class="hint" style="color:var(--negative);">No se pudo calcular esta tabla. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
+  }
 }
 async function renderSeguimientoVentasWidgetInstance(w){
   const tableEl = document.getElementById('reSeguimientoVentasTabla_'+w.instanceId);
   if(!tableEl) return;
-  const { filas } = calcularSeguimientoVentas();
-  tableEl.innerHTML = construirTablaSeguimientoVentasHtml(filas);
+  try{
+    const { filas } = calcularSeguimientoVentas();
+    tableEl.innerHTML = construirTablaSeguimientoVentasHtml(filas);
+  }catch(e){
+    console.error('Error en renderSeguimientoVentasWidgetInstance:', e);
+    tableEl.innerHTML = '<p class="hint" style="color:var(--negative);">No se pudo calcular esta tabla. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
+  }
 }
 async function renderPnlWidgetInstance(w){
   const tableEl = document.getElementById('rePnlTabla_'+w.instanceId);
@@ -12948,13 +12990,19 @@ function construirTablaSeguimientoCostesHtml(categorias){
 }
 async function renderCajaSeguimientoCostesTab(el){
   el.innerHTML = '<p class="hint" style="padding:20px;">Cargando...</p>';
-  const { categorias, mesReferencia } = await calcularSeguimientoCostes();
-  el.innerHTML = `
-    <div class="card">
-      <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:6px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+mesReferencia:''}</div>
-      <p class="hint" style="margin-bottom:14px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas del periodo. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la media de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año — si no hay datos guardados de hace un año, se muestra "-". En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
-      <div style="overflow-x:auto;">${construirTablaSeguimientoCostesHtml(categorias)}</div>
-    </div>`;
+  try{
+    if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+    const { categorias, mesReferencia } = await calcularSeguimientoCostes();
+    el.innerHTML = `
+      <div class="card">
+        <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:6px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+mesReferencia:''}</div>
+        <p class="hint" style="margin-bottom:14px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas del periodo. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la media de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año — si no hay datos guardados de hace un año, se muestra "-". En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
+        <div style="overflow-x:auto;">${construirTablaSeguimientoCostesHtml(categorias)}</div>
+      </div>`;
+  }catch(e){
+    console.error('Error en renderCajaSeguimientoCostesTab:', e);
+    el.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de costes. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
+  }
 }
 function cajaSquareIncomeDeMes(m){
   const bruto = (m.movements||[]).filter(mv=>{
