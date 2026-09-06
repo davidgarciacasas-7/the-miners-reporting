@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.276</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.279</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -365,6 +365,17 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
           <p class="hint" id="ventasComboResumen" style="margin-bottom:10px;"></p>
           <div class="chart-wrap"><canvas id="chartVentasCombo"></canvas></div>
         </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Seguimiento de ventas</span>
+          <button class="btn secondary no-print" id="ventasSegVerOcultasBtn" style="display:none;padding:3px 10px;font-size:11px;">Filas ocultas</button>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Ventas brutas y netas, ventas por categoría de Square (y su % sobre el total), nº de tickets, ticket medio, y ventas por tipo de cliente (y su % sobre el total) — cada una con el último mes, la media de los últimos 3 meses, la diferencia frente a los 3 meses anteriores a esos, y la comparación interanual (YoY). En ventas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y bajar es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo). Quitar una fila de aquí también la quita de esta misma tabla en Resumen Ejecutivo.</p>
+        <div id="ventasSegOcultasPanel" class="hidden" style="margin-bottom:12px;padding:10px;background:var(--surface-2);border-radius:8px;">
+          <div class="hint" style="margin-bottom:6px;">Filas quitadas de esta tabla:</div>
+          <div id="ventasSegOcultasLista" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+        <div class="card"><div id="tablaSeguimientoVentas" style="overflow-x:auto;"></div></div>
       </div>
 
       <!-- TICKETS -->
@@ -402,10 +413,6 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <div class="section-title">Detalle por franja</div>
         <div class="card"><table id="tablaFranjas"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>Ventas netas</th><th>Nº tickets</th><th>Ticket medio</th></tr></thead><tbody></tbody></table></div>
-
-        <div class="section-title">Seguimiento de ventas</div>
-        <p class="hint" style="margin-bottom:8px;">Ventas brutas y netas, ventas por categoría de Square (y su % sobre el total), nº de tickets, ticket medio, y ventas por tipo de cliente (y su % sobre el total) — cada una con el último mes, la media de los últimos 3 meses, la diferencia frente a los 3 meses anteriores a esos, y la comparación interanual (YoY). En ventas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y bajar es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
-        <div class="card"><div id="tablaSeguimientoVentas" style="overflow-x:auto;"></div></div>
       </div>
 
       <!-- PRODUCTOS -->
@@ -1534,6 +1541,10 @@ const STATE = {
   filters: { desde:null, hasta:null, categoria:[], articulo:[], segmento:[], franjaTipo:'negocio', diaTipo:'', diaSemana:'', metrica:'absoluto' },
   charts: {},
   ticketsClassified: null,       // cache de clasificación (se invalida al cambiar datos)
+  ventasSeguimientoOcultas: [],  // filas quitadas de la tabla "Seguimiento de ventas"
+  ventasSeguimientoOcultasLoaded: false,
+  ventasSeguimientoIndents: {},  // { "nombre de fila": nivel de sangría }
+  costesSeguimientoIndents: {},  // { "categoría": nivel de sangría }
   pnlLines: [],                  // líneas del PNL (ingreso/coste), con orden
   pnlValues: [],                 // importes manuales introducidos por línea/fecha
   productCosts: [],              // historial de coste final por producto (cada uno vigente desde una fecha)
@@ -3173,14 +3184,62 @@ function renderVentas(lines, tickets){
   try{ renderVentasTendenciaDia(lines); mostrarDiagnosticoSiVacio('chartVentasTendenciaDia','ventasTendenciaDia'); }catch(e){ console.error('Error en renderVentasTendenciaDia:', e); mostrarDiagnosticoError('chartVentasTendenciaDia', e); }
   try{ renderVentasTendenciaFranja(lines); mostrarDiagnosticoSiVacio('chartVentasTendenciaFranja','ventasTendenciaFranja'); }catch(e){ console.error('Error en renderVentasTendenciaFranja:', e); mostrarDiagnosticoError('chartVentasTendenciaFranja', e); }
   try{ renderVentasCombo(lines); mostrarDiagnosticoSiVacio('chartVentasCombo','ventasCombo'); }catch(e){ console.error('Error en renderVentasCombo:', e); mostrarDiagnosticoError('chartVentasCombo', e); }
-  try{
-    const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
-    if(tablaVentasEl){ const { filas } = calcularSeguimientoVentas(); tablaVentasEl.innerHTML = construirTablaSeguimientoVentasHtml(filas); }
-  }catch(e){
-    console.error('Error en calcularSeguimientoVentas:', e);
-    const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
-    if(tablaVentasEl) tablaVentasEl.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de ventas. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
-  }
+  (async () => {
+    try{
+      await cargarVentasSeguimientoOcultas();
+      const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
+      if(!tablaVentasEl) return;
+      const { filas } = calcularSeguimientoVentas();
+      tablaVentasEl.innerHTML = construirTablaSeguimientoVentasHtml(filas, true);
+      const ocultas = STATE.ventasSeguimientoOcultas||[];
+      const verOcultasBtn = document.getElementById('ventasSegVerOcultasBtn');
+      const ocultasLista = document.getElementById('ventasSegOcultasLista');
+      if(verOcultasBtn){
+        verOcultasBtn.style.display = ocultas.length>0 ? 'inline-block' : 'none';
+        verOcultasBtn.textContent = 'Filas ocultas ('+ocultas.length+')';
+        verOcultasBtn.onclick = () => document.getElementById('ventasSegOcultasPanel').classList.toggle('hidden');
+      }
+      if(ocultasLista) ocultasLista.innerHTML = ocultas.map(cat=>`<button class="btn secondary" data-mostrar-seg-ventas="${escapeHtml(cat)}" style="padding:3px 10px;font-size:11px;">↩ ${escapeHtml(cat)}</button>`).join('');
+      tablaVentasEl.querySelectorAll('[data-ocultar-seg-ventas]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const cat = btn.getAttribute('data-ocultar-seg-ventas');
+          STATE.ventasSeguimientoOcultas = [...new Set([...(STATE.ventasSeguimientoOcultas||[]), cat])];
+          await cajaSet('filasOcultasSeguimientoVentas', STATE.ventasSeguimientoOcultas);
+          renderVentas(lines, tickets);
+        });
+      });
+      if(ocultasLista) ocultasLista.querySelectorAll('[data-mostrar-seg-ventas]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const cat = btn.getAttribute('data-mostrar-seg-ventas');
+          STATE.ventasSeguimientoOcultas = (STATE.ventasSeguimientoOcultas||[]).filter(x=>x!==cat);
+          await cajaSet('filasOcultasSeguimientoVentas', STATE.ventasSeguimientoOcultas);
+          renderVentas(lines, tickets);
+        });
+      });
+      tablaVentasEl.querySelectorAll('[data-indent-in-seg-ventas]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const cat = btn.getAttribute('data-indent-in-seg-ventas');
+          STATE.ventasSeguimientoIndents = { ...(STATE.ventasSeguimientoIndents||{}), [cat]: (STATE.ventasSeguimientoIndents?.[cat]||0)+1 };
+          await cajaSet('indentsSeguimientoVentas', STATE.ventasSeguimientoIndents);
+          renderVentas(lines, tickets);
+        });
+      });
+      tablaVentasEl.querySelectorAll('[data-indent-out-seg-ventas]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const cat = btn.getAttribute('data-indent-out-seg-ventas');
+          const actual = STATE.ventasSeguimientoIndents?.[cat]||0;
+          if(actual<=0) return;
+          STATE.ventasSeguimientoIndents = { ...(STATE.ventasSeguimientoIndents||{}), [cat]: actual-1 };
+          await cajaSet('indentsSeguimientoVentas', STATE.ventasSeguimientoIndents);
+          renderVentas(lines, tickets);
+        });
+      });
+    }catch(e){
+      console.error('Error en calcularSeguimientoVentas:', e);
+      const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
+      if(tablaVentasEl) tablaVentasEl.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de ventas. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
+    }
+  })();
 }
 document.getElementById('ventasTendenciaGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderVentasTendenciaDia(lines); renderVentasTendenciaFranja(lines); renderVentasCombo(lines); });
 
@@ -8518,7 +8577,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       doc.setFontSize(7);
       let filaIdxSc = 0;
       const dibujarFilasDeLineaSc = (linea, esSubLinea) => {
-        const indentSc = esSubLinea ? 5 : 0;
+        const indentSc = (linea.indent||0)*3 + (esSubLinea ? 5 : 0);
         const prefijoSc = esSubLinea ? '↳ ' : '';
         if(filaIdxSc%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSc+numColsSc*colAnchoSc+4, filaAltoSc, 'F'); }
         doc.setFont('helvetica','normal'); doc.setTextColor(...NEGRO);
@@ -8614,6 +8673,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         const fmtValorSv = esConteo ? ((v)=>Math.round(v).toLocaleString('en-US')) : ((v)=>pnlFmtPdfSv(v)+'€');
         const fmtValorConSignoSv = esConteo ? fmtConteoConSignoSv : fmtEurosConSignoSv;
         const sufijoSv = esConteo ? '' : ' (€)';
+        const indentSv = (f.indent||0)*3;
         const numFilasF = (f.esSimple || f.esConteo) ? 1 : 2;
         if(y + filaAltoSv*numFilasF > yLimite){
           nuevaPagina();
@@ -8623,7 +8683,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         }
         if(filaIdxSv%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSv+numColsSv*colAnchoSv+4, filaAltoSv, 'F'); }
         doc.setFont('helvetica','normal'); doc.setTextColor(...NEGRO);
-        doc.text(f.categoria+sufijoSv, margin, y+3.5, { maxWidth: colNombreAnchoSv-2 });
+        doc.text(f.categoria+sufijoSv, margin+indentSv, y+3.5, { maxWidth: colNombreAnchoSv-2-indentSv });
         doc.text(fmtValorSv(f.ultimoMesEuros), margin+colNombreAnchoSv+0*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
         doc.setTextColor(...colorDifSv(f.difMesAnteriorEuros));
         doc.text(f.difMesAnteriorEuros===null?'-':fmtValorConSignoSv(f.difMesAnteriorEuros), margin+colNombreAnchoSv+1*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
@@ -8639,7 +8699,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
         if(f.esSimple || f.esConteo) return; // sin fila de % debajo
         if(filaIdxSv%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSv+numColsSv*colAnchoSv+4, filaAltoSv, 'F'); }
         doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
-        doc.text(f.categoria+' (% del total)', margin, y+3.5, { maxWidth: colNombreAnchoSv-2 });
+        doc.text(f.categoria+' (% del total)', margin+indentSv, y+3.5, { maxWidth: colNombreAnchoSv-2-indentSv });
         doc.text(f.ultimoMesPct===null?'-':fmtPctSv(f.ultimoMesPct), margin+colNombreAnchoSv+0*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
         doc.setTextColor(...colorDifSv(f.difMesAnteriorPctBps));
         doc.text(f.difMesAnteriorPctBps===null?'-':fmtBpsSv(f.difMesAnteriorPctBps), margin+colNombreAnchoSv+1*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
@@ -11308,11 +11368,26 @@ async function cajaSet(key, value){
     return true;
   }catch(e){ console.error('Error guardando en caja_storage:', e); return false; }
 }
+/* carga (una sola vez) la lista de filas ocultadas de "Seguimiento de ventas" — se guarda
+   en la misma tabla genérica de almacenamiento que usa Caja (caja_storage), aunque esto
+   viva en la pestaña de Ventas, para no tener que montar un mecanismo de guardado nuevo. */
+async function cargarVentasSeguimientoOcultas(){
+  if(STATE.ventasSeguimientoOcultasLoaded) return;
+  try{
+    const v = await cajaGet('filasOcultasSeguimientoVentas');
+    if(v) STATE.ventasSeguimientoOcultas = v;
+    const ind = await cajaGet('indentsSeguimientoVentas');
+    if(ind) STATE.ventasSeguimientoIndents = ind;
+  }catch(e){ console.error('Error cargando filas ocultas de Seguimiento de ventas:', e); }
+  STATE.ventasSeguimientoOcultasLoaded = true;
+}
 async function cajaLoadStorage(){
   try{
     const pp = await cajaGet('personal_provs'); if(pp) STATE.caja.savedPersonalProvs = pp;
     const p = await cajaGet('providers'); if(p) STATE.caja.savedProviders = p.map(x=>({...x, tipo:x.tipo||'gasto'}));
     const catsOcultas = await cajaGet('categoriasOcultasGraficos'); if(catsOcultas) STATE.caja.categoriasOcultasGraficos = catsOcultas;
+    const catsOcultasSc = await cajaGet('categoriasOcultasSeguimientoCostes'); if(catsOcultasSc) STATE.caja.categoriasOcultasSeguimientoCostes = catsOcultasSc;
+    const indentsSc = await cajaGet('indentsSeguimientoCostes'); if(indentsSc) STATE.costesSeguimientoIndents = indentsSc;
     const sc2 = await cajaGet('subcats'); if(sc2) STATE.caja.savedSubcats = sc2;
     const a = await cajaGet('months'); if(a) STATE.caja.savedMonths = a;
     const b = await cajaGet('cats'); if(b) STATE.caja.savedCats = b;
@@ -12770,31 +12845,34 @@ function calcularSeguimientoVentas(){
   }
 
   const totalBrutoEnIdx = (idx) => porBucket[idx].bruto;
+  const indentsSv = STATE.ventasSeguimientoIndents||{};
 
   const filas = [];
-  filas.push(calcularMetricas('Ventas brutas', (idx)=>porBucket[idx].bruto, null, {esSimple:true}));
-  filas.push(calcularMetricas('Ventas netas', (idx)=>porBucket[idx].neto, null, {esSimple:true}));
+  filas.push(calcularMetricas('Ventas brutas', (idx)=>porBucket[idx].bruto, null, {esSimple:true, indent:indentsSv['Ventas brutas']||0}));
+  filas.push(calcularMetricas('Ventas netas', (idx)=>porBucket[idx].neto, null, {esSimple:true, indent:indentsSv['Ventas netas']||0}));
 
   const categoriasSquare = [...new Set(allLines.map(l=>displayCategoryFor(l.categoria)))].sort();
   categoriasSquare.forEach(cat=>{
-    filas.push(calcularMetricas(cat, (idx)=>porBucket[idx].porCategoria[cat]||0, totalBrutoEnIdx, {esCategoriaSquare:true}));
+    filas.push(calcularMetricas(cat, (idx)=>porBucket[idx].porCategoria[cat]||0, totalBrutoEnIdx, {esCategoriaSquare:true, indent:indentsSv[cat]||0}));
   });
 
-  filas.push(calcularMetricas('Nº de tickets', (idx)=>porBucket[idx].tickets, null, {esConteo:true}));
-  filas.push(calcularMetricas('Ticket medio', (idx)=>porBucket[idx].tickets>0 ? porBucket[idx].bruto/porBucket[idx].tickets : 0, null, {esSimple:true}));
+  filas.push(calcularMetricas('Nº de tickets', (idx)=>porBucket[idx].tickets, null, {esConteo:true, indent:indentsSv['Nº de tickets']||0}));
+  filas.push(calcularMetricas('Ticket medio', (idx)=>porBucket[idx].tickets>0 ? porBucket[idx].bruto/porBucket[idx].tickets : 0, null, {esSimple:true, indent:indentsSv['Ticket medio']||0}));
 
   const SEGMENTOS_CLIENTE = [ ['nuevo','Nuevo'], ['repetido','Repetido sin fidelidad'], ['fidelidad','Con fidelidad'], ['noident','No identificable (efectivo)'] ];
   SEGMENTOS_CLIENTE.forEach(([key,etiqueta])=>{
-    filas.push(calcularMetricas(etiqueta, (idx)=>porBucket[idx].porSegmento[key]||0, totalBrutoEnIdx, {esSegmentoCliente:true}));
+    filas.push(calcularMetricas(etiqueta, (idx)=>porBucket[idx].porSegmento[key]||0, totalBrutoEnIdx, {esSegmentoCliente:true, indent:indentsSv[etiqueta]||0}));
   });
 
-  return { filas, mesReferencia };
+  const ocultasVentas = STATE.ventasSeguimientoOcultas||[];
+  const filasVisibles = filas.filter(f=>!ocultasVentas.includes(f.categoria));
+  return { filas:filasVisibles, mesReferencia };
 }
 /* construye el HTML de la tabla de Seguimiento de ventas — mismo formato visual que la de
    costes, pero en ventas SUBIR es lo bueno (verde) y BAJAR es lo malo (rojo). Las filas
    "simples" (Ventas brutas/netas, Ticket medio) y de "conteo" (Nº de tickets) no llevan
    fila de % debajo, ya que no son "una parte de un total". */
-function construirTablaSeguimientoVentasHtml(filas){
+function construirTablaSeguimientoVentasHtml(filas, mostrarBotonOcultar){
   if(filas.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de ventas todavía.</p>';
   const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
   const fmtEurosConSigno = (val) => (val>=0?'+':'')+pnlFmt(val);
@@ -12809,9 +12887,12 @@ function construirTablaSeguimientoVentasHtml(filas){
     const unidad = esConteo ? '' : ' (€)';
     const fmtValor = esConteo ? fmtConteo : pnlFmt;
     const fmtValorConSigno = esConteo ? fmtConteoConSigno : fmtEurosConSigno;
+    const sangria = `padding-left:${(f.indent||0)*20}px;`;
+    const botonOcultar = mostrarBotonOcultar ? ` <button class="btn danger no-print" data-ocultar-seg-ventas="${escapeHtml(f.categoria)}" title="Quitar esta fila de esta tabla" style="padding:0px 5px;font-size:9px;">✕</button>` : '';
+    const botonesIndent = mostrarBotonOcultar ? ` <button class="btn secondary no-print" data-indent-out-seg-ventas="${escapeHtml(f.categoria)}" title="Quitar sangría" style="padding:0px 5px;font-size:9px;" ${(f.indent||0)<=0?'disabled':''}>←</button><button class="btn secondary no-print" data-indent-in-seg-ventas="${escapeHtml(f.categoria)}" title="Sangrar" style="padding:0px 5px;font-size:9px;">→</button>` : '';
     const filaValor = `
     <tr>
-      <td>${escapeHtml(f.categoria)}${unidad}</td>
+      <td style="${sangria}">${escapeHtml(f.categoria)}${unidad}${botonesIndent}${botonOcultar}</td>
       <td class="num">${fmtValor(f.ultimoMesEuros)}</td>
       <td class="num" style="color:${colorDif(f.difMesAnteriorEuros)};font-weight:600;">${f.difMesAnteriorEuros===null?'-':fmtValorConSigno(f.difMesAnteriorEuros)}</td>
       <td class="num">${fmtValor(f.media3mEuros)}</td>
@@ -12821,7 +12902,7 @@ function construirTablaSeguimientoVentasHtml(filas){
     if(f.esSimple || f.esConteo) return filaValor; // sin fila de % debajo
     return filaValor + `
     <tr style="background:var(--surface-2);">
-      <td class="hint">${escapeHtml(f.categoria)} (% del total)</td>
+      <td class="hint" style="${sangria}">${escapeHtml(f.categoria)} (% del total)</td>
       <td class="num hint">${f.ultimoMesPct===null?'-':fmtPct(f.ultimoMesPct)}</td>
       <td class="num" style="color:${colorDif(f.difMesAnteriorPctBps)};font-weight:600;">${f.difMesAnteriorPctBps===null?'-':fmtBps(f.difMesAnteriorPctBps)}</td>
       <td class="num hint">${f.media3mPct===null?'-':fmtPct(f.media3mPct)}</td>
@@ -12840,7 +12921,8 @@ async function calcularSeguimientoCostes(){
   const excluirPropinas = getExcluirPropinasNominaCaja();
   const catSet = new Set();
   ordenados.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
-  const cats = [...catSet].sort();
+  const ocultasSc = STATE.caja.categoriasOcultasSeguimientoCostes||[];
+  const cats = [...catSet].filter(cat=>!ocultasSc.includes(cat)).sort();
 
   function eurosDeCategoriaEnMes(cat, entry){
     let euros = (entry.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
@@ -12920,7 +13002,8 @@ async function calcularSeguimientoCostes(){
     return { categoria:etiqueta, ultimoMesEuros, difMesAnteriorEuros, difMesAnteriorPctBps, media3mEuros, dif3mEuros, yoyEuros, ultimoMesPct, media3mPct, dif3mPctBps, yoyPctBps, ...extra };
   }
 
-  const categorias = cats.map(cat => calcularMetricas(cat, (idx)=>eurosDeCategoriaEnMes(cat, ordenados[idx])));
+  const indentsSc = STATE.costesSeguimientoIndents||{};
+  const categorias = cats.map(cat => calcularMetricas(cat, (idx)=>eurosDeCategoriaEnMes(cat, ordenados[idx]), {indent:indentsSc[cat]||0}));
 
   // sublíneas de PNL bajo "Alimentos" (Costes de producción, Merma, Stock faltante) — se
   // calculan con el mismo motor de PNL (pnlLineValueForBucket), para que coincidan exacto
@@ -12955,7 +13038,7 @@ async function calcularSeguimientoCostes(){
 /* construye el HTML de la tabla de Seguimiento de costes, con el mismo estilo visual que
    la tabla de PNL (número en monoespaciada, verde/rojo según si el coste sube o baja) —
    se usa tanto en la pestaña de Caja como en el widget de Resumen Ejecutivo. */
-function construirTablaSeguimientoCostesHtml(categorias){
+function construirTablaSeguimientoCostesHtml(categorias, mostrarBotonOcultar){
   if(categorias.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de Caja todavía.</p>';
   const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
   const fmtEurosConSigno = (val) => (val>=0?'+':'')+pnlFmt(val);
@@ -12965,11 +13048,17 @@ function construirTablaSeguimientoCostesHtml(categorias){
   // línea de ingresos, donde subir sería lo bueno.
   const colorDif = (val) => val===null ? 'var(--text-muted)' : (val<0 ? 'var(--positive)' : (val>0 ? 'var(--negative)' : 'var(--text)'));
   function filasDeLinea(c, esSubLinea){
-    const sangria = esSubLinea ? 'padding-left:22px;' : '';
+    const indentPx = (c.indent||0)*20 + (esSubLinea?22:0);
+    const sangria = `padding-left:${indentPx}px;`;
     const prefijo = esSubLinea ? '↳ ' : '';
+    // el botón de ocultar y los de sangría solo tienen sentido en categorías reales de
+    // Caja, no en las sublíneas de PNL (Costes de producción, Merma, Stock faltante), que
+    // no son categorías independientes que se puedan quitar o reordenar por separado.
+    const botonOcultar = (mostrarBotonOcultar && !esSubLinea) ? ` <button class="btn danger no-print" data-ocultar-seg-costes="${escapeHtml(c.categoria)}" title="Quitar esta categoría de esta tabla" style="padding:0px 5px;font-size:9px;">✕</button>` : '';
+    const botonesIndent = (mostrarBotonOcultar && !esSubLinea) ? ` <button class="btn secondary no-print" data-indent-out-seg-costes="${escapeHtml(c.categoria)}" title="Quitar sangría" style="padding:0px 5px;font-size:9px;" ${(c.indent||0)<=0?'disabled':''}>←</button><button class="btn secondary no-print" data-indent-in-seg-costes="${escapeHtml(c.categoria)}" title="Sangrar" style="padding:0px 5px;font-size:9px;">→</button>` : '';
     return `
     <tr>
-      <td style="${sangria}">${prefijo}${escapeHtml(c.categoria)} (€)</td>
+      <td style="${sangria}">${prefijo}${escapeHtml(c.categoria)} (€)${botonesIndent}${botonOcultar}</td>
       <td class="num">${pnlFmt(c.ultimoMesEuros)}</td>
       <td class="num" style="color:${colorDif(c.difMesAnteriorEuros)};font-weight:600;">${c.difMesAnteriorEuros===null?'-':fmtEurosConSigno(c.difMesAnteriorEuros)}</td>
       <td class="num">${pnlFmt(c.media3mEuros)}</td>
@@ -12993,12 +13082,58 @@ async function renderCajaSeguimientoCostesTab(el){
   try{
     if(!STATE.caja.storageLoaded) await cajaLoadStorage();
     const { categorias, mesReferencia } = await calcularSeguimientoCostes();
+    const ocultas = STATE.caja.categoriasOcultasSeguimientoCostes||[];
     el.innerHTML = `
       <div class="card">
-        <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:6px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+mesReferencia:''}</div>
-        <p class="hint" style="margin-bottom:14px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas del periodo. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la media de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año — si no hay datos guardados de hace un año, se muestra "-". En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
-        <div style="overflow-x:auto;">${construirTablaSeguimientoCostesHtml(categorias)}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
+          <div style="color:var(--copper);font-weight:700;font-size:14px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+mesReferencia:''}</div>
+          ${ocultas.length>0 ? `<button class="btn secondary no-print" id="cajaSegCostesVerOcultasBtn" style="padding:3px 10px;font-size:11px;">Categorías ocultas (${ocultas.length})</button>` : ''}
+        </div>
+        <p class="hint" style="margin-bottom:14px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas del periodo. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la media de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año — si no hay datos guardados de hace un año, se muestra "-". En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo). Quitar una categoría de aquí (✕) también la quita de esta misma tabla en Resumen Ejecutivo.</p>
+        ${ocultas.length>0 ? `<div id="cajaSegCostesOcultasPanel" class="hidden" style="margin-bottom:12px;padding:10px;background:var(--surface-2);border-radius:8px;">
+          <div class="hint" style="margin-bottom:6px;">Categorías quitadas de esta tabla:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${ocultas.map(cat=>`<button class="btn secondary" data-mostrar-seg-costes="${escapeHtml(cat)}" style="padding:3px 10px;font-size:11px;">↩ ${escapeHtml(cat)}</button>`).join('')}
+          </div>
+        </div>` : ''}
+        <div style="overflow-x:auto;">${construirTablaSeguimientoCostesHtml(categorias, true)}</div>
       </div>`;
+    el.querySelectorAll('[data-ocultar-seg-costes]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cat = btn.getAttribute('data-ocultar-seg-costes');
+        STATE.caja.categoriasOcultasSeguimientoCostes = [...new Set([...(STATE.caja.categoriasOcultasSeguimientoCostes||[]), cat])];
+        cajaSet('categoriasOcultasSeguimientoCostes', STATE.caja.categoriasOcultasSeguimientoCostes);
+        renderCajaSeguimientoCostesTab(el);
+      });
+    });
+    el.querySelectorAll('[data-mostrar-seg-costes]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cat = btn.getAttribute('data-mostrar-seg-costes');
+        STATE.caja.categoriasOcultasSeguimientoCostes = (STATE.caja.categoriasOcultasSeguimientoCostes||[]).filter(x=>x!==cat);
+        cajaSet('categoriasOcultasSeguimientoCostes', STATE.caja.categoriasOcultasSeguimientoCostes);
+        renderCajaSeguimientoCostesTab(el);
+      });
+    });
+    el.querySelectorAll('[data-indent-in-seg-costes]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cat = btn.getAttribute('data-indent-in-seg-costes');
+        STATE.costesSeguimientoIndents = { ...(STATE.costesSeguimientoIndents||{}), [cat]: (STATE.costesSeguimientoIndents?.[cat]||0)+1 };
+        cajaSet('indentsSeguimientoCostes', STATE.costesSeguimientoIndents);
+        renderCajaSeguimientoCostesTab(el);
+      });
+    });
+    el.querySelectorAll('[data-indent-out-seg-costes]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const cat = btn.getAttribute('data-indent-out-seg-costes');
+        const actual = STATE.costesSeguimientoIndents?.[cat]||0;
+        if(actual<=0) return;
+        STATE.costesSeguimientoIndents = { ...(STATE.costesSeguimientoIndents||{}), [cat]: actual-1 };
+        cajaSet('indentsSeguimientoCostes', STATE.costesSeguimientoIndents);
+        renderCajaSeguimientoCostesTab(el);
+      });
+    });
+    const verOcultasBtn = document.getElementById('cajaSegCostesVerOcultasBtn');
+    if(verOcultasBtn) verOcultasBtn.addEventListener('click', ()=>{ document.getElementById('cajaSegCostesOcultasPanel').classList.toggle('hidden'); });
   }catch(e){
     console.error('Error en renderCajaSeguimientoCostesTab:', e);
     el.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de costes. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
