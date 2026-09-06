@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.269</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.274</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -402,6 +402,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 
         <div class="section-title">Detalle por franja</div>
         <div class="card"><table id="tablaFranjas"><thead><tr><th>Franja</th><th>Ventas brutas</th><th>Ventas netas</th><th>Nº tickets</th><th>Ticket medio</th></tr></thead><tbody></tbody></table></div>
+
+        <div class="section-title">Seguimiento de ventas</div>
+        <p class="hint" style="margin-bottom:8px;">Ventas brutas y netas, ventas por categoría de Square (y su % sobre el total), nº de tickets, ticket medio, y ventas por tipo de cliente (y su % sobre el total) — cada una con el último mes, la media de los últimos 3 meses, la diferencia frente a los 3 meses anteriores a esos, y la comparación interanual (YoY). En ventas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y bajar es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
+        <div class="card"><div id="tablaSeguimientoVentas" style="overflow-x:auto;"></div></div>
       </div>
 
       <!-- PRODUCTOS -->
@@ -1227,6 +1231,16 @@ Bowl de acai,Acai,150,g</pre>
           </div>
         </div>
         <p class="hint" style="margin-bottom:14px;">Todos los gráficos usan el mismo periodo elegido arriba. Arrastra una tarjeta por su cabecera (✥) para reordenarla.</p>
+        <div class="card" style="margin-bottom:16px;">
+          <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Portada del PDF</label>
+          <p class="hint" style="margin-bottom:10px;">Foto que aparece en la página de portada del informe, junto al título. Si no subes ninguna, la portada sale sin foto.</p>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div id="rePortadaFotoPreviewWrap" style="display:none;width:120px;height:80px;border-radius:8px;overflow:hidden;border:1px solid var(--line);"><img id="rePortadaFotoPreview" style="width:100%;height:100%;object-fit:cover;"></div>
+            <input type="file" id="rePortadaFotoInput" accept="image/*" style="display:none;">
+            <button class="btn secondary no-print" id="rePortadaFotoSubirBtn">Subir foto</button>
+            <button class="btn danger no-print" id="rePortadaFotoQuitarBtn" style="display:none;">Quitar foto</button>
+          </div>
+        </div>
         <div class="card" style="margin-bottom:16px;">
           <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Resumen ejecutivo (opcional — solo aparece en el PDF si escribes algo aquí)</label>
           <div class="no-print" style="display:flex;gap:6px;margin-bottom:8px;">
@@ -3159,6 +3173,10 @@ function renderVentas(lines, tickets){
   try{ renderVentasTendenciaDia(lines); mostrarDiagnosticoSiVacio('chartVentasTendenciaDia','ventasTendenciaDia'); }catch(e){ console.error('Error en renderVentasTendenciaDia:', e); mostrarDiagnosticoError('chartVentasTendenciaDia', e); }
   try{ renderVentasTendenciaFranja(lines); mostrarDiagnosticoSiVacio('chartVentasTendenciaFranja','ventasTendenciaFranja'); }catch(e){ console.error('Error en renderVentasTendenciaFranja:', e); mostrarDiagnosticoError('chartVentasTendenciaFranja', e); }
   try{ renderVentasCombo(lines); mostrarDiagnosticoSiVacio('chartVentasCombo','ventasCombo'); }catch(e){ console.error('Error en renderVentasCombo:', e); mostrarDiagnosticoError('chartVentasCombo', e); }
+  try{
+    const tablaVentasEl = document.getElementById('tablaSeguimientoVentas');
+    if(tablaVentasEl){ const { filas } = calcularSeguimientoVentas(); tablaVentasEl.innerHTML = construirTablaSeguimientoVentasHtml(filas); }
+  }catch(e){ console.error('Error en calcularSeguimientoVentas:', e); }
 }
 document.getElementById('ventasTendenciaGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderVentasTendenciaDia(lines); renderVentasTendenciaFranja(lines); renderVentasCombo(lines); });
 
@@ -6919,6 +6937,8 @@ const RE_WIDGET_TYPES = {
   cajaIngresos:  { label:'Caja — Ingresos Square + Efectivo por mes', tipo:'snapshot-async' },
   cajaBalance:   { label:'Flujo de caja mensual', tipo:'snapshot-async' },
   cajaBalancePct:{ label:'Flujo de caja mensual (% de Ventas netas)', tipo:'snapshot-async' },
+  seguimientoCostes:{ label:'Caja — Seguimiento de costes (tabla)', tipo:'tabla' },
+  seguimientoVentas:{ label:'Ventas — Seguimiento de ventas (tabla)', tipo:'tabla' },
   pnl:           { label:'PNL (con su propio periodo, independiente del resto)', tipo:'pnl' },
   pnlLinea:      { label:'PNL — evolución de una línea (tú eliges cuál)', tipo:'pnlLinea' },
   cajaCategoriaLinea: { label:'Caja — evolución de gasto por categoría (añade de golpe todas las que no tengas ocultas en Caja, en €)', tipo:'cajaCategoriaLinea' },
@@ -7549,6 +7569,67 @@ async function renderResumenEjecutivo(){
   }
   renderReAddWidgetSelect();
   renderReTemplateSelect();
+  // portada del PDF: cargar la foto guardada (si hay) y mostrar su vista previa
+  const fotoGuardada = localStorage.getItem('miners_re_portada_foto');
+  const previewWrap = document.getElementById('rePortadaFotoPreviewWrap');
+  const quitarFotoBtn = document.getElementById('rePortadaFotoQuitarBtn');
+  if(previewWrap && quitarFotoBtn){
+    if(fotoGuardada){
+      document.getElementById('rePortadaFotoPreview').src = fotoGuardada;
+      previewWrap.style.display = 'block';
+      quitarFotoBtn.style.display = 'inline-block';
+    } else {
+      previewWrap.style.display = 'none';
+      quitarFotoBtn.style.display = 'none';
+    }
+  }
+  const fotoSubirBtn = document.getElementById('rePortadaFotoSubirBtn');
+  const fotoInput = document.getElementById('rePortadaFotoInput');
+  if(fotoSubirBtn && !fotoSubirBtn.dataset.wired){
+    fotoSubirBtn.dataset.wired = '1';
+    fotoSubirBtn.addEventListener('click', ()=>fotoInput.click());
+    fotoInput.addEventListener('change', ()=>{
+      const file = fotoInput.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // se reduce y se recomprime a JPEG antes de guardar — una foto de móvil sin
+          // tocar puede pesar varios MB, y eso se notaría tanto en localStorage (que
+          // tiene un límite de espacio) como en el peso final del PDF.
+          const maxAncho = 1200;
+          const escala = Math.min(1, maxAncho/img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width*escala;
+          canvas.height = img.height*escala;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          try{
+            localStorage.setItem('miners_re_portada_foto', dataUrl);
+            document.getElementById('rePortadaFotoPreview').src = dataUrl;
+            previewWrap.style.display = 'block';
+            quitarFotoBtn.style.display = 'inline-block';
+            toast('Foto de portada guardada ✓');
+          }catch(err){
+            toast('La foto sigue siendo demasiado grande para guardarla. Prueba con otra más ligera.', true);
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      fotoInput.value = '';
+    });
+  }
+  if(quitarFotoBtn && !quitarFotoBtn.dataset.wired){
+    quitarFotoBtn.dataset.wired = '1';
+    quitarFotoBtn.addEventListener('click', ()=>{
+      localStorage.removeItem('miners_re_portada_foto');
+      previewWrap.style.display = 'none';
+      quitarFotoBtn.style.display = 'none';
+    });
+  }
   const introEl = document.getElementById('reIntroduccion');
   if(introEl && !introEl.dataset.wired){
     // se guarda como HTML ahora (para poder tener negrita/viñetas) — si había algo escrito
@@ -7616,6 +7697,26 @@ async function renderResumenEjecutivo(){
         <div style="overflow-x:auto;" id="rePnlTabla_${w.instanceId}"></div>
       </div>`;
     }
+    if(w.typeId==='seguimientoCostes'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}" style="grid-column:1 / -1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Caja — Seguimiento de costes</h3>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <p class="hint" style="margin-bottom:10px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año. En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
+        <div style="overflow-x:auto;" id="reSeguimientoCostesTabla_${w.instanceId}"></div>
+      </div>`;
+    }
+    if(w.typeId==='seguimientoVentas'){
+      return `<div class="card" draggable="true" data-re-instance="${w.instanceId}" style="grid-column:1 / -1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <h3 style="cursor:grab;margin:0;"><span class="no-print">✥ </span>Seguimiento de ventas</h3>
+          <button class="btn danger no-print" data-re-quitar="${w.instanceId}" style="padding:2px 8px;font-size:11px;">✕</button>
+        </div>
+        <p class="hint" style="margin-bottom:10px;">Ventas brutas y netas, ventas por categoría de Square (y su % sobre el total), nº de tickets, ticket medio, y ventas por tipo de cliente (y su % sobre el total). En ventas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y bajar es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
+        <div style="overflow-x:auto;" id="reSeguimientoVentasTabla_${w.instanceId}"></div>
+      </div>`;
+    }
     if(w.typeId==='pnlLinea'){
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -7673,6 +7774,8 @@ async function renderResumenEjecutivo(){
   for(const w of widgets){
     if(w.typeId==='texto') continue;
     if(w.typeId==='pnl'){ await renderPnlWidgetInstance(w); continue; }
+    if(w.typeId==='seguimientoCostes'){ await renderSeguimientoCostesWidgetInstance(w); continue; }
+    if(w.typeId==='seguimientoVentas'){ await renderSeguimientoVentasWidgetInstance(w); continue; }
     if(w.typeId==='pnlLinea'){ await renderPnlLineaWidgetInstance(w, buckets); continue; }
     if(w.typeId==='cajaCategoriaLinea'){ await renderCajaCategoriaLineaWidgetInstance(w, buckets); continue; }
     if(w.typeId==='cajaPieCategoria'){ await renderCajaPieCategoriaWidgetInstance(w, buckets); continue; }
@@ -8049,6 +8152,55 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     return { chart, esCircular, necesitaFilaCompleta, chartWLocal, chartHLocal };
   }
 
+  // --- Página de portada --- fondo blanco, título grande, y la foto subida (si hay) —
+  // se dibuja en la página inicial del documento (jsPDF ya crea una en blanco al empezar),
+  // y luego se pasa a una página nueva para el resto del informe, que sí lleva cabecera().
+  doc.setFillColor(255,255,255);
+  doc.rect(0,0,W,H,'F');
+  doc.setFillColor(...COBRE);
+  doc.rect(0,0,W,3,'F');
+  doc.setFillColor(...COBRE);
+  doc.rect(0,H-3,W,3,'F');
+
+  const fotoPortada = localStorage.getItem('miners_re_portada_foto');
+  let yPortada = H*0.28;
+
+  doc.setFont('times','normal'); doc.setFontSize(15); doc.setTextColor(...GRIS);
+  const etiquetaSuperior = 'R E S U M E N   E J E C U T I V O';
+  doc.text(etiquetaSuperior, W/2, yPortada, {align:'center'});
+  yPortada += 14;
+
+  doc.setFont('times','bold'); doc.setFontSize(34); doc.setTextColor(...NEGRO);
+  doc.text('The Miners', W/2, yPortada, {align:'center'});
+  yPortada += 13;
+  doc.setTextColor(...COBRE);
+  doc.text('Plaza de España', W/2, yPortada, {align:'center'});
+  yPortada += 10;
+
+  doc.setDrawColor(...COBRE); doc.setLineWidth(0.6);
+  doc.line(W/2-18, yPortada, W/2+18, yPortada);
+  yPortada += 14;
+
+  if(fotoPortada){
+    try{
+      const propsFoto = doc.getImageProperties(fotoPortada);
+      const cajaAnchoMax = W*0.55, cajaAltoMax = H-yPortada-margin-14;
+      let anchoFoto = cajaAnchoMax, altoFoto = anchoFoto*(propsFoto.height/propsFoto.width);
+      if(altoFoto>cajaAltoMax){ altoFoto = cajaAltoMax; anchoFoto = altoFoto*(propsFoto.width/propsFoto.height); }
+      const xFoto = (W-anchoFoto)/2;
+      doc.setDrawColor(...LINEA); doc.setLineWidth(0.3);
+      doc.rect(xFoto-1.5, yPortada-1.5, anchoFoto+3, altoFoto+3);
+      doc.addImage(fotoPortada, 'JPEG', xFoto, yPortada, anchoFoto, altoFoto);
+      yPortada += altoFoto+14;
+    }catch(e){ console.error('No se pudo dibujar la foto de portada:', e); }
+  }
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...GRIS);
+  doc.text('Periodo: '+desde+' a '+hasta, W/2, H-margin-8, {align:'center'});
+  doc.setFontSize(8.5); doc.setTextColor(...GRIS_CLARO);
+  doc.text('Generado el '+hoy, W/2, H-margin-3, {align:'center'});
+
+  doc.addPage();
   cabecera(paginaActual);
   let y = yInicio;
   let colPendiente = null;
@@ -8307,6 +8459,173 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
           lineas.forEach(l=>{ doc.text(l, margin, y+3); y += 4; });
         });
       }
+      y += 10;
+      continue;
+    }
+    if(w.typeId==='seguimientoCostes'){
+      if(colPendiente){ y += chartH + 16; colPendiente = null; }
+      if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+      const { categorias:categoriasW, mesReferencia:mesRefW } = await calcularSeguimientoCostes();
+      if(categoriasW.length===0) continue;
+
+      const pnlFmtPdfSc = (val) => Math.round(val).toLocaleString('en-US');
+      const fmtEurosConSignoSc = (val) => (val>=0?'+':'')+pnlFmtPdfSc(val)+'€';
+      const fmtPctSc = (val) => val.toFixed(1)+'%';
+      const fmtBpsSc = (val) => (val>=0?'+':'')+Math.round(val)+' bps';
+      // para un COSTE, bajar es bueno (verde) y subir es malo (rojo) — al revés que una
+      // línea de ingresos, donde subir sería lo bueno.
+      const colorDifSc = (val) => val===null ? GRIS : (val<0 ? VERDE : (val>0 ? ROJO : NEGRO));
+
+      const colNombreAnchoSc = 50;
+      const numColsSc = 5;
+      const colAnchoSc = (W-margin*2-colNombreAnchoSc)/numColsSc;
+      const filaAltoSc = 5;
+      const cabecerasSc = ['Último mes','vs mes ant.','Media últ. 3m','Dif. vs 3m ant.','YoY'];
+
+      const dibujarCabeceraTablaSc = () => {
+        doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
+        doc.text('Caja — Seguimiento de costes'+(mesRefW?' — datos hasta '+mesRefW:''), margin, y+5);
+        y += 9;
+        doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
+        doc.text('Categoría', margin, y+3.5);
+        cabecerasSc.forEach((cab,i)=>{ doc.text(cab, margin+colNombreAnchoSc+i*colAnchoSc+colAnchoSc, y+3.5, {align:'right'}); });
+        y += filaAltoSc;
+        doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAnchoSc+numColsSc*colAnchoSc, y);
+        y += 3;
+      };
+
+      if(y + 20 > yLimite) nuevaPagina();
+      dibujarCabeceraTablaSc();
+      doc.setFontSize(7);
+      let filaIdxSc = 0;
+      const dibujarFilasDeLineaSc = (linea, esSubLinea) => {
+        const indentSc = esSubLinea ? 5 : 0;
+        const prefijoSc = esSubLinea ? '↳ ' : '';
+        if(filaIdxSc%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSc+numColsSc*colAnchoSc+4, filaAltoSc, 'F'); }
+        doc.setFont('helvetica','normal'); doc.setTextColor(...NEGRO);
+        doc.text(prefijoSc+linea.categoria+' (€)', margin+indentSc, y+3.5, { maxWidth: colNombreAnchoSc-2-indentSc });
+        doc.text(pnlFmtPdfSc(linea.ultimoMesEuros)+'€', margin+colNombreAnchoSc+0*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSc(linea.difMesAnteriorEuros));
+        doc.text(linea.difMesAnteriorEuros===null?'-':fmtEurosConSignoSc(linea.difMesAnteriorEuros), margin+colNombreAnchoSc+1*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...NEGRO);
+        doc.text(pnlFmtPdfSc(linea.media3mEuros)+'€', margin+colNombreAnchoSc+2*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSc(linea.dif3mEuros));
+        doc.text(linea.dif3mEuros===null?'-':fmtEurosConSignoSc(linea.dif3mEuros), margin+colNombreAnchoSc+3*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSc(linea.yoyEuros));
+        doc.text(linea.yoyEuros===null?'-':fmtEurosConSignoSc(linea.yoyEuros), margin+colNombreAnchoSc+4*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        y += filaAltoSc;
+        filaIdxSc++;
+
+        if(filaIdxSc%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSc+numColsSc*colAnchoSc+4, filaAltoSc, 'F'); }
+        doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+        doc.text(prefijoSc+linea.categoria+' (% ventas netas)', margin+indentSc, y+3.5, { maxWidth: colNombreAnchoSc-2-indentSc });
+        doc.text(linea.ultimoMesPct===null?'-':fmtPctSc(linea.ultimoMesPct), margin+colNombreAnchoSc+0*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSc(linea.difMesAnteriorPctBps));
+        doc.text(linea.difMesAnteriorPctBps===null?'-':fmtBpsSc(linea.difMesAnteriorPctBps), margin+colNombreAnchoSc+1*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...GRIS);
+        doc.text(linea.media3mPct===null?'-':fmtPctSc(linea.media3mPct), margin+colNombreAnchoSc+2*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSc(linea.dif3mPctBps));
+        doc.text(linea.dif3mPctBps===null?'-':fmtBpsSc(linea.dif3mPctBps), margin+colNombreAnchoSc+3*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSc(linea.yoyPctBps));
+        doc.text(linea.yoyPctBps===null?'-':fmtBpsSc(linea.yoyPctBps), margin+colNombreAnchoSc+4*colAnchoSc+colAnchoSc, y+3.5, {align:'right'});
+        y += filaAltoSc;
+        filaIdxSc++;
+      };
+      categoriasW.forEach(cat=>{
+        // todas las filas de una misma categoría (€, %, y sus posibles sublíneas) se
+        // mantienen siempre juntas — si no caben todas, se pasa de página antes de
+        // empezar esa categoría entera, en vez de cortarla por la mitad.
+        const numFilasCat = 2 + (cat.subLineas||[]).length*2;
+        if(y + filaAltoSc*numFilasCat > yLimite){
+          nuevaPagina();
+          dibujarCabeceraTablaSc();
+          doc.setFontSize(7);
+          filaIdxSc = 0;
+        }
+        dibujarFilasDeLineaSc(cat, false);
+        (cat.subLineas||[]).forEach(sl=>dibujarFilasDeLineaSc(sl, true));
+      });
+      y += 10;
+      continue;
+    }
+    if(w.typeId==='seguimientoVentas'){
+      if(colPendiente){ y += chartH + 16; colPendiente = null; }
+      const { filas:filasW, mesReferencia:mesRefVW } = calcularSeguimientoVentas();
+      if(filasW.length===0) continue;
+
+      const pnlFmtPdfSv = (val) => Math.round(val).toLocaleString('en-US');
+      const fmtEurosConSignoSv = (val) => (val>=0?'+':'')+pnlFmtPdfSv(val)+'€';
+      const fmtConteoConSignoSv = (val) => (val>=0?'+':'')+Math.round(val).toLocaleString('en-US');
+      const fmtPctSv = (val) => val.toFixed(1)+'%';
+      const fmtBpsSv = (val) => (val>=0?'+':'')+Math.round(val)+' bps';
+      // en VENTAS, subir es bueno (verde) y bajar es malo (rojo) — al revés que en costes.
+      const colorDifSv = (val) => val===null ? GRIS : (val>0 ? VERDE : (val<0 ? ROJO : NEGRO));
+
+      const colNombreAnchoSv = 50;
+      const numColsSv = 5;
+      const colAnchoSv = (W-margin*2-colNombreAnchoSv)/numColsSv;
+      const filaAltoSv = 5;
+      const cabecerasSv = ['Último mes','vs mes ant.','Media últ. 3m','Dif. vs 3m ant.','YoY'];
+
+      const dibujarCabeceraTablaSv = () => {
+        doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
+        doc.text('Seguimiento de ventas'+(mesRefVW?' — datos hasta '+mesRefVW:''), margin, y+5);
+        y += 9;
+        doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
+        doc.text('Métrica', margin, y+3.5);
+        cabecerasSv.forEach((cab,i)=>{ doc.text(cab, margin+colNombreAnchoSv+i*colAnchoSv+colAnchoSv, y+3.5, {align:'right'}); });
+        y += filaAltoSv;
+        doc.setDrawColor(...LINEA); doc.line(margin, y, margin+colNombreAnchoSv+numColsSv*colAnchoSv, y);
+        y += 3;
+      };
+
+      if(y + 20 > yLimite) nuevaPagina();
+      dibujarCabeceraTablaSv();
+      doc.setFontSize(7);
+      let filaIdxSv = 0;
+      filasW.forEach(f=>{
+        const esConteo = !!f.esConteo;
+        const fmtValorSv = esConteo ? ((v)=>Math.round(v).toLocaleString('en-US')) : ((v)=>pnlFmtPdfSv(v)+'€');
+        const fmtValorConSignoSv = esConteo ? fmtConteoConSignoSv : fmtEurosConSignoSv;
+        const sufijoSv = esConteo ? '' : ' (€)';
+        const numFilasF = (f.esSimple || f.esConteo) ? 1 : 2;
+        if(y + filaAltoSv*numFilasF > yLimite){
+          nuevaPagina();
+          dibujarCabeceraTablaSv();
+          doc.setFontSize(7);
+          filaIdxSv = 0;
+        }
+        if(filaIdxSv%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSv+numColsSv*colAnchoSv+4, filaAltoSv, 'F'); }
+        doc.setFont('helvetica','normal'); doc.setTextColor(...NEGRO);
+        doc.text(f.categoria+sufijoSv, margin, y+3.5, { maxWidth: colNombreAnchoSv-2 });
+        doc.text(fmtValorSv(f.ultimoMesEuros), margin+colNombreAnchoSv+0*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSv(f.difMesAnteriorEuros));
+        doc.text(f.difMesAnteriorEuros===null?'-':fmtValorConSignoSv(f.difMesAnteriorEuros), margin+colNombreAnchoSv+1*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...NEGRO);
+        doc.text(fmtValorSv(f.media3mEuros), margin+colNombreAnchoSv+2*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSv(f.dif3mEuros));
+        doc.text(f.dif3mEuros===null?'-':fmtValorConSignoSv(f.dif3mEuros), margin+colNombreAnchoSv+3*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSv(f.yoyEuros));
+        doc.text(f.yoyEuros===null?'-':fmtValorConSignoSv(f.yoyEuros), margin+colNombreAnchoSv+4*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        y += filaAltoSv;
+        filaIdxSv++;
+
+        if(f.esSimple || f.esConteo) return; // sin fila de % debajo
+        if(filaIdxSv%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSv+numColsSv*colAnchoSv+4, filaAltoSv, 'F'); }
+        doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+        doc.text(f.categoria+' (% del total)', margin, y+3.5, { maxWidth: colNombreAnchoSv-2 });
+        doc.text(f.ultimoMesPct===null?'-':fmtPctSv(f.ultimoMesPct), margin+colNombreAnchoSv+0*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSv(f.difMesAnteriorPctBps));
+        doc.text(f.difMesAnteriorPctBps===null?'-':fmtBpsSv(f.difMesAnteriorPctBps), margin+colNombreAnchoSv+1*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...GRIS);
+        doc.text(f.media3mPct===null?'-':fmtPctSv(f.media3mPct), margin+colNombreAnchoSv+2*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSv(f.dif3mPctBps));
+        doc.text(f.dif3mPctBps===null?'-':fmtBpsSv(f.dif3mPctBps), margin+colNombreAnchoSv+3*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        doc.setTextColor(...colorDifSv(f.yoyPctBps));
+        doc.text(f.yoyPctBps===null?'-':fmtBpsSv(f.yoyPctBps), margin+colNombreAnchoSv+4*colAnchoSv+colAnchoSv, y+3.5, {align:'right'});
+        y += filaAltoSv;
+        filaIdxSv++;
+      });
       y += 10;
       continue;
     }
@@ -8870,6 +9189,19 @@ async function ensureDefaultPnlLines(){
 /* tabla de PNL para un widget de Resumen Ejecutivo — usa el MISMO cálculo que la pestaña
    PNL (mensual siempre, para que quepa bien en una página), pero con el periodo propio de
    ESTE widget, totalmente independiente del Desde/Hasta general del Resumen Ejecutivo */
+async function renderSeguimientoCostesWidgetInstance(w){
+  const tableEl = document.getElementById('reSeguimientoCostesTabla_'+w.instanceId);
+  if(!tableEl) return;
+  if(!STATE.caja.storageLoaded) await cajaLoadStorage();
+  const { categorias } = await calcularSeguimientoCostes();
+  tableEl.innerHTML = construirTablaSeguimientoCostesHtml(categorias);
+}
+async function renderSeguimientoVentasWidgetInstance(w){
+  const tableEl = document.getElementById('reSeguimientoVentasTabla_'+w.instanceId);
+  if(!tableEl) return;
+  const { filas } = calcularSeguimientoVentas();
+  tableEl.innerHTML = construirTablaSeguimientoVentasHtml(filas);
+}
 async function renderPnlWidgetInstance(w){
   const tableEl = document.getElementById('rePnlTabla_'+w.instanceId);
   if(!tableEl) return;
@@ -11519,7 +11851,7 @@ async function cajaDeleteMonth(month){
 
 const CAJA_TABS_FULL = [
   {id:'categorizar', label:'Categorizar'}, {id:'movimientos', label:'Movimientos'}, {id:'tendencias', label:'Tendencias'},
-  {id:'graficos', label:'Gráficos'}, {id:'balances', label:'Balances'}, {id:'proveedores', label:'Proveedores'},
+  {id:'graficos', label:'Gráficos'}, {id:'seguimientocostes', label:'Seguimiento costes'}, {id:'balances', label:'Balances'}, {id:'proveedores', label:'Proveedores'},
 ];
 function cajaTabsVisibles(){
   const c = STATE.caja;
@@ -11626,6 +11958,7 @@ function renderCajaTabContent(){
   if(c.tab==='proveedores'){ renderCajaProveedoresTab(el); return; }
   if(c.tab==='tendencias'){ renderCajaTendenciasTab(el); return; }
   if(c.tab==='graficos'){ renderCajaGraficosTab(el); return; }
+  if(c.tab==='seguimientocostes'){ renderCajaSeguimientoCostesTab(el); return; }
   el.innerHTML = '';
 }
 
@@ -12269,6 +12602,359 @@ function ventasNetasDelMes(m){
   // dividir entre 100 en cada uno de los sitios donde se usa esta función como
   // denominador de un %.
   return total/100;
+}
+/* calcula la tabla de "Seguimiento costes": para cada categoría de gasto de Caja, su
+   importe en € y en % de ventas netas del último mes, la media de los últimos 3 meses, la
+   diferencia frente a los 3 meses inmediatamente anteriores a esos, y la comparación
+   interanual (YoY, mismo mes un año antes) — usa la misma lógica que el resto de la app
+   (incluida la exclusión de propinas de nóminas si el interruptor está activado). Las
+   diferencias en % se dan en puntos básicos (bps = puntos porcentuales × 100). */
+/* calcula la tabla de "Seguimiento de ventas": ventas brutas y netas, ventas por categoría
+   de Square (y su % sobre el total de ventas de ese mes), nº de tickets, ticket medio, y
+   ventas por tipo de cliente (y su % sobre el total) — cada una con Último mes, Media
+   últimos 3 meses, Diferencia vs los 3 meses inmediatamente anteriores, y comparación
+   interanual (YoY). Mismo formato que "Seguimiento de costes", pero aquí SUBIR es lo
+   bueno (verde) y BAJAR es lo malo (rojo), al revés que en un coste. */
+function calcularSeguimientoVentas(){
+  const allLines = getAllSalesLinesRaw();
+  if(allLines.length===0) return { filas:[], mesReferencia:null };
+
+  const fechas = allLines.map(l=>l.fecha).sort();
+  const buckets = monthBucketsInRange(fechas[0], fechas[fechas.length-1]);
+  if(buckets.length===0) return { filas:[], mesReferencia:null };
+
+  const bucketIndexPorFecha = (fecha) => buckets.findIndex(b=>fecha>=b.dateMin && fecha<=b.dateMax);
+  const classified = classifyCustomers();
+
+  const porBucket = buckets.map(()=>({ bruto:0, neto:0, tickets:0, porCategoria:{}, porSegmento:{nuevo:0,repetido:0,fidelidad:0,noident:0} }));
+
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const segByTicket = classified[periodId] || {};
+    const porTicket = {};
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
+      if(!porTicket[ticketIdx]) porTicket[ticketIdx] = { fecha, bruto:0, neto:0, tienePago:false };
+      porTicket[ticketIdx].bruto += bruto;
+      porTicket[ticketIdx].neto += neto;
+      if(esPago) porTicket[ticketIdx].tienePago = true;
+    });
+    Object.entries(porTicket).forEach(([ticketIdx,t])=>{
+      if(!t.tienePago) return;
+      const idx = bucketIndexPorFecha(t.fecha);
+      if(idx<0) return;
+      const seg = segByTicket[ticketIdx] || 'noident';
+      porBucket[idx].bruto += t.bruto;
+      porBucket[idx].neto += t.neto;
+      porBucket[idx].tickets++;
+      porBucket[idx].porSegmento[seg] += t.bruto;
+    });
+  }
+  // ventas por categoría — por LÍNEA, no por ticket (igual que el resto de gráficos de
+  // categoría de la app), ya que un mismo ticket puede tener líneas de varias categorías
+  allLines.forEach(l=>{
+    const idx = bucketIndexPorFecha(l.fecha);
+    if(idx<0) return;
+    const cat = displayCategoryFor(l.categoria);
+    porBucket[idx].porCategoria[cat] = (porBucket[idx].porCategoria[cat]||0) + l.bruto;
+  });
+  // los importes de las líneas vienen en céntimos — se pasan a euros aquí, una sola vez
+  porBucket.forEach(pb=>{
+    pb.bruto/=100; pb.neto/=100;
+    Object.keys(pb.porCategoria).forEach(c=>pb.porCategoria[c]/=100);
+    Object.keys(pb.porSegmento).forEach(s=>pb.porSegmento[s]/=100);
+  });
+
+  const idxUltimo = buckets.length-1;
+  const mesReferencia = buckets[idxUltimo].label;
+  const idxDesde3 = Math.max(0, idxUltimo-2);
+  const nMeses3 = idxUltimo-idxDesde3+1;
+  const idxHasta3Ant = idxDesde3-1;
+  const idxDesde3Ant = idxHasta3Ant-2;
+  const hayHistoricoSuficiente = idxDesde3Ant>=0;
+  const nMeses3Ant = hayHistoricoSuficiente ? (idxHasta3Ant-idxDesde3Ant+1) : 0;
+  const [anioRef, mesRef] = mesReferencia.split('-');
+  const monthYoY = (parseInt(anioRef,10)-1)+'-'+mesRef;
+  const idxYoY = buckets.findIndex(b=>b.label===monthYoY);
+
+  // genérico: valorEnIdx da el número de esa fila para el mes idx; totalEnIdx (opcional)
+  // da el total sobre el que calcular el % — si no se pasa, la fila no lleva % (p.ej.
+  // "Ticket medio" o "Nº de tickets", que no son "una parte de un todo").
+  function calcularMetricas(etiqueta, valorEnIdx, totalEnIdx, extra){
+    const ultimoMesValor = valorEnIdx(idxUltimo);
+    const ultimoMesTotal = totalEnIdx ? totalEnIdx(idxUltimo) : 0;
+    const ultimoMesPct = (totalEnIdx && ultimoMesTotal>0) ? (ultimoMesValor/ultimoMesTotal*100) : null;
+
+    // vs mes anterior (el mes justo antes del último, uno solo — no una media)
+    let difMesAnteriorValor = null, difMesAnteriorPctBps = null;
+    if(idxUltimo>=1){
+      const mesAnteriorValor = valorEnIdx(idxUltimo-1);
+      difMesAnteriorValor = ultimoMesValor - mesAnteriorValor;
+      if(totalEnIdx){
+        const mesAnteriorTotal = totalEnIdx(idxUltimo-1);
+        const mesAnteriorPct = mesAnteriorTotal>0 ? (mesAnteriorValor/mesAnteriorTotal*100) : null;
+        if(ultimoMesPct!==null && mesAnteriorPct!==null) difMesAnteriorPctBps = (ultimoMesPct-mesAnteriorPct)*100;
+      }
+    }
+
+    let sumaValor3 = 0; for(let i=idxDesde3;i<=idxUltimo;i++) sumaValor3 += valorEnIdx(i);
+    const media3mValor = sumaValor3/nMeses3;
+    let sumaTotal3 = 0; if(totalEnIdx) for(let i=idxDesde3;i<=idxUltimo;i++) sumaTotal3 += totalEnIdx(i);
+    const media3mPct = (totalEnIdx && sumaTotal3>0) ? (sumaValor3/sumaTotal3*100) : null;
+
+    let dif3mValor = null, dif3mPctBps = null;
+    if(hayHistoricoSuficiente){
+      let sumaValor3Ant = 0; for(let i=idxDesde3Ant;i<=idxHasta3Ant;i++) sumaValor3Ant += valorEnIdx(i);
+      const media3mAntValor = sumaValor3Ant/nMeses3Ant;
+      dif3mValor = media3mValor - media3mAntValor;
+      if(totalEnIdx){
+        let sumaTotal3Ant = 0; for(let i=idxDesde3Ant;i<=idxHasta3Ant;i++) sumaTotal3Ant += totalEnIdx(i);
+        const media3mAntPct = sumaTotal3Ant>0 ? (sumaValor3Ant/sumaTotal3Ant*100) : null;
+        if(media3mPct!==null && media3mAntPct!==null) dif3mPctBps = (media3mPct-media3mAntPct)*100;
+      }
+    }
+
+    let yoyValor = null, yoyPctBps = null;
+    if(idxYoY>=0){
+      const yoyMesValorAbs = valorEnIdx(idxYoY);
+      yoyValor = ultimoMesValor - yoyMesValorAbs;
+      if(totalEnIdx){
+        const yoyMesTotalAbs = totalEnIdx(idxYoY);
+        const yoyMesPct = yoyMesTotalAbs>0 ? (yoyMesValorAbs/yoyMesTotalAbs*100) : null;
+        if(ultimoMesPct!==null && yoyMesPct!==null) yoyPctBps = (ultimoMesPct-yoyMesPct)*100;
+      }
+    }
+    return { categoria:etiqueta, ultimoMesEuros:ultimoMesValor, difMesAnteriorEuros:difMesAnteriorValor, difMesAnteriorPctBps, media3mEuros:media3mValor, dif3mEuros:dif3mValor, yoyEuros:yoyValor, ultimoMesPct, media3mPct, dif3mPctBps, yoyPctBps, ...(extra||{}) };
+  }
+
+  const totalBrutoEnIdx = (idx) => porBucket[idx].bruto;
+
+  const filas = [];
+  filas.push(calcularMetricas('Ventas brutas', (idx)=>porBucket[idx].bruto, null, {esSimple:true}));
+  filas.push(calcularMetricas('Ventas netas', (idx)=>porBucket[idx].neto, null, {esSimple:true}));
+
+  const categoriasSquare = [...new Set(allLines.map(l=>displayCategoryFor(l.categoria)))].sort();
+  categoriasSquare.forEach(cat=>{
+    filas.push(calcularMetricas(cat, (idx)=>porBucket[idx].porCategoria[cat]||0, totalBrutoEnIdx, {esCategoriaSquare:true}));
+  });
+
+  filas.push(calcularMetricas('Nº de tickets', (idx)=>porBucket[idx].tickets, null, {esConteo:true}));
+  filas.push(calcularMetricas('Ticket medio', (idx)=>porBucket[idx].tickets>0 ? porBucket[idx].bruto/porBucket[idx].tickets : 0, null, {esSimple:true}));
+
+  const SEGMENTOS_CLIENTE = [ ['nuevo','Nuevo'], ['repetido','Repetido sin fidelidad'], ['fidelidad','Con fidelidad'], ['noident','No identificable (efectivo)'] ];
+  SEGMENTOS_CLIENTE.forEach(([key,etiqueta])=>{
+    filas.push(calcularMetricas(etiqueta, (idx)=>porBucket[idx].porSegmento[key]||0, totalBrutoEnIdx, {esSegmentoCliente:true}));
+  });
+
+  return { filas, mesReferencia };
+}
+/* construye el HTML de la tabla de Seguimiento de ventas — mismo formato visual que la de
+   costes, pero en ventas SUBIR es lo bueno (verde) y BAJAR es lo malo (rojo). Las filas
+   "simples" (Ventas brutas/netas, Ticket medio) y de "conteo" (Nº de tickets) no llevan
+   fila de % debajo, ya que no son "una parte de un total". */
+function construirTablaSeguimientoVentasHtml(filas){
+  if(filas.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de ventas todavía.</p>';
+  const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
+  const fmtEurosConSigno = (val) => (val>=0?'+':'')+pnlFmt(val);
+  const fmtConteo = (val) => Math.round(val).toLocaleString('en-US');
+  const fmtConteoConSigno = (val) => (val>=0?'+':'')+fmtConteo(val);
+  const fmtPct = (val) => val.toFixed(1)+'%';
+  const fmtBps = (val) => (val>=0?'+':'')+Math.round(val)+' bps';
+  // en VENTAS: subir es bueno (verde), bajar es malo (rojo) — al revés que en un coste.
+  const colorDif = (val) => val===null ? 'var(--text-muted)' : (val>0 ? 'var(--positive)' : (val<0 ? 'var(--negative)' : 'var(--text)'));
+  const filasHtml = filas.map(f=>{
+    const esConteo = !!f.esConteo;
+    const unidad = esConteo ? '' : ' (€)';
+    const fmtValor = esConteo ? fmtConteo : pnlFmt;
+    const fmtValorConSigno = esConteo ? fmtConteoConSigno : fmtEurosConSigno;
+    const filaValor = `
+    <tr>
+      <td>${escapeHtml(f.categoria)}${unidad}</td>
+      <td class="num">${fmtValor(f.ultimoMesEuros)}</td>
+      <td class="num" style="color:${colorDif(f.difMesAnteriorEuros)};font-weight:600;">${f.difMesAnteriorEuros===null?'-':fmtValorConSigno(f.difMesAnteriorEuros)}</td>
+      <td class="num">${fmtValor(f.media3mEuros)}</td>
+      <td class="num" style="color:${colorDif(f.dif3mEuros)};font-weight:600;">${f.dif3mEuros===null?'-':fmtValorConSigno(f.dif3mEuros)}</td>
+      <td class="num" style="color:${colorDif(f.yoyEuros)};font-weight:600;">${f.yoyEuros===null?'-':fmtValorConSigno(f.yoyEuros)}</td>
+    </tr>`;
+    if(f.esSimple || f.esConteo) return filaValor; // sin fila de % debajo
+    return filaValor + `
+    <tr style="background:var(--surface-2);">
+      <td class="hint">${escapeHtml(f.categoria)} (% del total)</td>
+      <td class="num hint">${f.ultimoMesPct===null?'-':fmtPct(f.ultimoMesPct)}</td>
+      <td class="num" style="color:${colorDif(f.difMesAnteriorPctBps)};font-weight:600;">${f.difMesAnteriorPctBps===null?'-':fmtBps(f.difMesAnteriorPctBps)}</td>
+      <td class="num hint">${f.media3mPct===null?'-':fmtPct(f.media3mPct)}</td>
+      <td class="num" style="color:${colorDif(f.dif3mPctBps)};font-weight:600;">${f.dif3mPctBps===null?'-':fmtBps(f.dif3mPctBps)}</td>
+      <td class="num" style="color:${colorDif(f.yoyPctBps)};font-weight:600;">${f.yoyPctBps===null?'-':fmtBps(f.yoyPctBps)}</td>
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr><th>Métrica</th><th class="num">Último mes</th><th class="num">vs mes anterior</th><th class="num">Media últ. 3 meses</th><th class="num">Dif. vs 3 meses ant.</th><th class="num">YoY</th></tr></thead><tbody>${filasHtml}</tbody></table>`;
+}
+async function calcularSeguimientoCostes(){
+  const cc = STATE.caja;
+  const ordenados = [...cc.savedMonths].sort((a,b)=>a.month.localeCompare(b.month));
+  if(ordenados.length===0) return { categorias:[], mesReferencia:null };
+
+  const catNomina = getCajaCategoriaNomina();
+  const excluirPropinas = getExcluirPropinasNominaCaja();
+  const catSet = new Set();
+  ordenados.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
+  const cats = [...catSet].sort();
+
+  function eurosDeCategoriaEnMes(cat, entry){
+    let euros = (entry.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+    if(excluirPropinas && cat===catNomina){ euros = Math.max(0, euros - cajaPropinasDelMes(entry.month, 'pagada')); }
+    return euros;
+  }
+  const ventasNetasPorMes = {};
+  ordenados.forEach(m=>{ ventasNetasPorMes[m.month] = ventasNetasDelMes(m); });
+
+  const idxUltimo = ordenados.length-1;
+  const mesReferencia = ordenados[idxUltimo].month;
+
+  function sumaVentasEnRango(desdeIdx, hastaIdx){
+    let suma = 0;
+    for(let i=desdeIdx;i<=hastaIdx;i++) suma += ventasNetasPorMes[ordenados[i].month]||0;
+    return suma;
+  }
+
+  // mismo mes, un año antes — si ese mes no está guardado, no hay YoY
+  const [anioRef, mesRef] = mesReferencia.split('-');
+  const monthYoY = (parseInt(anioRef,10)-1)+'-'+mesRef;
+  const idxYoY = ordenados.findIndex(m=>m.month===monthYoY);
+
+  const idxDesde3 = Math.max(0, idxUltimo-2);
+  const nMeses3 = idxUltimo-idxDesde3+1;
+  const idxHasta3Ant = idxDesde3-1;
+  const idxDesde3Ant = idxHasta3Ant-2;
+  const hayHistoricoSuficiente = idxDesde3Ant>=0;
+  const sumaVentas3 = sumaVentasEnRango(idxDesde3, idxUltimo);
+  const sumaVentas3Ant = hayHistoricoSuficiente ? sumaVentasEnRango(idxDesde3Ant, idxHasta3Ant) : 0;
+  const nMeses3Ant = hayHistoricoSuficiente ? (idxHasta3Ant-idxDesde3Ant+1) : 0;
+  const ventasYoY = idxYoY>=0 ? (ventasNetasPorMes[monthYoY]||0) : 0;
+
+  // calcula las 4 métricas (último mes, media 3m, dif vs 3m ant., YoY) en € y en % de
+  // ventas netas — genérico, dado solo una función que sepa el importe de esa fila para
+  // el índice de mes que le pidas. Se reutiliza tanto para las categorías de Caja como
+  // para las sublíneas de PNL de más abajo, para no repetir dos veces la misma lógica de
+  // comparación de periodos.
+  function calcularMetricas(etiqueta, valorEnIdx, extra){
+    const ultimoMesEuros = valorEnIdx(idxUltimo);
+    const ultimoMesVentas = ventasNetasPorMes[mesReferencia]||0;
+    const ultimoMesPct = ultimoMesVentas>0 ? (ultimoMesEuros/ultimoMesVentas*100) : null;
+
+    // vs mes anterior (el mes justo antes del último, uno solo — no una media)
+    let difMesAnteriorEuros = null, difMesAnteriorPctBps = null;
+    if(idxUltimo>=1){
+      const mesAnteriorEuros = valorEnIdx(idxUltimo-1);
+      difMesAnteriorEuros = ultimoMesEuros - mesAnteriorEuros;
+      const mesAnteriorVentas = ventasNetasPorMes[ordenados[idxUltimo-1].month]||0;
+      const mesAnteriorPct = mesAnteriorVentas>0 ? (mesAnteriorEuros/mesAnteriorVentas*100) : null;
+      if(ultimoMesPct!==null && mesAnteriorPct!==null) difMesAnteriorPctBps = (ultimoMesPct-mesAnteriorPct)*100;
+    }
+
+    let sumaEuros3 = 0;
+    for(let i=idxDesde3;i<=idxUltimo;i++) sumaEuros3 += valorEnIdx(i);
+    const media3mEuros = sumaEuros3/nMeses3;
+    const media3mPct = sumaVentas3>0 ? (sumaEuros3/sumaVentas3*100) : null;
+
+    let dif3mEuros = null, dif3mPctBps = null;
+    if(hayHistoricoSuficiente){
+      let sumaEuros3Ant = 0;
+      for(let i=idxDesde3Ant;i<=idxHasta3Ant;i++) sumaEuros3Ant += valorEnIdx(i);
+      const media3mAntEuros = sumaEuros3Ant/nMeses3Ant;
+      dif3mEuros = media3mEuros - media3mAntEuros;
+      const media3mAntPct = sumaVentas3Ant>0 ? (sumaEuros3Ant/sumaVentas3Ant*100) : null;
+      if(media3mPct!==null && media3mAntPct!==null) dif3mPctBps = (media3mPct-media3mAntPct)*100;
+    }
+
+    let yoyEuros = null, yoyPctBps = null;
+    if(idxYoY>=0){
+      const yoyMesEurosAbs = valorEnIdx(idxYoY);
+      yoyEuros = ultimoMesEuros - yoyMesEurosAbs;
+      const yoyMesPct = ventasYoY>0 ? (yoyMesEurosAbs/ventasYoY*100) : null;
+      if(ultimoMesPct!==null && yoyMesPct!==null) yoyPctBps = (ultimoMesPct-yoyMesPct)*100;
+    }
+
+    return { categoria:etiqueta, ultimoMesEuros, difMesAnteriorEuros, difMesAnteriorPctBps, media3mEuros, dif3mEuros, yoyEuros, ultimoMesPct, media3mPct, dif3mPctBps, yoyPctBps, ...extra };
+  }
+
+  const categorias = cats.map(cat => calcularMetricas(cat, (idx)=>eurosDeCategoriaEnMes(cat, ordenados[idx])));
+
+  // sublíneas de PNL bajo "Alimentos" (Costes de producción, Merma, Stock faltante) — se
+  // calculan con el mismo motor de PNL (pnlLineValueForBucket), para que coincidan exacto
+  // con lo que se ve en esa pestaña, mes a mes — no es una cifra recalculada aparte.
+  try{
+    await ensureDefaultPnlLines();
+    const linesPnl = STATE.pnlLines||[];
+    const allSalesLinesPnl = getAllSalesLinesRaw();
+    const costHistoryPnl = buildCostHistoryMap();
+    const otherCostHistoryPnl = buildOtherCostHistoryMap();
+    const bucketsPnl = ordenados.map(m=>{
+      const d = new Date(m.month+'-01T00:00:00'); d.setMonth(d.getMonth()+1); d.setDate(0);
+      return { dateMin: m.month+'-01', dateMax: fechaLocalISO(d) };
+    });
+    function valorLineaPnlEnIdx(nombreLinea, idx){
+      const linea = linesPnl.find(l=>!l.esTitulo && l.name===nombreLinea);
+      if(!linea) return 0;
+      return Math.abs(pnlLineValueForBucket(linea, bucketsPnl[idx], allSalesLinesPnl, costHistoryPnl, otherCostHistoryPnl));
+    }
+    const alimentos = categorias.find(c=>c.categoria==='Alimentos');
+    if(alimentos){
+      alimentos.subLineas = [
+        calcularMetricas('Costes de producción', (idx)=>valorLineaPnlEnIdx('Production Costs', idx), {esSubLinea:true}),
+        calcularMetricas('Merma', (idx)=>valorLineaPnlEnIdx('Write-off Total', idx), {esSubLinea:true}),
+        calcularMetricas('Stock faltante', (idx)=>valorLineaPnlEnIdx('Missing stock', idx), {esSubLinea:true}),
+      ];
+    }
+  }catch(e){ console.error('Error calculando las sublíneas de PNL bajo Alimentos (no debería afectar al resto de la tabla):', e); }
+
+  return { categorias, mesReferencia };
+}
+/* construye el HTML de la tabla de Seguimiento de costes, con el mismo estilo visual que
+   la tabla de PNL (número en monoespaciada, verde/rojo según si el coste sube o baja) —
+   se usa tanto en la pestaña de Caja como en el widget de Resumen Ejecutivo. */
+function construirTablaSeguimientoCostesHtml(categorias){
+  if(categorias.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de Caja todavía.</p>';
+  const pnlFmt = (val) => Math.round(val).toLocaleString('en-US')+'€';
+  const fmtEurosConSigno = (val) => (val>=0?'+':'')+pnlFmt(val);
+  const fmtPct = (val) => val.toFixed(1)+'%';
+  const fmtBps = (val) => (val>=0?'+':'')+Math.round(val)+' bps';
+  // para un COSTE: bajar es bueno (verde), subir es malo (rojo) — al revés que en una
+  // línea de ingresos, donde subir sería lo bueno.
+  const colorDif = (val) => val===null ? 'var(--text-muted)' : (val<0 ? 'var(--positive)' : (val>0 ? 'var(--negative)' : 'var(--text)'));
+  function filasDeLinea(c, esSubLinea){
+    const sangria = esSubLinea ? 'padding-left:22px;' : '';
+    const prefijo = esSubLinea ? '↳ ' : '';
+    return `
+    <tr>
+      <td style="${sangria}">${prefijo}${escapeHtml(c.categoria)} (€)</td>
+      <td class="num">${pnlFmt(c.ultimoMesEuros)}</td>
+      <td class="num" style="color:${colorDif(c.difMesAnteriorEuros)};font-weight:600;">${c.difMesAnteriorEuros===null?'-':fmtEurosConSigno(c.difMesAnteriorEuros)}</td>
+      <td class="num">${pnlFmt(c.media3mEuros)}</td>
+      <td class="num" style="color:${colorDif(c.dif3mEuros)};font-weight:600;">${c.dif3mEuros===null?'-':fmtEurosConSigno(c.dif3mEuros)}</td>
+      <td class="num" style="color:${colorDif(c.yoyEuros)};font-weight:600;">${c.yoyEuros===null?'-':fmtEurosConSigno(c.yoyEuros)}</td>
+    </tr>
+    <tr style="background:var(--surface-2);">
+      <td class="hint" style="${sangria}">${prefijo}${escapeHtml(c.categoria)} (% ventas netas)</td>
+      <td class="num hint">${c.ultimoMesPct===null?'-':fmtPct(c.ultimoMesPct)}</td>
+      <td class="num" style="color:${colorDif(c.difMesAnteriorPctBps)};font-weight:600;">${c.difMesAnteriorPctBps===null?'-':fmtBps(c.difMesAnteriorPctBps)}</td>
+      <td class="num hint">${c.media3mPct===null?'-':fmtPct(c.media3mPct)}</td>
+      <td class="num" style="color:${colorDif(c.dif3mPctBps)};font-weight:600;">${c.dif3mPctBps===null?'-':fmtBps(c.dif3mPctBps)}</td>
+      <td class="num" style="color:${colorDif(c.yoyPctBps)};font-weight:600;">${c.yoyPctBps===null?'-':fmtBps(c.yoyPctBps)}</td>
+    </tr>`;
+  }
+  const filas = categorias.map(c => filasDeLinea(c,false) + (c.subLineas||[]).map(sl=>filasDeLinea(sl,true)).join('')).join('');
+  return `<table><thead><tr><th>Categoría</th><th class="num">Último mes</th><th class="num">vs mes anterior</th><th class="num">Media últ. 3 meses</th><th class="num">Dif. vs 3 meses ant.</th><th class="num">YoY</th></tr></thead><tbody>${filas}</tbody></table>`;
+}
+async function renderCajaSeguimientoCostesTab(el){
+  el.innerHTML = '<p class="hint" style="padding:20px;">Cargando...</p>';
+  const { categorias, mesReferencia } = await calcularSeguimientoCostes();
+  el.innerHTML = `
+    <div class="card">
+      <div style="color:var(--copper);font-weight:700;font-size:14px;margin-bottom:6px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+mesReferencia:''}</div>
+      <p class="hint" style="margin-bottom:14px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas del periodo. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la media de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año — si no hay datos guardados de hace un año, se muestra "-". En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo).</p>
+      <div style="overflow-x:auto;">${construirTablaSeguimientoCostesHtml(categorias)}</div>
+    </div>`;
 }
 function cajaSquareIncomeDeMes(m){
   const bruto = (m.movements||[]).filter(mv=>{
