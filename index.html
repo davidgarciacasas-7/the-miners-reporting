@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.281</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.282</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8583,7 +8583,10 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       let filaIdxSc = 0;
       const dibujarFilasDeLineaSc = (linea, esSubLinea) => {
         const indentSc = (linea.indent||0)*3 + (esSubLinea ? 5 : 0);
-        const prefijoSc = esSubLinea ? '↳ ' : '';
+        // "↳" no está en la codificación estándar de las fuentes del PDF (helvetica,
+        // times...) y sale corrompido al imprimir — "»" sí forma parte de esa
+        // codificación (Latin-1/WinAnsi) y se ve bien, tanto en pantalla como impreso.
+        const prefijoSc = esSubLinea ? '» ' : '';
         if(filaIdxSc%2===1){ doc.setFillColor(248,246,242); doc.rect(margin-2, y-1, colNombreAnchoSc+numColsSc*colAnchoSc+4, filaAltoSc, 'F'); }
         doc.setFont('helvetica','normal'); doc.setTextColor(...NEGRO);
         doc.text(prefijoSc+linea.categoria+' (€)', margin+indentSc, y+3.5, { maxWidth: colNombreAnchoSc-2-indentSc });
