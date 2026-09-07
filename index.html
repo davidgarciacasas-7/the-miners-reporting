@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.279</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.280</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -13029,7 +13029,7 @@ async function calcularSeguimientoCostes(){
         calcularMetricas('Costes de producción', (idx)=>valorLineaPnlEnIdx('Production Costs', idx), {esSubLinea:true}),
         calcularMetricas('Merma', (idx)=>valorLineaPnlEnIdx('Write-off Total', idx), {esSubLinea:true}),
         calcularMetricas('Stock faltante', (idx)=>valorLineaPnlEnIdx('Missing stock', idx), {esSubLinea:true}),
-      ];
+      ].filter(sl=>!ocultasSc.includes(sl.categoria));
     }
   }catch(e){ console.error('Error calculando las sublíneas de PNL bajo Alimentos (no debería afectar al resto de la tabla):', e); }
 
@@ -13051,10 +13051,10 @@ function construirTablaSeguimientoCostesHtml(categorias, mostrarBotonOcultar){
     const indentPx = (c.indent||0)*20 + (esSubLinea?22:0);
     const sangria = `padding-left:${indentPx}px;`;
     const prefijo = esSubLinea ? '↳ ' : '';
-    // el botón de ocultar y los de sangría solo tienen sentido en categorías reales de
-    // Caja, no en las sublíneas de PNL (Costes de producción, Merma, Stock faltante), que
-    // no son categorías independientes que se puedan quitar o reordenar por separado.
-    const botonOcultar = (mostrarBotonOcultar && !esSubLinea) ? ` <button class="btn danger no-print" data-ocultar-seg-costes="${escapeHtml(c.categoria)}" title="Quitar esta categoría de esta tabla" style="padding:0px 5px;font-size:9px;">✕</button>` : '';
+    // el botón de ocultar ahora también vale para las sublíneas de PNL (para poder
+    // mostrar solo algunas, p.ej. solo Merma) — los de sangría se quedan solo en las
+    // categorías principales, ya que las sublíneas ya van con su propia sangría fija.
+    const botonOcultar = mostrarBotonOcultar ? ` <button class="btn danger no-print" data-ocultar-seg-costes="${escapeHtml(c.categoria)}" title="Quitar esta ${esSubLinea?'línea':'categoría'} de esta tabla" style="padding:0px 5px;font-size:9px;">✕</button>` : '';
     const botonesIndent = (mostrarBotonOcultar && !esSubLinea) ? ` <button class="btn secondary no-print" data-indent-out-seg-costes="${escapeHtml(c.categoria)}" title="Quitar sangría" style="padding:0px 5px;font-size:9px;" ${(c.indent||0)<=0?'disabled':''}>←</button><button class="btn secondary no-print" data-indent-in-seg-costes="${escapeHtml(c.categoria)}" title="Sangrar" style="padding:0px 5px;font-size:9px;">→</button>` : '';
     return `
     <tr>
