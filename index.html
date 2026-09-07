@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.282</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.283</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8343,9 +8343,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     { etiqueta:'Nº de tickets', fmt:(v)=>String(Math.round(v)), ultimoMes:ticketsUltimoMes, mesAnterior:ticketsMesAnterior, ultimos3:ticketsUltimos3, anteriores3:tickets3Anteriores, total:ticketsTotalPeriodo },
     { etiqueta:'Ticket medio', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:tm(ventasUltimoMes,ticketsUltimoMes), mesAnterior:tm(ventasMesAnterior,ticketsMesAnterior), ultimos3:tm(ventasUltimos3,ticketsUltimos3), anteriores3:tm(ventas3Anteriores,tickets3Anteriores), total:tm(ventasTotalPeriodo,ticketsTotalPeriodo) },
     { etiqueta:'Resultado (EBITDA)', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:ebitdaUltimoMes, mesAnterior:ebitdaMesAnterior, ultimos3:ebitdaUltimos3, anteriores3:ebitda3Anteriores, total:ebitdaTotalPeriodo },
-    { etiqueta:'EBITDA (% de ventas netas)', fmt:fmtPct, ultimoMes:pctSobreVentasNetas(ebitdaUltimoMes,ventasNetasUltimoMes), mesAnterior:pctSobreVentasNetas(ebitdaMesAnterior,ventasNetasMesAnterior), ultimos3:pctSobreVentasNetas(ebitdaUltimos3,ventasNetasUltimos3), anteriores3:pctSobreVentasNetas(ebitda3Anteriores,ventasNetas3Anteriores), total:pctSobreVentasNetas(ebitdaTotalPeriodo,ventasNetasTotalPeriodo) },
+    { etiqueta:'EBITDA (% de ventas netas)', fmt:fmtPct, esPct:true, ultimoMes:pctSobreVentasNetas(ebitdaUltimoMes,ventasNetasUltimoMes), mesAnterior:pctSobreVentasNetas(ebitdaMesAnterior,ventasNetasMesAnterior), ultimos3:pctSobreVentasNetas(ebitdaUltimos3,ventasNetasUltimos3), anteriores3:pctSobreVentasNetas(ebitda3Anteriores,ventasNetas3Anteriores), total:pctSobreVentasNetas(ebitdaTotalPeriodo,ventasNetasTotalPeriodo) },
     { etiqueta:'Flujo de caja', fmt:(v)=>eur(Math.round(v*100)), ultimoMes:balanceUltimoMes, mesAnterior:balanceMesAnterior, ultimos3:balanceUltimos3, anteriores3:balance3Anteriores, total:balanceTotalPeriodo },
-    { etiqueta:'Flujo de caja (% de Ventas netas)', fmt:fmtPct, ultimoMes:pctSobreVentasNetas(balanceUltimoMes,ventasNetasUltimoMes), mesAnterior:pctSobreVentasNetas(balanceMesAnterior,ventasNetasMesAnterior), ultimos3:pctSobreVentasNetas(balanceUltimos3,ventasNetasUltimos3), anteriores3:pctSobreVentasNetas(balance3Anteriores,ventasNetas3Anteriores), total:pctSobreVentasNetas(balanceTotalPeriodo,ventasNetasTotalPeriodo) },
+    { etiqueta:'Flujo de caja (% de Ventas netas)', fmt:fmtPct, esPct:true, ultimoMes:pctSobreVentasNetas(balanceUltimoMes,ventasNetasUltimoMes), mesAnterior:pctSobreVentasNetas(balanceMesAnterior,ventasNetasMesAnterior), ultimos3:pctSobreVentasNetas(balanceUltimos3,ventasNetasUltimos3), anteriores3:pctSobreVentasNetas(balance3Anteriores,ventasNetas3Anteriores), total:pctSobreVentasNetas(balanceTotalPeriodo,ventasNetasTotalPeriodo) },
   ];
 
   // helper: diferencia en valor y % entre un periodo y el anterior — null si no hay datos
@@ -8383,7 +8383,12 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
       if(!d){ doc.setTextColor(...GRIS); doc.text('Sin datos suficientes', cx+colDatoW-2, y+1.5, {align:'right'}); return; }
       const color = d.dif>=0 ? VERDE : ROJO;
-      const texto = (d.dif>=0?'+':'')+f.fmt(d.dif)+(d.pct!==null?' ('+(d.pct>=0?'+':'')+d.pct.toFixed(1)+'%)':'');
+      // en las filas que ya son un % (EBITDA, Flujo de caja como % de ventas), la
+      // diferencia se da en puntos básicos (bps = puntos porcentuales × 100) — mostrar a
+      // la vez un % de un %, como se hacía antes, confundía más de lo que aclaraba.
+      const texto = f.esPct
+        ? (d.dif>=0?'+':'')+Math.round(d.dif*100)+' bps'
+        : (d.dif>=0?'+':'')+f.fmt(d.dif)+(d.pct!==null?' ('+(d.pct>=0?'+':'')+d.pct.toFixed(1)+'%)':'');
       doc.setFont('helvetica','bold'); doc.setTextColor(...color);
       doc.text(texto, cx+colDatoW-2, y+1.5, {align:'right'});
     };
