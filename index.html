@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.283</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.286</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8322,8 +8322,8 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const ventasNetasPorBucket = bucketsKpi.map(b => ventasNetasDelMes({month:b.label}));
 
   const nMeses = bucketsKpi.length;
-  const sumaUltimosN = (arr,n) => nMeses>=1 ? arr.slice(-n).reduce((s,v)=>s+v,0) : null;
-  const sumaAnterioresN = (arr,n) => nMeses>=2*n ? arr.slice(-2*n,-n).reduce((s,v)=>s+v,0) : null;
+  const mediaUltimosN = (arr,n) => { if(nMeses<1) return null; const slice = arr.slice(-n); return slice.reduce((s,v)=>s+v,0)/slice.length; };
+  const mediaAnterioresN = (arr,n) => { if(nMeses<2*n) return null; const slice = arr.slice(-2*n,-n); return slice.reduce((s,v)=>s+v,0)/slice.length; };
   const valorUltimoMes = (arr) => nMeses>=1 ? arr[nMeses-1] : null;
   const valorMesAnterior = (arr) => nMeses>=2 ? arr[nMeses-2] : null;
   // ticket medio no se promedia — se recalcula como ventas/tickets de cada periodo
@@ -8331,11 +8331,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   // % de un valor sobre las ventas netas de ese mismo periodo (para EBITDA % y Flujo de caja %)
   const pctSobreVentasNetas = (v,ventasNetas) => (v!==null && ventasNetas!==null && ventasNetas!==0) ? (v/ventasNetas*100) : null;
 
-  const ventasUltimoMes=valorUltimoMes(ventasPorBucket), ventasMesAnterior=valorMesAnterior(ventasPorBucket), ventasUltimos3=sumaUltimosN(ventasPorBucket,3), ventas3Anteriores=sumaAnterioresN(ventasPorBucket,3), ventasTotalPeriodo=ventasPorBucket.reduce((s,v)=>s+v,0);
-  const ticketsUltimoMes=valorUltimoMes(ticketsPorBucket), ticketsMesAnterior=valorMesAnterior(ticketsPorBucket), ticketsUltimos3=sumaUltimosN(ticketsPorBucket,3), tickets3Anteriores=sumaAnterioresN(ticketsPorBucket,3), ticketsTotalPeriodo=ticketsPorBucket.reduce((s,v)=>s+v,0);
-  const ebitdaUltimoMes=valorUltimoMes(ebitdaPorBucket), ebitdaMesAnterior=valorMesAnterior(ebitdaPorBucket), ebitdaUltimos3=sumaUltimosN(ebitdaPorBucket,3), ebitda3Anteriores=sumaAnterioresN(ebitdaPorBucket,3), ebitdaTotalPeriodo=ebitdaPorBucket.reduce((s,v)=>s+v,0);
-  const balanceUltimoMes=valorUltimoMes(balancePorBucket), balanceMesAnterior=valorMesAnterior(balancePorBucket), balanceUltimos3=sumaUltimosN(balancePorBucket,3), balance3Anteriores=sumaAnterioresN(balancePorBucket,3), balanceTotalPeriodo=balancePorBucket.reduce((s,v)=>s+v,0);
-  const ventasNetasUltimoMes=valorUltimoMes(ventasNetasPorBucket), ventasNetasMesAnterior=valorMesAnterior(ventasNetasPorBucket), ventasNetasUltimos3=sumaUltimosN(ventasNetasPorBucket,3), ventasNetas3Anteriores=sumaAnterioresN(ventasNetasPorBucket,3), ventasNetasTotalPeriodo=ventasNetasPorBucket.reduce((s,v)=>s+v,0);
+  const ventasUltimoMes=valorUltimoMes(ventasPorBucket), ventasMesAnterior=valorMesAnterior(ventasPorBucket), ventasUltimos3=mediaUltimosN(ventasPorBucket,3), ventas3Anteriores=mediaAnterioresN(ventasPorBucket,3), ventasTotalPeriodo=ventasPorBucket.reduce((s,v)=>s+v,0);
+  const ticketsUltimoMes=valorUltimoMes(ticketsPorBucket), ticketsMesAnterior=valorMesAnterior(ticketsPorBucket), ticketsUltimos3=mediaUltimosN(ticketsPorBucket,3), tickets3Anteriores=mediaAnterioresN(ticketsPorBucket,3), ticketsTotalPeriodo=ticketsPorBucket.reduce((s,v)=>s+v,0);
+  const ebitdaUltimoMes=valorUltimoMes(ebitdaPorBucket), ebitdaMesAnterior=valorMesAnterior(ebitdaPorBucket), ebitdaUltimos3=mediaUltimosN(ebitdaPorBucket,3), ebitda3Anteriores=mediaAnterioresN(ebitdaPorBucket,3), ebitdaTotalPeriodo=ebitdaPorBucket.reduce((s,v)=>s+v,0);
+  const balanceUltimoMes=valorUltimoMes(balancePorBucket), balanceMesAnterior=valorMesAnterior(balancePorBucket), balanceUltimos3=mediaUltimosN(balancePorBucket,3), balance3Anteriores=mediaAnterioresN(balancePorBucket,3), balanceTotalPeriodo=balancePorBucket.reduce((s,v)=>s+v,0);
+  const ventasNetasUltimoMes=valorUltimoMes(ventasNetasPorBucket), ventasNetasMesAnterior=valorMesAnterior(ventasNetasPorBucket), ventasNetasUltimos3=mediaUltimosN(ventasNetasPorBucket,3), ventasNetas3Anteriores=mediaAnterioresN(ventasNetasPorBucket,3), ventasNetasTotalPeriodo=ventasNetasPorBucket.reduce((s,v)=>s+v,0);
 
   const fmtPct = (v)=>v.toFixed(1)+'%';
   const filasKpi = [
@@ -8360,7 +8360,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const colDatoW = (W-margin*2-colEtiquetaW)/5;
   const filaAltoKpi = 8.5;
   doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
-  ['Último mes','vs mes anterior','Últimos 3 meses','vs 3 meses anteriores','Total periodo'].forEach((c,i)=>{
+  ['Último mes','vs mes anterior','Media últ. 3 meses','vs media 3 meses ant.','Total periodo'].forEach((c,i)=>{
     doc.text(c, margin+colEtiquetaW+i*colDatoW+colDatoW-2, y+3, {align:'right'});
   });
   y += 6;
@@ -8572,7 +8572,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
 
       const dibujarCabeceraTablaSc = () => {
         doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
-        doc.text('Caja — Seguimiento de costes'+(mesRefW?' — datos hasta '+mesRefW:''), margin, y+5);
+        doc.text('Caja — Seguimiento de costes'+(mesRefW?' — datos hasta '+formatMesLargo(mesRefW)+' incluido':''), margin, y+5);
         y += 9;
         doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
         doc.text('Categoría', margin, y+3.5);
@@ -8667,7 +8667,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
 
       const dibujarCabeceraTablaSv = () => {
         doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
-        doc.text('Seguimiento de ventas'+(mesRefVW?' — datos hasta '+mesRefVW:''), margin, y+5);
+        doc.text('Seguimiento de ventas'+(mesRefVW?' — datos hasta '+formatMesLargo(mesRefVW)+' incluido':''), margin, y+5);
         y += 9;
         doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
         doc.text('Métrica', margin, y+3.5);
@@ -11981,7 +11981,7 @@ async function cajaDeleteMonth(month){
 
 const CAJA_TABS_FULL = [
   {id:'categorizar', label:'Categorizar'}, {id:'movimientos', label:'Movimientos'}, {id:'tendencias', label:'Tendencias'},
-  {id:'graficos', label:'Gráficos'}, {id:'seguimientocostes', label:'Seguimiento costes'}, {id:'balances', label:'Balances'}, {id:'proveedores', label:'Proveedores'},
+  {id:'graficos', label:'Gráficos'}, {id:'seguimientocostes', label:'Seguimiento costes'}, {id:'balances', label:'Balances'}, {id:'proveedores', label:'Proveedores y categorías'},
 ];
 function cajaTabsVisibles(){
   const c = STATE.caja;
@@ -12624,6 +12624,65 @@ function renderCajaProveedoresTab(el){
     cajaSet('providers', c.savedProviders); renderCajaTabContent();
   }));
 }
+/* renombra una categoría de Caja en todos los sitios donde vive su nombre: la lista de
+   categorías, los movimientos de todos los balances guardados (y el que esté abierto
+   ahora mismo sin guardar aún), los proveedores que apuntaban a ella, y las preferencias
+   de "ocultar"/"sangría" de la tabla Seguimiento de costes — así una categoría oculta o
+   sangrada se queda igual tras el cambio de nombre, en vez de "perderse". Como todo lo
+   demás (Resumen Ejecutivo incluido) lee el nombre directamente de cada movimiento, el
+   cambio se refleja ahí automáticamente, sin nada más que sincronizar.
+   Se declara `async function` de forma expresa (en vez de solo `function`) porque hace
+   varias llamadas a cajaSet(), que son asíncronas — sin el `await` de cada una, el toast
+   de confirmación podría aparecer antes de que el guardado real hubiera terminado. */
+async function renombrarCategoriaCaja(catVieja, catNueva){
+  const c = STATE.caja;
+  if(!catNueva || catNueva===catVieja){ document.getElementById('cajaRenombrarCategoriaForm').innerHTML=''; return; }
+  const yaExiste = c.savedCats.gastos.includes(catNueva) || c.savedCats.ingresos.includes(catNueva);
+  if(yaExiste){
+    if(!confirm('Ya existe una categoría llamada "'+catNueva+'". Si continúas, se fusionarán en una sola — todos los movimientos de "'+catVieja+'" pasarán a contar como "'+catNueva+'". ¿Continuar?')) return;
+  }
+  c.savedCats = {
+    gastos: c.savedCats.gastos.map(x=>x===catVieja?catNueva:x),
+    ingresos: c.savedCats.ingresos.map(x=>x===catVieja?catNueva:x),
+  };
+  await cajaSet('cats', c.savedCats);
+
+  let usos = 0;
+  c.savedMonths.forEach(m=>{
+    (m.movements||[]).forEach(mv=>{ if(mv.category===catVieja){ mv.category=catNueva; usos++; } });
+    if(m.movementsOriginal){ m.movementsOriginal.forEach(mv=>{ if(mv.category===catVieja) mv.category=catNueva; }); }
+  });
+  await cajaSet('months', c.savedMonths);
+
+  if(c.data && c.data.movements){
+    const movsActualizados = c.data.movements.map(mv => mv.category===catVieja ? {...mv, category:catNueva} : mv);
+    c.data = { ...c.data, movements:movsActualizados, ...cajaRecompute(movsActualizados) };
+  }
+
+  let provsCambiados = false;
+  c.savedProviders = c.savedProviders.map(p=>{ if(p.cat===catVieja){ provsCambiados=true; return {...p, cat:catNueva}; } return p; });
+  if(provsCambiados) await cajaSet('providers', c.savedProviders);
+
+  // preferencias de Seguimiento de costes (ocultar / sangría) — si la categoría vieja
+  // tenía alguna, se traspasa a la nueva para no perderla
+  let cambioPrefs = false;
+  if((c.categoriasOcultasSeguimientoCostes||[]).includes(catVieja)){
+    c.categoriasOcultasSeguimientoCostes = c.categoriasOcultasSeguimientoCostes.map(x=>x===catVieja?catNueva:x);
+    await cajaSet('categoriasOcultasSeguimientoCostes', c.categoriasOcultasSeguimientoCostes);
+    cambioPrefs = true;
+  }
+  if(STATE.costesSeguimientoIndents && STATE.costesSeguimientoIndents[catVieja]!==undefined){
+    const nuevoMapa = {...STATE.costesSeguimientoIndents};
+    nuevoMapa[catNueva] = nuevoMapa[catVieja];
+    delete nuevoMapa[catVieja];
+    STATE.costesSeguimientoIndents = nuevoMapa;
+    await cajaSet('indentsSeguimientoCostes', STATE.costesSeguimientoIndents);
+    cambioPrefs = true;
+  }
+
+  toast('Categoría renombrada a "'+catNueva+'"'+(usos>0?' — '+usos+' movimiento(s) actualizados.':'.')+(cambioPrefs?' Sus preferencias de Seguimiento de costes se han conservado.':''));
+  renderCajaTabContent();
+}
 function renderCajaGestionarCategorias(){
   const c = STATE.caja;
   const cont = document.getElementById('cajaGestionarCategorias');
@@ -12647,8 +12706,27 @@ function renderCajaGestionarCategorias(){
   const todas = [...new Set([...c.savedCats.ingresos, ...c.savedCats.gastos, ...Object.keys(usoPorCategoria)])].sort((a,b)=>a.localeCompare(b,'es'));
   if(todas.length===0){ cont.innerHTML = '<p class="hint">Sin categorías todavía.</p>'; return; }
   cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
-    ${todas.map(cat=>`<span class="pill noident" style="display:inline-flex;align-items:center;gap:6px;">${escapeHtml(cat)} <span class="hint">(${usoPorCategoria[cat]||0})</span> <button class="btn danger" data-del-categoria="${escapeHtml(cat)}" style="padding:1px 6px;font-size:10px;">✕</button></span>`).join('')}
-  </div>`;
+    ${todas.map(cat=>`<span class="pill noident" data-categoria-pill="${escapeHtml(cat)}" style="display:inline-flex;align-items:center;gap:6px;">${escapeHtml(cat)} <span class="hint">(${usoPorCategoria[cat]||0})</span> <button class="btn secondary" data-renombrar-categoria="${escapeHtml(cat)}" title="Renombrar esta categoría" style="padding:1px 6px;font-size:10px;">✏️</button> <button class="btn danger" data-del-categoria="${escapeHtml(cat)}" style="padding:1px 6px;font-size:10px;">✕</button></span>`).join('')}
+  </div>
+  <div id="cajaRenombrarCategoriaForm" style="margin-top:10px;"></div>`;
+  cont.querySelectorAll('[data-renombrar-categoria]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const cat = btn.getAttribute('data-renombrar-categoria');
+      const formCont = document.getElementById('cajaRenombrarCategoriaForm');
+      formCont.innerHTML = `<div class="card" style="border:1px solid var(--copper);display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="hint">Renombrar "<b style="color:var(--text);">${escapeHtml(cat)}</b>" a:</span>
+        <input type="text" id="cajaRenombrarCategoriaInput" value="${escapeHtml(cat)}" style="flex:1;min-width:160px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:6px 10px;">
+        <button class="btn" id="cajaRenombrarCategoriaGuardarBtn">Guardar</button>
+        <button class="btn secondary" id="cajaRenombrarCategoriaCancelarBtn">Cancelar</button>
+      </div>`;
+      const input = document.getElementById('cajaRenombrarCategoriaInput');
+      input.focus(); input.select();
+      const guardar = () => renombrarCategoriaCaja(cat, input.value.trim());
+      document.getElementById('cajaRenombrarCategoriaGuardarBtn').addEventListener('click', guardar);
+      document.getElementById('cajaRenombrarCategoriaCancelarBtn').addEventListener('click', ()=>{ formCont.innerHTML=''; });
+      input.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); guardar(); } if(e.key==='Escape'){ formCont.innerHTML=''; } });
+    });
+  });
   cont.querySelectorAll('[data-del-categoria]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const cat = btn.getAttribute('data-del-categoria');
@@ -12745,6 +12823,14 @@ function ventasNetasDelMes(m){
    últimos 3 meses, Diferencia vs los 3 meses inmediatamente anteriores, y comparación
    interanual (YoY). Mismo formato que "Seguimiento de costes", pero aquí SUBIR es lo
    bueno (verde) y BAJAR es lo malo (rojo), al revés que en un coste. */
+/* convierte "2026-08" en "agosto 2026" (con la primera letra en mayúscula) — para mostrar
+   un mes de referencia de forma legible en vez del formato en crudo "YYYY-MM". */
+function formatMesLargo(mesStr){
+  if(!mesStr) return '';
+  const d = new Date(mesStr+'-01T00:00:00');
+  const raw = d.toLocaleDateString('es-ES', {month:'long', year:'numeric'}).replace(' de ', ' ');
+  return raw.charAt(0).toUpperCase()+raw.slice(1);
+}
 function calcularSeguimientoVentas(){
   const allLines = getAllSalesLinesRaw();
   if(allLines.length===0) return { filas:[], mesReferencia:null };
@@ -13099,7 +13185,7 @@ async function renderCajaSeguimientoCostesTab(el){
     el.innerHTML = `
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
-          <div style="color:var(--copper);font-weight:700;font-size:14px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+mesReferencia:''}</div>
+          <div style="color:var(--copper);font-weight:700;font-size:14px;">Seguimiento de costes ${mesReferencia?'— datos hasta '+formatMesLargo(mesReferencia)+' incluido':''}</div>
           ${ocultas.length>0 ? `<button class="btn secondary no-print" id="cajaSegCostesVerOcultasBtn" style="padding:3px 10px;font-size:11px;">Categorías ocultas (${ocultas.length})</button>` : ''}
         </div>
         <p class="hint" style="margin-bottom:14px;">Cada categoría tiene dos filas: el importe en euros, y justo debajo, ese mismo coste como % de las ventas netas del periodo. "Dif. vs 3 meses ant." compara la media de los últimos 3 meses con la media de los 3 meses inmediatamente anteriores a esos. "YoY" compara el último mes con ese mismo mes hace un año — si no hay datos guardados de hace un año, se muestra "-". En un coste, bajar es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) y subir es <span style="color:var(--negative);font-weight:600;">rojo</span> (malo). Quitar una categoría de aquí (✕) también la quita de esta misma tabla en Resumen Ejecutivo.</p>
