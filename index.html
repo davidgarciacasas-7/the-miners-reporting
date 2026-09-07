@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.280</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.281</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7833,6 +7833,12 @@ async function renderResumenEjecutivo(){
       <div class="chart-wrap"><canvas id="chartReW_${w.instanceId}"></canvas></div>
     </div>`;
   }).join('') || '<p class="hint">Sin gráficos — añade uno con el desplegable de arriba.</p>';
+  // se llama aquí, justo después de construir las tarjetas, y no al final de la función:
+  // esta es la función que inyecta la sección de "notas al pie" (y el botón "+ Título
+  // aquí") en cada tarjeta — si se llamaba al final, el wiring de esos botones (más abajo
+  // en esta misma función) se ejecutaba antes de que los botones existieran de verdad en
+  // el DOM, y por eso no hacían nada al pulsarlos.
+  attachReDragHandlers();
 
   for(const w of widgets){
     if(w.typeId==='texto') continue;
@@ -8040,7 +8046,6 @@ async function renderResumenEjecutivo(){
       setTimeout(()=>document.addEventListener('click', cerrarFuera), 0);
     });
   });
-  attachReDragHandlers();
 }
 document.getElementById('reDesde').addEventListener('change', renderResumenEjecutivo);
 document.getElementById('reHasta').addEventListener('change', renderResumenEjecutivo);
