@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.286</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.287</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -12680,7 +12680,22 @@ async function renombrarCategoriaCaja(catVieja, catNueva){
     cambioPrefs = true;
   }
 
-  toast('Categoría renombrada a "'+catNueva+'"'+(usos>0?' — '+usos+' movimiento(s) actualizados.':'.')+(cambioPrefs?' Sus preferencias de Seguimiento de costes se han conservado.':''));
+  // los widgets individuales de categoría en Resumen Ejecutivo ("Alimentos (€)", etc.)
+  // guardan el nombre directamente en su propia configuración — si no se actualizan
+  // aquí, se quedan apuntando al nombre viejo, que ya no coincide con ningún movimiento,
+  // y el gráfico se ve vacío o "huérfano" aunque en Caja ya esté todo bien.
+  const widgetsRe = getReWidgets();
+  let widgetsCambiados = 0;
+  const widgetsReActualizados = widgetsRe.map(w=>{
+    if(w.typeId==='cajaCategoriaLinea' && w.cajaCategoriaNombre===catVieja){
+      widgetsCambiados++;
+      return { ...w, cajaCategoriaNombre:catNueva };
+    }
+    return w;
+  });
+  if(widgetsCambiados>0) setReWidgets(widgetsReActualizados);
+
+  toast('Categoría renombrada a "'+catNueva+'"'+(usos>0?' — '+usos+' movimiento(s) actualizados.':'.')+(cambioPrefs?' Sus preferencias de Seguimiento de costes se han conservado.':'')+(widgetsCambiados>0?' '+widgetsCambiados+' gráfico(s) de Resumen Ejecutivo actualizados.':''));
   renderCajaTabContent();
 }
 function renderCajaGestionarCategorias(){
