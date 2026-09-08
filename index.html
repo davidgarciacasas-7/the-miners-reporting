@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.287</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.293</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -445,6 +445,17 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <p class="hint" style="margin-bottom:8px;">Evolución de ventas brutas de cada categoría, dentro del periodo Desde/Hasta de arriba. Usa las categorías ya reagrupadas si has definido alguna arriba.</p>
         <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartCategoriasTendencia"></canvas></div></div>
+
+        <div class="section-title">Ventas de artículos de la categoría seleccionada</div>
+        <p class="hint" style="margin-bottom:8px;">Usa el filtro de "Categoría" de arriba del todo — con una o varias categorías elegidas ahí, aquí se ve la tendencia de cada uno de sus artículos por separado, dentro del periodo Desde/Hasta.</p>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="hint" style="font-weight:600;margin-bottom:6px;">En unidades</div>
+          <div class="chart-wrap"><canvas id="chartArticulosCategoriaUds"></canvas></div>
+        </div>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="hint" style="font-weight:600;margin-bottom:6px;">En euros</div>
+          <div class="chart-wrap"><canvas id="chartArticulosCategoriaEuros"></canvas></div>
+        </div>
 
         <div class="section-title">Tendencia de ventas por producto</div>
         <div class="card" style="margin-bottom:14px;">
@@ -671,7 +682,6 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div id="cajaUpload_providers"></div>
           </div>
           <p class="hint" id="cajaUploadError" style="color:var(--negative);display:none;"></p>
-          <div id="cajaCategoriasGuardadas" style="margin-bottom:14px;"></div>
           <button class="btn" id="cajaProcesarBtn" disabled>Generar balance del mes</button>
         </div>
 
@@ -2361,7 +2371,11 @@ function getFilteredLines(){
       if(f.diaSemana && dInfo.nombre!==f.diaSemana) continue;
       const categoria = pd.cats[catIdx];
       const articulo = pd.arts[artIdx];
-      if(f.categoria.length && !f.categoria.includes(categoria)) continue;
+      // el filtro ahora ofrece las categorías ya reagrupadas (ver populateFilterOptions),
+      // así que hay que comparar contra el nombre agrupado, no el original del POS —
+      // si no, elegir "Vinos" en el desplegable no encontraría ninguna fila con "Vino
+      // tinto" tal cual, ya que esa cadena exacta ya no existe como opción seleccionable.
+      if(f.categoria.length && !f.categoria.includes(displayCategoryFor(categoria))) continue;
       if(f.articulo.length && !f.articulo.includes(articulo)) continue;
       const segmento = segByTicket[ticketIdx] || 'noident';
       if(f.segmento.length && !f.segmento.includes(segmento)) continue;
@@ -2466,7 +2480,12 @@ function populateFilterOptions(){
     STATE.periodsData[periodId].cats.forEach(c=>cats.add(c));
     STATE.periodsData[periodId].arts.forEach(a=>arts.add(a));
   }
-  setupMultiSelect('categoria', [...cats].sort());
+  // el desplegable de Categoría muestra las categorías YA reagrupadas (el resultado de
+  // "Reagrupar categorías"), no las categorías en crudo del POS — así, si varias
+  // categorías pequeñas se agruparon en una sola (p.ej. "Vino tinto"+"Vino blanco" ->
+  // "Vinos"), en el filtro solo aparece "Vinos" una vez, no las 3 originales sueltas.
+  const catsAgrupadas = new Set([...cats].map(c=>displayCategoryFor(c)));
+  setupMultiSelect('categoria', [...catsAgrupadas].sort());
   setupMultiSelect('articulo', [...arts].sort());
 }
 
@@ -3710,6 +3729,7 @@ function renderProductos(lines){
   }).join('');
 
   try{ renderCategoriasTendencia(lines); mostrarDiagnosticoSiVacio('chartCategoriasTendencia','categoriasTendencia'); }catch(e){ console.error('Error en renderCategoriasTendencia:', e); mostrarDiagnosticoError('chartCategoriasTendencia', e); }
+  try{ renderArticulosCategoriaTendencia(lines); }catch(e){ console.error('Error en renderArticulosCategoriaTendencia:', e); mostrarDiagnosticoError('chartArticulosCategoriaUds', e); mostrarDiagnosticoError('chartArticulosCategoriaEuros', e); }
   try{ renderProductosTendenciaChart(lines); }catch(e){ console.error('Error en renderProductosTendenciaChart:', e); mostrarDiagnosticoError('chartProductosTendencia', e); }
 }
 /* tendencia de ventas por categoría — siempre en líneas, dentro del Desde/Hasta general */
@@ -3739,7 +3759,52 @@ function renderCategoriasTendencia(lines){
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback:v=>eur(Math.round(v*100))}, grid:{color:c.grid} } } }
   });
 }
-document.getElementById('productosGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderCategoriasTendencia(lines); renderProductosTendenciaChart(lines); });
+document.getElementById('productosGranularidad').addEventListener('change', ()=>{ const {lines}=currentDataset(); renderCategoriasTendencia(lines); renderArticulosCategoriaTendencia(lines); renderProductosTendenciaChart(lines); });
+
+/* tendencia de cada artículo de la(s) categoría(s) elegida(s) en el filtro de arriba —
+   como "lines" ya viene filtrado por ese mismo filtro de categoría (ver
+   getFilteredLines()), aquí no hace falta volver a filtrar por categoría: basta con
+   agrupar lo que ya ha llegado, artículo a artículo. Si no hay ninguna categoría elegida
+   en el filtro, se pide elegir una en vez de dibujar cientos de artículos de golpe. */
+function renderArticulosCategoriaTendencia(lines){
+  const canvasUds = document.getElementById('chartArticulosCategoriaUds');
+  const canvasEuros = document.getElementById('chartArticulosCategoriaEuros');
+  if(!canvasUds || !canvasEuros) return;
+  if(!STATE.filters.categoria || STATE.filters.categoria.length===0){
+    destroyChart('articulosCategoriaUds'); destroyChart('articulosCategoriaEuros');
+    mostrarDiagnosticoError('chartArticulosCategoriaUds', new Error('Elige una categoría en el filtro de arriba para ver este gráfico.'));
+    mostrarDiagnosticoError('chartArticulosCategoriaEuros', new Error('Elige una categoría en el filtro de arriba para ver este gráfico.'));
+    return;
+  }
+  limpiarDiagnostico('chartArticulosCategoriaUds'); limpiarDiagnostico('chartArticulosCategoriaEuros');
+  const _rango = derivarRangoFechas(lines); const desde = _rango.desde, hasta = _rango.hasta;
+  if(!desde || !hasta){ destroyChart('articulosCategoriaUds'); destroyChart('articulosCategoriaEuros'); return; }
+  const gran = document.getElementById('productosGranularidad').value;
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const articulos = [...new Set(lines.map(l=>l.articulo))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'es'));
+  const porArtBucket = {};
+  articulos.forEach(a=>{ porArtBucket[a]={}; buckets.forEach(b=>porArtBucket[a][b.label]={uds:0, euros:0}); });
+  lines.forEach(l=>{
+    if(!porArtBucket[l.articulo]) return;
+    const b = buckets.find(bk=>l.fecha>=bk.dateMin && l.fecha<=bk.dateMax);
+    if(b){ porArtBucket[l.articulo][b.label].uds += l.cant; porArtBucket[l.articulo][b.label].euros += l.bruto; }
+  });
+  const c = chartColors();
+  const opcionesComunes = (callback) => ({ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{color:c.muted, boxWidth:11, font:{size:10}}}}, scales:{ x:{ ticks:{color:c.muted, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c.muted, callback}, grid:{color:c.grid} } } });
+
+  destroyChart('articulosCategoriaUds');
+  STATE.charts.articulosCategoriaUds = safeNewChart('chartArticulosCategoriaUds', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets: articulos.map((a,i)=>trendDataset(a, buckets.map(b=>+porArtBucket[a][b.label].uds.toFixed(1)), FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length])) },
+    options: opcionesComunes(v=>v)
+  });
+  destroyChart('articulosCategoriaEuros');
+  STATE.charts.articulosCategoriaEuros = safeNewChart('chartArticulosCategoriaEuros', {
+    type:'line',
+    data:{ labels: buckets.map(b=>b.label), datasets: articulos.map((a,i)=>trendDataset(a, buckets.map(b=>+(porArtBucket[a][b.label].euros/100).toFixed(2)), FRANJA_COLOR_PALETTE[i % FRANJA_COLOR_PALETTE.length])) },
+    options: opcionesComunes(v=>eur(Math.round(v*100)))
+  });
+}
 
 /* tendencia de ventas por producto — solo dibuja los productos que el usuario elija
    explícitamente, para no saturar el gráfico con cientos de líneas */
@@ -7791,9 +7856,9 @@ async function renderResumenEjecutivo(){
       </div>`;
     }
     if(w.typeId==='cajaCategoriaLinea'){
-      const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : '';
+      const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : (w.cajaCategoriaTipo==='categoriaIngreso' ? 'Ingreso — ' : '');
       const titulo = w.cajaCategoriaEnPct
-        ? `Flujo de Caja coste de ${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(% ventas netas)</span>`
+        ? `Coste de ${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">como % de ventas netas</span>`
         : `${tipoPrefijo}${escapeHtml(w.cajaCategoriaNombre||'')} <span class="hint" style="font-weight:400;">(€)</span>`;
       return `<div class="card" draggable="true" data-re-instance="${w.instanceId}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
@@ -8192,8 +8257,8 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   // distinguir.
   function tituloWidgetPdf(w, type){
     if(w.typeId==='cajaCategoriaLinea'){
-      const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : '';
-      if(w.cajaCategoriaEnPct) return 'Flujo de Caja coste de '+tipoPrefijo+(w.cajaCategoriaNombre||'')+' (% ventas netas)';
+      const tipoPrefijo = w.cajaCategoriaTipo==='subcategoria' ? 'Subcategoría — ' : (w.cajaCategoriaTipo==='categoriaIngreso' ? 'Ingreso — ' : '');
+      if(w.cajaCategoriaEnPct) return 'Coste de '+tipoPrefijo+(w.cajaCategoriaNombre||'')+' como % de ventas netas';
       return tipoPrefijo+(w.cajaCategoriaNombre||'')+' (€)';
     }
     if(w.typeId==='cajaPieCategoria'){
@@ -9439,7 +9504,7 @@ async function renderCajaCategoriaLineaWidgetInstance(w, buckets){
   if(!STATE.caja.storageLoaded) await cajaLoadStorage();
   const cc = STATE.caja;
   const tipo = w.cajaCategoriaTipo || 'categoria';
-  const fuente = tipo==='categoria' ? cajaDetalleCatData() : cajaDetalleSubcatData();
+  const fuente = tipo==='categoria' ? cajaDetalleCatData() : (tipo==='categoriaIngreso' ? cajaDetalleCatDataIngresos() : cajaDetalleSubcatData());
   const claveElegida = w.cajaCategoriaNombre || '';
   const c = chartColors();
   if(!claveElegida){ destroyChart('reW_'+w.instanceId); return; }
@@ -11541,7 +11606,7 @@ function renderCajaUploadScreen(){
   const qa = document.getElementById('cajaQuickAccess');
   if(c.storageLoaded && c.savedMonths.length>0){
     qa.innerHTML = '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;"><span class="hint">Ver datos:</span>' +
-      [['balances','Balances'],['tendencias','Tendencias'],['graficos','Gráficos'],['proveedores','Proveedores']].map(([t,l])=>
+      [['balances','Balances'],['tendencias','Tendencias'],['graficos','Gráficos'],['seguimientocostes','Seguimiento costes'],['proveedores','Proveedores y categorías']].map(([t,l])=>
         `<button class="btn secondary" data-caja-quick="${t}" style="padding:9px 16px;font-size:12px;">${l}</button>`
       ).join('') + '</div>';
     qa.querySelectorAll('[data-caja-quick]').forEach(btn=>{
@@ -11552,23 +11617,6 @@ function renderCajaUploadScreen(){
       });
     });
   } else { qa.innerHTML=''; }
-
-  const catsEl = document.getElementById('cajaCategoriasGuardadas');
-  if(c.savedCats.gastos.length>0 || c.savedCats.ingresos.length>0){
-    catsEl.innerHTML = `<div class="card"><p class="hint" style="text-transform:uppercase;letter-spacing:1px;font-size:10px;margin-bottom:8px;">Categorías guardadas</p>` +
-      (c.savedCats.gastos.length>0 ? `<div style="margin-bottom:6px;"><span class="hint" style="margin-right:8px;">Gastos:</span>${c.savedCats.gastos.map(cat=>`<span class="pill noident" style="margin-right:5px;">${cat} <a href="#" data-del-cat="gastos|${cat}" style="color:var(--text-muted);">✕</a></span>`).join('')}</div>` : '') +
-      (c.savedCats.ingresos.length>0 ? `<div><span class="hint" style="margin-right:8px;">Ingresos:</span>${c.savedCats.ingresos.map(cat=>`<span class="pill nuevo" style="margin-right:5px;">${cat} <a href="#" data-del-cat="ingresos|${cat}" style="color:var(--text-muted);">✕</a></span>`).join('')}</div>` : '') +
-      `</div>`;
-    catsEl.querySelectorAll('[data-del-cat]').forEach(a=>{
-      a.addEventListener('click', (e)=>{
-        e.preventDefault();
-        const [tipo,cat] = a.getAttribute('data-del-cat').split('|');
-        const sc = { ...c.savedCats, [tipo]: c.savedCats[tipo].filter(x=>x!==cat) };
-        c.savedCats = sc; cajaSet('cats', sc);
-        renderCajaUploadScreen();
-      });
-    });
-  } else { catsEl.innerHTML=''; }
 }
 
 async function cajaProcess(){
@@ -13410,6 +13458,27 @@ function renderCajaTendenciasTab(el){
   });
 }
 
+/* igual que cajaDetalleCatData(), pero para INGRESOS (importes positivos) en vez de
+   gastos — se usa en la nueva sección "Por categoría de ingresos" de Caja → Gráficos, y
+   en los widgets de Resumen Ejecutivo que apuntan a una categoría de ingreso concreta. */
+function cajaDetalleCatDataIngresos(){
+  const c = STATE.caja;
+  if(!c.savedMonths.length) return {months:[], cats:[], table:{}};
+  const months = c.savedMonths.map(m=>m.title||m.month);
+  const catSet = new Set();
+  c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount>0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
+  const cats = [...catSet].sort();
+  const table = {};
+  cats.forEach(cat=>{
+    table[cat] = {};
+    c.savedMonths.forEach(m=>{
+      const totalIngreso = m.totalIncome||1;
+      const euros = (m.movements||[]).filter(mv=>mv.amount>0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+mv.amount,0);
+      table[cat][m.title||m.month] = { euros, pct: +(euros/totalIngreso*100).toFixed(1) };
+    });
+  });
+  return { months, cats, table };
+}
 function cajaDetalleCatData(){
   const c = STATE.caja;
   if(!c.savedMonths.length) return {months:[], cats:[], table:{}};
@@ -13621,6 +13690,11 @@ function renderCajaGraficosTab(el){
     </div>
     <div id="cajaGraficosGrid"></div>
     <div style="margin-top:28px;">
+      <div style="color:var(--copper);font-weight:700;font-size:15px;margin-bottom:6px;">Por categoría de ingresos</div>
+      <p class="hint" style="margin-bottom:14px;">Igual que los gastos, pero con los movimientos en positivo (ingresos) de Caja. Cada tarjeta tiene su propio botón para añadir ese gráfico concreto a Resumen Ejecutivo, sin tener que añadir todas las categorías de golpe.</p>
+      <div id="cajaGraficosIngresosGrid"></div>
+    </div>
+    <div style="margin-top:28px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
         <div style="color:var(--copper);font-weight:700;font-size:15px;">Análisis personalizado</div>
         <button class="btn" id="cajaNuevoGrupoBtn" style="padding:7px 16px;font-size:12px;">+ Nuevo grupo</button>
@@ -13639,7 +13713,61 @@ function renderCajaGraficosTab(el){
   attachCajaFiltroPeriodoHandlers(el, renderCajaTabContent);
 
   renderCajaGraficosGrid();
+  renderCajaGraficosIngresosGrid();
   renderCajaGruposSection();
+}
+/* mini-tarjetas de "Por categoría de ingresos" — más sencillas que las de gastos (sin
+   subcategoría/proveedor/vista destacada), con un botón propio en cada una para añadir
+   esa categoría concreta a Resumen Ejecutivo — al contrario que en gastos, donde el menú
+   de Resumen Ejecutivo añade todas las categorías visibles de golpe, aquí se pidió poder
+   elegir solo una en concreto (p.ej. "Devoluciones"). */
+function renderCajaGraficosIngresosGrid(){
+  const c = STATE.caja;
+  const gridEl = document.getElementById('cajaGraficosIngresosGrid');
+  if(!gridEl) return;
+  const tendPeriod = cajaPeriodoFiltrado(c.grafPeriod, c.grafFrom, c.grafTo);
+  const periodMonthNames = tendPeriod.map(m=>m.title||m.month);
+  const c2 = chartColors();
+  const detalleIngresos = cajaDetalleCatDataIngresos();
+  const cats = detalleIngresos.cats;
+  const getEurosIngreso = (cat,month) => detalleIngresos.table[cat]?.[month]?.euros||0;
+
+  if(cats.length===0){ gridEl.innerHTML = '<p class="hint" style="text-align:center;padding:30px;">Sin categorías de ingresos con movimientos todavía.</p>'; return; }
+
+  const widgetsRe = getReWidgets();
+  gridEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">
+    ${cats.map((cat,ci)=>{
+      const total = periodMonthNames.reduce((s,m)=>s+getEurosIngreso(cat,m),0);
+      const media = periodMonthNames.length ? total/periodMonthNames.length : 0;
+      const yaAnadido = widgetsRe.some(w=>w.typeId==='cajaCategoriaLinea' && w.cajaCategoriaTipo==='categoriaIngreso' && w.cajaCategoriaNombre===cat);
+      return `<div class="card">
+        <div style="color:var(--text);font-weight:600;font-size:12px;margin-bottom:6px;">${escapeHtml(cat)}</div>
+        <div class="hint" style="font-size:10px;margin-bottom:8px;">Media mensual: <b style="color:var(--text);">${cajaFmt(media)}</b> · Total: <b style="color:var(--text);">${cajaFmt(total)}</b></div>
+        <div class="chart-wrap" style="height:110px;margin-bottom:8px;"><canvas id="cajaCatIngresoMini_${ci}"></canvas></div>
+        <button class="btn ${yaAnadido?'secondary':''}" data-add-re-cat-ingreso="${escapeHtml(cat)}" style="width:100%;padding:5px 10px;font-size:11px;" ${yaAnadido?'disabled':''}>${yaAnadido?'Ya está en Resumen Ejecutivo ✓':'+ Añadir a Resumen Ejecutivo'}</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  cats.forEach((cat,ci)=>{
+    destroyChart('cajaCatIngresoMini_'+ci);
+    STATE.charts['cajaCatIngresoMini_'+ci] = safeNewChart('cajaCatIngresoMini_'+ci, {
+      type:'line',
+      data:{ labels:periodMonthNames, datasets:[{ data:periodMonthNames.map(m=>getEurosIngreso(cat,m)), borderColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[ci%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:3 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:9}}, grid:{display:false} }, y:{ ticks:{color:c2.muted, callback:v=>v+'€', font:{size:9}}, grid:{color:c2.grid} } } }
+    });
+  });
+
+  gridEl.querySelectorAll('[data-add-re-cat-ingreso]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const cat = btn.getAttribute('data-add-re-cat-ingreso');
+      const widgets = getReWidgets();
+      widgets.push({ instanceId:'w'+Date.now()+Math.random().toString(36).slice(2,6), typeId:'cajaCategoriaLinea', cajaCategoriaTipo:'categoriaIngreso', cajaCategoriaNombre:cat, cajaCategoriaEnPct:false });
+      setReWidgets(widgets);
+      toast('"'+cat+'" añadido a Resumen Ejecutivo ✓');
+      renderCajaGraficosIngresosGrid();
+    });
+  });
 }
 
 function renderCajaGraficosGrid(){
