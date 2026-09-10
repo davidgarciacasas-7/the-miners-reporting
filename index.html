@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.299</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.300</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8222,7 +8222,7 @@ document.getElementById('reCopyClaudeBtn').addEventListener('click', ()=>{
   const buckets = monthBucketsInRange(desde, hasta);
   const resultado = calcularResumenEjecutivo(buckets);
 
-  let texto = 'Datos de The Miners Plaza de España — Resumen Ejecutivo\n';
+  let texto = 'Datos de The Miners Plaza de España — Informe Ejecutivo\n';
   texto += 'Periodo: '+desde+' a '+hasta+' (tendencia mensual)\n\n';
   texto += '| Mes | Ventas brutas | Nº tickets | Ticket medio | Clientes nuevos | Repetidos sin fidelidad (tickets) | Repetidos sin fidelidad (% ventas) | Con fidelidad (tickets) | Con fidelidad (% ventas) |\n';
   texto += '|---|---|---|---|---|---|---|---|---|\n';
@@ -8271,7 +8271,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     doc.setTextColor(...COBRE);
     doc.text('Plaza de España', margin+doc.getTextWidth('The Miners ')+0, margin+6);
     doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...GRIS);
-    doc.text('Resumen Ejecutivo  ·  Periodo: '+desde+' a '+hasta, margin, margin+12.5);
+    doc.text('Informe Ejecutivo  ·  Periodo: '+desde+' a '+hasta, margin, margin+12.5);
     doc.setDrawColor(...LINEA); doc.setLineWidth(0.4);
     doc.line(margin, margin+16.5, W-margin, margin+16.5);
     doc.setFontSize(8); doc.setTextColor(...GRIS_CLARO); doc.setFont('helvetica','normal');
@@ -8421,7 +8421,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   let yPortada = H*0.4;
 
   doc.setFont('times','normal'); doc.setFontSize(14); doc.setTextColor(...GRIS);
-  doc.text('R E S U M E N   E J E C U T I V O', centroTexto, yPortada, {align:'center'});
+  doc.text('I N F O R M E   E J E C U T I V O', centroTexto, yPortada, {align:'center'});
   yPortada += 15;
 
   doc.setFont('times','bold'); doc.setFontSize(30); doc.setTextColor(...NEGRO);
@@ -8436,8 +8436,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
 
   // el mes de generación va debajo de la foto (llenando ese hueco en blanco que quedaba
   // sin nada) cuando hay foto — si no hay foto, se queda en el bloque de texto de la
-  // derecha, como antes, para no dejarlo sin sitio.
-  doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+  // derecha, como antes, para no dejarlo sin sitio. Misma fuente (times) que el resto de
+  // la portada, para que no desentone.
+  doc.setFont('times','normal'); doc.setTextColor(...GRIS);
   if(anchoFotoPortada>0){
     doc.setFontSize(17);
     doc.text(mesGeneracion, anchoFotoPortada/2, altoFotoPortada+16, {align:'center'});
@@ -8445,6 +8446,11 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     doc.setFontSize(12);
     doc.text(mesGeneracion, centroTexto, yPortada+11, {align:'center'});
   }
+
+  // franja de color en el borde inferior de la portada — para que no quede tanto blanco
+  // vacío ahí abajo, con el mismo cobre de marca que ya se usa en el resto de la portada.
+  doc.setFillColor(...COBRE);
+  doc.rect(0, H-12, W, 12, 'F');
 
   doc.addPage();
   cabecera(paginaActual);
