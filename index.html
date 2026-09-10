@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.296</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.298</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -7134,6 +7134,19 @@ function setReWidgets(list){ localStorage.setItem('miners_re_widgets', JSON.stri
     if(cambiado) setReWidgets(widgets);
   }catch(e){ /* si algo falla aquí, no debe romper el resto de la carga de la página */ }
 })();
+// la línea de tendencia (discontinua, gris) se activa o desactiva por gráfico individual,
+// y esa preferencia también vive solo en localStorage (desactivada por defecto) — se
+// restaura solo en los gráficos donde el PDF original la mostraba, y solo si no hay
+// ninguna preferencia guardada ya (no pisa una elección deliberada de quitarla).
+(function restaurarTendenciaSiVacia(){
+  try{
+    ['chartReW_rec02','chartReW_rec03','chartReW_rec08'].forEach(canvasId=>{
+      if(localStorage.getItem('miners_tendencia_'+canvasId)===null){
+        localStorage.setItem('miners_tendencia_'+canvasId, 'true');
+      }
+    });
+  }catch(e){ /* no debe romper el resto de la carga de la página */ }
+})();
 /* histórico de plantillas guardadas del propio Resumen Ejecutivo — guarda qué gráficos
    y títulos tienes montados, y en qué orden, para poder recuperarlo más adelante */
 function getReTemplates(){
@@ -8387,27 +8400,17 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   let anchoFotoPortada = 0;
   if(fotoPortada){
     try{
-      // a sangre completa: desde el borde izquierdo y superior de la página, sin margen —
-      // se recorta (no se deforma) para llenar exactamente ese ancho por toda la altura.
-      anchoFotoPortada = W*0.5;
+      // se muestra la foto ENTERA (sin recortar nada) — el ancho se ajusta a la
+      // proporción real de la foto, con un máximo del 60% de la página y la altura
+      // completa como límite, para que quepa cualquier orientación sin cortar nada por
+      // los lados ni por arriba/abajo. Empieza en la esquina superior izquierda, sin
+      // margen, tal como se pidió.
       const propsFoto = doc.getImageProperties(fotoPortada);
-      const ratioCaja = anchoFotoPortada/H;
       const ratioFoto = propsFoto.width/propsFoto.height;
-      let sx=0, sy=0, sw=propsFoto.width, sh=propsFoto.height;
-      if(ratioFoto>ratioCaja){ sw = sh*ratioCaja; sx = (propsFoto.width-sw)/2; }
-      else { sh = sw/ratioCaja; sy = (propsFoto.height-sh)/2; }
-      // jsPDF no recorta directamente al insertar, así que el recorte se hace aparte, en
-      // un canvas, antes de pasarle la imagen ya recortada a addImage.
-      const canvasRecorte = document.createElement('canvas');
-      const pxPorMm = 4; // resolución de recorte suficiente para que no se vea pixelado
-      canvasRecorte.width = anchoFotoPortada*pxPorMm;
-      canvasRecorte.height = H*pxPorMm;
-      const ctxRecorte = canvasRecorte.getContext('2d');
-      const imgTmp = new Image();
-      await new Promise((resolve,reject)=>{ imgTmp.onload=resolve; imgTmp.onerror=reject; imgTmp.src=fotoPortada; });
-      ctxRecorte.drawImage(imgTmp, sx, sy, sw, sh, 0, 0, canvasRecorte.width, canvasRecorte.height);
-      const fotoRecortada = canvasRecorte.toDataURL('image/jpeg', 0.9);
-      doc.addImage(fotoRecortada, 'JPEG', 0, 0, anchoFotoPortada, H);
+      const anchoMax = W*0.6;
+      anchoFotoPortada = Math.min(anchoMax, H*ratioFoto);
+      const altoFotoPortada = anchoFotoPortada/ratioFoto;
+      doc.addImage(fotoPortada, 'JPEG', 0, 0, anchoFotoPortada, altoFotoPortada);
     }catch(e){ console.error('No se pudo dibujar la foto de portada:', e); anchoFotoPortada = 0; }
   }
 
