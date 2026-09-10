@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.298</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.299</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -8397,7 +8397,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   const mesGeneracionRaw = new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'});
   const mesGeneracion = mesGeneracionRaw.charAt(0).toUpperCase()+mesGeneracionRaw.slice(1);
 
-  let anchoFotoPortada = 0;
+  let anchoFotoPortada = 0, altoFotoPortada = 0;
   if(fotoPortada){
     try{
       // se muestra la foto ENTERA (sin recortar nada) — el ancho se ajusta a la
@@ -8409,9 +8409,9 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
       const ratioFoto = propsFoto.width/propsFoto.height;
       const anchoMax = W*0.6;
       anchoFotoPortada = Math.min(anchoMax, H*ratioFoto);
-      const altoFotoPortada = anchoFotoPortada/ratioFoto;
+      altoFotoPortada = anchoFotoPortada/ratioFoto;
       doc.addImage(fotoPortada, 'JPEG', 0, 0, anchoFotoPortada, altoFotoPortada);
-    }catch(e){ console.error('No se pudo dibujar la foto de portada:', e); anchoFotoPortada = 0; }
+    }catch(e){ console.error('No se pudo dibujar la foto de portada:', e); anchoFotoPortada = 0; altoFotoPortada = 0; }
   }
 
   // el título va centrado en el hueco que quede a la derecha de la foto (o en toda la
@@ -8433,10 +8433,18 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
 
   doc.setDrawColor(...COBRE); doc.setLineWidth(0.6);
   doc.line(centroTexto-16, yPortada, centroTexto+16, yPortada);
-  yPortada += 11;
 
-  doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.setTextColor(...GRIS);
-  doc.text(mesGeneracion, centroTexto, yPortada, {align:'center'});
+  // el mes de generación va debajo de la foto (llenando ese hueco en blanco que quedaba
+  // sin nada) cuando hay foto — si no hay foto, se queda en el bloque de texto de la
+  // derecha, como antes, para no dejarlo sin sitio.
+  doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+  if(anchoFotoPortada>0){
+    doc.setFontSize(17);
+    doc.text(mesGeneracion, anchoFotoPortada/2, altoFotoPortada+16, {align:'center'});
+  } else {
+    doc.setFontSize(12);
+    doc.text(mesGeneracion, centroTexto, yPortada+11, {align:'center'});
+  }
 
   doc.addPage();
   cabecera(paginaActual);
