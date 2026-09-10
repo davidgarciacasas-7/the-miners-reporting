@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.293</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.294</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1245,6 +1245,14 @@ Bowl de acai,Acai,150,g</pre>
             <button class="btn secondary" id="reGuardarPlantillaBtn">Guardar esta plantilla</button>
             <div class="filter-group"><label>Plantillas guardadas</label><select id="reCargarPlantillaSelect"><option value="">Cargar plantilla guardada...</option></select></div>
             <button class="btn danger" id="reBorrarPlantillaBtn" style="display:none;">Eliminar esta plantilla</button>
+          </div>
+        </div>
+        <div class="topbar no-print" style="margin-bottom:10px;">
+          <div class="subfilter" style="margin-bottom:0;">
+            <span class="hint">Copia de seguridad (fuera del navegador — sobrevive a borrar datos de navegación):</span>
+            <button class="btn secondary" id="reExportarArchivoBtn">Exportar a archivo</button>
+            <button class="btn secondary" id="reImportarArchivoBtn">Importar desde archivo</button>
+            <input type="file" id="reImportarArchivoInput" accept=".json" style="display:none;">
           </div>
         </div>
         <p class="hint" style="margin-bottom:14px;">Todos los gráficos usan el mismo periodo elegido arriba. Arrastra una tarjeta por su cabecera (✥) para reordenarla.</p>
@@ -7084,6 +7092,18 @@ function getReWidgets(){
   ];
 }
 function setReWidgets(list){ localStorage.setItem('miners_re_widgets', JSON.stringify(list)); }
+// restauración puntual de la plantilla de Resumen Ejecutivo — se borró al limpiar datos
+// de navegación (localStorage), y se reconstruyó a partir de un PDF de ejemplo que el
+// usuario conservaba. Solo se aplica si la plantilla está VACÍA de verdad (no pisa nada
+// si ya se hubiera vuelto a montar algo, a mano o de otra sesión).
+(function restaurarPlantillaReSiVacia(){
+  try{
+    const actual = JSON.parse(localStorage.getItem('miners_re_widgets'));
+    if(Array.isArray(actual) && actual.length>0) return; // ya hay algo, no tocar nada
+  }catch(e){ /* nada guardado o corrupto -> se restaura igualmente */ }
+  const widgetsRestaurados = [{"instanceId": "rec01", "typeId": "texto", "contenido": "Ventas"}, {"instanceId": "rec02", "typeId": "ventas"}, {"instanceId": "rec03", "typeId": "tickets"}, {"instanceId": "rec04", "typeId": "seguimientoVentas"}, {"instanceId": "rec05", "typeId": "texto", "contenido": "Clientes"}, {"instanceId": "rec06", "typeId": "clientesVentas"}, {"instanceId": "rec07", "typeId": "categoriasTendencia", "categoriasOcultas": ["Bottled", "Merch", "Seasonal Drinks"]}, {"instanceId": "rec08", "typeId": "ticketMedio"}, {"instanceId": "rec09", "typeId": "clientesTickets"}, {"instanceId": "rec10", "typeId": "texto", "contenido": "Resúmen de costes"}, {"instanceId": "rec11", "typeId": "cajaGastos"}, {"instanceId": "rec12", "typeId": "cajaPieCategoria", "cajaPieTipo": "categoria", "cajaPiePeriodo": "1m"}, {"instanceId": "rec13", "typeId": "cajaPieCategoria", "cajaPieTipo": "categoria", "cajaPiePeriodo": "3m"}, {"instanceId": "rec14", "typeId": "cajaPieCategoria", "cajaPieTipo": "categoria", "cajaPiePeriodo": "total"}, {"instanceId": "rec15", "typeId": "texto", "contenido": "EBITDA y Caja"}, {"instanceId": "rec16", "typeId": "ebitdaEuros"}, {"instanceId": "rec17", "typeId": "ebitdaPct"}, {"instanceId": "rec18", "typeId": "cajaBalance", "footnotes": ["El pico positivo de febrero se debe al ingreso de todo el efectivo acumulado hasta el momento de una sola vez"]}, {"instanceId": "rec19", "typeId": "texto", "contenido": "PnL"}, {"instanceId": "rec20", "typeId": "pnl", "pnlDesde": "2025-11-01", "pnlHasta": "2026-08-31", "footnotes": ["Los siguientes costes son una estimación realista por el momento, basada en datos reales puntuales: write-off, missing stock, packaging costs, operating supplies", "Los costes de electricidad, gas, y agua son una media aproximada mensual del coste desde la apertura, en lugar de una medición exacta mensual", "Las partidas no recurrentes como inversiones en equipamiento o en mejoras del local no se incluyen en el PnL para calcular el EBITDA", "El pago de la cuota del préstamo (498.28 euros al mes) no es parte del cálculo del EBITDA"]}, {"instanceId": "rec21", "typeId": "texto", "contenido": "Costes principales por categoría (€)"}, {"instanceId": "rec22", "typeId": "seguimientoCostes"}, {"instanceId": "rec23", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "Alimentos", "cajaCategoriaEnPct": false}, {"instanceId": "rec24", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "nominas", "cajaCategoriaEnPct": false}, {"instanceId": "rec25", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "alquiler", "cajaCategoriaEnPct": false}, {"instanceId": "rec26", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "bebidas", "cajaCategoriaEnPct": false}, {"instanceId": "rec27", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "consumibles operacionales", "cajaCategoriaEnPct": false}, {"instanceId": "rec28", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "equipamiento", "cajaCategoriaEnPct": false}, {"instanceId": "rec29", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "mantenimiento", "cajaCategoriaEnPct": false}, {"instanceId": "rec30", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "obras y materiales", "cajaCategoriaEnPct": false}, {"instanceId": "rec31", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "prestamo", "cajaCategoriaEnPct": false}, {"instanceId": "rec32", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "retenciones", "cajaCategoriaEnPct": false}, {"instanceId": "rec33", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "royalties", "cajaCategoriaEnPct": false}, {"instanceId": "rec34", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "servicios", "cajaCategoriaEnPct": false}, {"instanceId": "rec35", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "gestoría", "cajaCategoriaEnPct": false}, {"instanceId": "rec36", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "software", "cajaCategoriaEnPct": false}, {"instanceId": "rec37", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "suministros", "cajaCategoriaEnPct": false}, {"instanceId": "rec38", "typeId": "texto", "contenido": "Costes principales por categoría (% de Ventas netas)"}, {"instanceId": "rec39", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "Alimentos", "cajaCategoriaEnPct": true}, {"instanceId": "rec40", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "nominas", "cajaCategoriaEnPct": true}, {"instanceId": "rec41", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "alquiler", "cajaCategoriaEnPct": true}, {"instanceId": "rec42", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "bebidas", "cajaCategoriaEnPct": true}, {"instanceId": "rec43", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "consumibles operacionales", "cajaCategoriaEnPct": true}, {"instanceId": "rec44", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "equipamiento", "cajaCategoriaEnPct": true}, {"instanceId": "rec45", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "mantenimiento", "cajaCategoriaEnPct": true}, {"instanceId": "rec46", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "obras y materiales", "cajaCategoriaEnPct": true}, {"instanceId": "rec47", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "prestamo", "cajaCategoriaEnPct": true}, {"instanceId": "rec48", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "retenciones", "cajaCategoriaEnPct": true}, {"instanceId": "rec49", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "royalties", "cajaCategoriaEnPct": true}, {"instanceId": "rec50", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "servicios", "cajaCategoriaEnPct": true}, {"instanceId": "rec51", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "software", "cajaCategoriaEnPct": true}, {"instanceId": "rec52", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "suministros", "cajaCategoriaEnPct": true}, {"instanceId": "rec53", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoria", "cajaCategoriaNombre": "gestoría", "cajaCategoriaEnPct": true}, {"instanceId": "rec54", "typeId": "texto", "contenido": "Otros movimientos de activos y balance"}, {"instanceId": "rec55", "typeId": "inventoryStockUp", "footnotes": ["Este gráfico muestar si se ha creado inventario (valor positivo) o consumido inventario (valor negativo)"]}, {"instanceId": "rec56", "typeId": "cajaCategoriaLinea", "cajaCategoriaTipo": "categoriaIngreso", "cajaCategoriaNombre": "Devolucion", "cajaCategoriaEnPct": false, "footnotes": ["Devoluciones de equipamiento. El coste real del equipamiento se obtendría descontando estos valores"]}];
+  localStorage.setItem('miners_re_widgets', JSON.stringify(widgetsRestaurados));
+})();
 /* histórico de plantillas guardadas del propio Resumen Ejecutivo — guarda qué gráficos
    y títulos tienes montados, y en qué orden, para poder recuperarlo más adelante */
 function getReTemplates(){
@@ -7150,6 +7170,44 @@ document.getElementById('reBorrarPlantillaBtn').addEventListener('click', ()=>{
   sel.value = '';
   renderReTemplateSelect();
   toast('Plantilla eliminada.');
+});
+/* exportar/importar la plantilla actual como archivo — a diferencia de "Guardar esta
+   plantilla" (que solo vive en este navegador, en localStorage), esto genera un archivo
+   de verdad que se descarga al ordenador — sobrevive a borrar datos de navegación,
+   cambiar de navegador, o de dispositivo. */
+document.getElementById('reExportarArchivoBtn').addEventListener('click', ()=>{
+  const widgets = getReWidgets();
+  const blob = new Blob([JSON.stringify({ tipo:'miners_re_plantilla', version:1, widgets }, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'the-miners-resumen-ejecutivo-plantilla-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Plantilla exportada — guarda ese archivo en un sitio seguro.');
+});
+document.getElementById('reImportarArchivoBtn').addEventListener('click', ()=>{
+  document.getElementById('reImportarArchivoInput').click();
+});
+document.getElementById('reImportarArchivoInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try{
+      const datos = JSON.parse(ev.target.result);
+      const widgets = Array.isArray(datos) ? datos : datos.widgets; // admite tanto el archivo nuevo como una lista de widgets suelta
+      if(!Array.isArray(widgets)) throw new Error('El archivo no tiene el formato esperado.');
+      if(!confirm('¿Importar esta plantilla ('+widgets.length+' gráficos)? Sustituye los gráficos y títulos que tienes ahora mismo en pantalla.')){ e.target.value=''; return; }
+      setReWidgets(widgets);
+      renderResumenEjecutivo();
+      toast('Plantilla importada ✓ ('+widgets.length+' gráficos)');
+    }catch(err){
+      toast('No se pudo leer el archivo: '+err.message, true);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 function renderReAddWidgetSelect(){
   const sel = document.getElementById('reAddWidgetSelect');
