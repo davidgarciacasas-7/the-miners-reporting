@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.300</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.304</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -488,6 +488,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card"><h3>Total de ventas por tipo de cliente</h3><div class="chart-wrap tall"><canvas id="chartClientesTendenciaVentas"></canvas></div></div>
         <div class="card" style="margin-top:14px;"><h3>Nº de tickets por tipo de cliente</h3><div class="chart-wrap tall"><canvas id="chartClientesTendencia"></canvas></div></div>
         <div class="card" style="margin-top:14px;"><h3>% de ventas por tipo de cliente</h3><div class="chart-wrap tall"><canvas id="chartClientesTendenciaPct"></canvas></div></div>
+
+        <div class="section-title">Seguimiento de clientes</div>
+        <p class="hint" style="margin-bottom:8px;">Para cada tipo de cliente identificable (Nuevo, Repetido sin fidelidad, Con fidelidad): gasto medio por visita, frecuencia de visita, % de gasto en Brunch, gasto en Pastry y en bebidas por visita, abandonos potenciales (visitas previas y no ha vuelto este mes — "potenciales" porque si vuelve un mes más tarde, deja de serlo) y abandonos anulados (había un hueco, y este mes ha vuelto) — con dos filas finales de totales, sumando los 3 grupos. Al final, "Nuevos clientes repetidos" cuenta, por separado con y sin fidelidad, a quienes están haciendo su primera repetición de siempre este mes (no la 3ª, 4ª... visita). Los clientes no identificables (pagos en efectivo, sin tarjeta) no se incluyen aquí, ya que no hay forma de saber si es el mismo cliente entre visitas. En la mayoría de las métricas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) — salvo en abandonos potenciales, donde es al revés.</p>
+        <div class="card"><div id="tablaSeguimientoClientes" style="overflow-x:auto;"></div></div>
       </div>
 
       <!-- PNL -->
@@ -3907,6 +3911,15 @@ function renderClientes(lines, tickets){
     const d = seg[k]; const ticketMedio = d.n? d.bruto/d.n : 0;
     return `<tr><td><span class="pill ${k}">${segLabels[k]}</span></td><td class="num">${d.n}</td><td class="num">${pct(d.n,totalN)}</td><td class="num">${eur(d.bruto)}</td><td class="num">${pct(d.bruto,totalBruto)}</td><td class="num">${eur(ticketMedio)}</td></tr>`;
   }).join('');
+
+  try{
+    const tablaClientesEl = document.getElementById('tablaSeguimientoClientes');
+    if(tablaClientesEl){ const { filas } = calcularSeguimientoClientes(); tablaClientesEl.innerHTML = construirTablaSeguimientoClientesHtml(filas); }
+  }catch(e){
+    console.error('Error en calcularSeguimientoClientes:', e);
+    const tablaClientesEl = document.getElementById('tablaSeguimientoClientes');
+    if(tablaClientesEl) tablaClientesEl.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de clientes. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
+  }
 }
 
 function renderClientesTendencia(){
@@ -12998,6 +13011,244 @@ function formatMesLargo(mesStr){
   const d = new Date(mesStr+'-01T00:00:00');
   const raw = d.toLocaleDateString('es-ES', {month:'long', year:'numeric'}).replace(' de ', ' ');
   return raw.charAt(0).toUpperCase()+raw.slice(1);
+}
+/* categorías de venta consideradas "bebidas" para el gasto medio en bebidas por visita —
+   ajustable aquí si hiciera falta cambiar qué categorías cuentan como bebida. */
+const CATEGORIAS_BEBIDAS_CLIENTES = ['Coffee for here','Coffee to go','Hot drinks','Iced drinks','Bottled','Seasonal Drinks'];
+/* calcula la tabla de "Seguimiento de clientes": para cada tipo de cliente (fila), el
+   gasto medio por visita, visitas por semana/mes, % de gasto en Brunch, gasto en Pastry y
+   en bebidas por visita, y el nº de abandonos (clientes con visitas previas que no han
+   vuelto este mes) — con Último mes, vs mes anterior, Media últ. 3 meses, vs 3 meses
+   anteriores para cada métrica. "No identificable" (pagos en efectivo, sin tarjeta) no
+   tiene forma de saber si es el mismo cliente entre visitas, así que las métricas que
+   necesitan seguir a una misma persona (visitas por semana/mes, abandonos) no aplican ahí
+   y se muestran como "-". */
+/* construye el HTML de la tabla de Seguimiento de clientes — 4 columnas (Último mes, vs
+   mes anterior, Media últ. 3 meses, vs 3 meses ant.), sin YoY ni Total periodo. En la
+   mayoría de las métricas, subir es bueno (verde) — salvo en "Nº de abandonos", donde es
+   al revés (bajar es bueno). Las filas "no aplica" (No identificable) muestran "-" en
+   todo salvo la propia etiqueta. */
+function construirTablaSeguimientoClientesHtml(filas){
+  if(filas.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de clientes todavía.</p>';
+  const fmtEuro = (v)=>eur(Math.round(v*100));
+  const fmtEuroConSigno = (v)=>(v>=0?'+':'')+fmtEuro(v);
+  const fmtDecimal = (v)=>v.toFixed(1);
+  const fmtDecimalConSigno = (v)=>(v>=0?'+':'')+v.toFixed(1);
+  const fmtConteo = (v)=>Math.round(v).toLocaleString('en-US');
+  const fmtConteoConSigno = (v)=>(v>=0?'+':'')+fmtConteo(v);
+  const fmtPct = (v)=>v.toFixed(1)+'%';
+  const fmtBps = (v)=>(v>=0?'+':'')+Math.round(v)+' bps';
+  const filasHtml = filas.map(f=>{
+    const fmtValor = f.esEuro?fmtEuro : f.esConteo?fmtConteo : f.esPct?fmtPct : fmtDecimal;
+    const fmtValorConSigno = f.esEuro?fmtEuroConSigno : f.esConteo?fmtConteoConSigno : f.esPct?fmtBps : fmtDecimalConSigno;
+    // en esta tabla, subir suele ser bueno (verde) — salvo en abandonos, donde es al revés
+    const colorDif = (v)=>{
+      if(v===null) return 'var(--text-muted)';
+      const sube = v>0, baja = v<0;
+      const esBueno = f.menorEsMejor ? baja : sube;
+      const esMalo = f.menorEsMejor ? sube : baja;
+      return esBueno ? 'var(--positive)' : (esMalo ? 'var(--negative)' : 'var(--text)');
+    };
+    return `<tr>
+      <td>${escapeHtml(f.categoria)}</td>
+      <td class="num">${f.ultimoMesEuros===null?'-':fmtValor(f.ultimoMesEuros)}</td>
+      <td class="num" style="color:${colorDif(f.difMesAnteriorEuros)};font-weight:600;">${f.difMesAnteriorEuros===null?'-':fmtValorConSigno(f.difMesAnteriorEuros)}</td>
+      <td class="num">${f.media3mEuros===null?'-':fmtValor(f.media3mEuros)}</td>
+      <td class="num" style="color:${colorDif(f.dif3mEuros)};font-weight:600;">${f.dif3mEuros===null?'-':fmtValorConSigno(f.dif3mEuros)}</td>
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr><th>Métrica</th><th class="num">Último mes</th><th class="num">vs mes anterior</th><th class="num">Media últ. 3 meses</th><th class="num">vs 3 meses ant.</th></tr></thead><tbody>${filasHtml}</tbody></table>`;
+}
+function calcularSeguimientoClientes(){
+  const allLines = getAllSalesLinesRaw();
+  if(allLines.length===0) return { filas:[], mesReferencia:null };
+  const fechas = allLines.map(l=>l.fecha).sort();
+  const buckets = monthBucketsInRange(fechas[0], fechas[fechas.length-1]);
+  if(buckets.length===0) return { filas:[], mesReferencia:null };
+
+  const bucketIndexPorFecha = (fecha) => buckets.findIndex(b=>fecha>=b.dateMin && fecha<=b.dateMax);
+  const classified = classifyCustomers();
+
+  // reconstruir, ticket a ticket, su mes, segmento, tarjeta, gasto total y gasto por
+  // categoría — una sola pasada por todas las líneas de venta.
+  const ticketsInfo = [];
+  for(const periodId in STATE.periodsData){
+    const pd = STATE.periodsData[periodId];
+    const segByTicket = classified[periodId] || {};
+    const porTicket = {};
+    pd.lines.forEach(row=>{
+      const [fecha,hora,catIdx,artIdx,cant,bruto] = row;
+      const ticketIdx = row[7];
+      if(!porTicket[ticketIdx]) porTicket[ticketIdx] = { fecha, bruto:0, catSpend:{} };
+      const cat = displayCategoryFor(pd.cats[catIdx]);
+      porTicket[ticketIdx].bruto += bruto;
+      porTicket[ticketIdx].catSpend[cat] = (porTicket[ticketIdx].catSpend[cat]||0) + bruto;
+    });
+    Object.entries(porTicket).forEach(([idx, info])=>{
+      const bIdx = bucketIndexPorFecha(info.fecha);
+      if(bIdx<0) return;
+      const segmento = segByTicket[idx] || 'noident';
+      const tarjeta = (pd.tickets[idx]||[])[0] || null;
+      ticketsInfo.push({ bucketIdx:bIdx, segmento, tarjeta, bruto:info.bruto/100, catSpend:info.catSpend });
+    });
+  }
+
+  // historial de visitas por tarjeta (ordenado por mes), para poder calcular abandonos
+  const visitasPorTarjeta = {};
+  ticketsInfo.forEach(t=>{
+    if(!t.tarjeta) return;
+    if(!visitasPorTarjeta[t.tarjeta]) visitasPorTarjeta[t.tarjeta] = [];
+    visitasPorTarjeta[t.tarjeta].push({ bucketIdx:t.bucketIdx, segmento:t.segmento });
+  });
+  Object.values(visitasPorTarjeta).forEach(v=>v.sort((a,b)=>a.bucketIdx-b.bucketIdx));
+
+  function ticketsDeSegmentoEnBucket(seg, bIdx){ return ticketsInfo.filter(t=>t.segmento===seg && t.bucketIdx===bIdx); }
+  function gastoMedioEnIdx(seg, bIdx){
+    const tickets = ticketsDeSegmentoEnBucket(seg, bIdx);
+    return tickets.length ? tickets.reduce((s,t)=>s+t.bruto,0)/tickets.length : 0;
+  }
+  function pctBrunchEnIdx(seg, bIdx){
+    const tickets = ticketsDeSegmentoEnBucket(seg, bIdx);
+    if(!tickets.length) return 0;
+    return tickets.reduce((s,t)=>{ const brunch=(t.catSpend['Brunch']||0)/100; return s+(t.bruto>0?brunch/t.bruto*100:0); },0)/tickets.length;
+  }
+  function gastoCategoriasEnIdx(seg, bIdx, cats){
+    const tickets = ticketsDeSegmentoEnBucket(seg, bIdx);
+    if(!tickets.length) return 0;
+    return tickets.reduce((s,t)=>{ let suma=0; cats.forEach(c=>suma+=(t.catSpend[c]||0)); return s+suma/100; },0)/tickets.length;
+  }
+  function tarjetasUnicasEnIdx(seg, bIdx){
+    return new Set(ticketsDeSegmentoEnBucket(seg,bIdx).map(t=>t.tarjeta).filter(Boolean)).size;
+  }
+  function visitasPorMesEnIdx(seg, bIdx){
+    const nTickets = ticketsDeSegmentoEnBucket(seg,bIdx).length;
+    const nTarjetas = tarjetasUnicasEnIdx(seg,bIdx);
+    return nTarjetas>0 ? nTickets/nTarjetas : 0;
+  }
+  function diasEnBucket(bIdx){
+    const b = buckets[bIdx];
+    return (new Date(b.dateMax+'T00:00:00') - new Date(b.dateMin+'T00:00:00'))/86400000 + 1;
+  }
+  function visitasPorSemanaEnIdx(seg, bIdx){
+    return visitasPorMesEnIdx(seg,bIdx) / (diasEnBucket(bIdx)/7);
+  }
+  function abandonosEnIdx(seg, bIdx){
+    let count = 0;
+    Object.values(visitasPorTarjeta).forEach(visitas=>{
+      const anteriores = visitas.filter(v=>v.bucketIdx<bIdx);
+      if(anteriores.length===0) return;
+      const ultimaAntes = anteriores[anteriores.length-1];
+      if(ultimaAntes.segmento!==seg) return;
+      const vinoEsteMes = visitas.some(v=>v.bucketIdx===bIdx);
+      if(!vinoEsteMes) count++;
+    });
+    return count;
+  }
+  // abandono anulado: el cliente SÍ ha vuelto este mes, pero su visita anterior NO fue el
+  // mes justo antes (hubo al menos un mes de hueco de por medio) — es decir, en ese hueco
+  // habría estado contando como "abandono potencial" del segmento de esa visita anterior,
+  // y ahora, al volver, ese abandono queda anulado.
+  function abandonosAnuladosEnIdx(seg, bIdx){
+    let count = 0;
+    Object.values(visitasPorTarjeta).forEach(visitas=>{
+      const idxEnEsteMes = visitas.findIndex(v=>v.bucketIdx===bIdx);
+      if(idxEnEsteMes<=0) return; // no vino este mes, o es su primerísima visita (nada que anular)
+      const visitaAnterior = visitas[idxEnEsteMes-1];
+      if(visitaAnterior.bucketIdx === bIdx-1) return; // vino el mes justo antes, no hubo hueco
+      if(visitaAnterior.segmento !== seg) return;
+      count++;
+    });
+    return count;
+  }
+  // nuevo cliente repetido (con o sin fidelidad): su SEGUNDA visita de siempre cae en este
+  // mes — distingue si en esa segunda visita ya usó la tarjeta de fidelidad o no. No
+  // cuenta la 3ª, 4ª... visita en adelante, solo el paso de "nuevo" a su primera repetición.
+  function nuevosRepetidosEnIdx(bIdx, conFidelidad){
+    let count = 0;
+    Object.values(visitasPorTarjeta).forEach(visitas=>{
+      if(visitas.length<2) return;
+      const segundaVisita = visitas[1];
+      if(segundaVisita.bucketIdx !== bIdx) return;
+      const esFidelidad = segundaVisita.segmento==='fidelidad';
+      if(esFidelidad !== conFidelidad) return;
+      count++;
+    });
+    return count;
+  }
+  // pasó de "repetido sin fidelidad" a "repetido con fidelidad": es la PRIMERA vez que
+  // esa tarjeta aparece como "fidelidad", Y la visita justo antes fue "repetido" (no
+  // "nuevo" — ese otro caso, empezar a usar la fidelidad ya en la 2ª visita de siempre, ya
+  // se cuenta aparte en "Nuevos clientes repetidos (con fidelidad)").
+  function pasoARepetidoConFidelidadEnIdx(bIdx){
+    let count = 0;
+    Object.values(visitasPorTarjeta).forEach(visitas=>{
+      const idxPrimeraFidelidad = visitas.findIndex(v=>v.segmento==='fidelidad');
+      if(idxPrimeraFidelidad<=0) return; // nunca ha sido fidelidad, o lo fue ya en su 1ª visita (no debería darse)
+      if(visitas[idxPrimeraFidelidad].bucketIdx !== bIdx) return;
+      if(visitas[idxPrimeraFidelidad-1].segmento !== 'repetido') return;
+      count++;
+    });
+    return count;
+  }
+
+  const idxUltimo = buckets.length-1;
+  const mesReferencia = buckets[idxUltimo].label;
+  const idxDesde3 = Math.max(0, idxUltimo-2);
+  const nMeses3 = idxUltimo-idxDesde3+1;
+  const idxHasta3Ant = idxDesde3-1;
+  const idxDesde3Ant = idxHasta3Ant-2;
+  const hayHistoricoSuficiente = idxDesde3Ant>=0;
+  const nMeses3Ant = hayHistoricoSuficiente ? (idxHasta3Ant-idxDesde3Ant+1) : 0;
+
+  // genérico: valorEnIdx da el número de esa métrica en el mes idx; "mediaSimple" indica
+  // si la media de "últimos 3 meses" debe promediar los 3 valores mensuales tal cual
+  // (frecuencias, %, abandonos) en vez de sumar-y-dividir como con el gasto (que si se
+  // promedia mes a mes en vez de sumar y dividir entre tickets reales, pondera cada mes
+  // por igual sin importar cuántos tickets tuviera, lo cual es lo que se quiere aquí).
+  function calcularMetricasCliente(etiqueta, valorEnIdx, extra){
+    if(extra && extra.noAplica){
+      return { categoria:etiqueta, ultimoMesEuros:null, difMesAnteriorEuros:null, media3mEuros:null, dif3mEuros:null, ...extra };
+    }
+    const ultimoMesValor = valorEnIdx(idxUltimo);
+    let sumaValor3 = 0; for(let i=idxDesde3;i<=idxUltimo;i++) sumaValor3 += valorEnIdx(i);
+    const media3mValor = sumaValor3/nMeses3;
+    let difMesAnteriorValor = null;
+    if(idxUltimo>=1) difMesAnteriorValor = ultimoMesValor - valorEnIdx(idxUltimo-1);
+    let dif3mValor = null;
+    if(hayHistoricoSuficiente){
+      let sumaValor3Ant = 0; for(let i=idxDesde3Ant;i<=idxHasta3Ant;i++) sumaValor3Ant += valorEnIdx(i);
+      const media3mAntValor = sumaValor3Ant/nMeses3Ant;
+      dif3mValor = media3mValor - media3mAntValor;
+    }
+    return { categoria:etiqueta, ultimoMesEuros:ultimoMesValor, difMesAnteriorEuros:difMesAnteriorValor, media3mEuros:media3mValor, dif3mEuros:dif3mValor, ...(extra||{}) };
+  }
+
+  const SEGMENTOS_CLIENTES_TABLA = [ ['nuevo','Nuevo'], ['repetido','Repetido sin fidelidad'], ['fidelidad','Con fidelidad'] ];
+  const filas = [];
+  SEGMENTOS_CLIENTES_TABLA.forEach(([key,etiqueta])=>{
+    filas.push(calcularMetricasCliente('Gasto medio por visita — '+etiqueta, (idx)=>gastoMedioEnIdx(key,idx), {esEuro:true}));
+    filas.push(calcularMetricasCliente('Visitas por semana — '+etiqueta, (idx)=>visitasPorSemanaEnIdx(key,idx), {esDecimal:true}));
+    filas.push(calcularMetricasCliente('Visitas por mes — '+etiqueta, (idx)=>visitasPorMesEnIdx(key,idx), {esDecimal:true}));
+    filas.push(calcularMetricasCliente('% gasto en Brunch por visita — '+etiqueta, (idx)=>pctBrunchEnIdx(key,idx), {esPct:true}));
+    filas.push(calcularMetricasCliente('Gasto en Pastry por visita — '+etiqueta, (idx)=>gastoCategoriasEnIdx(key,idx,['Pastry']), {esEuro:true}));
+    filas.push(calcularMetricasCliente('Gasto en bebidas por visita — '+etiqueta, (idx)=>gastoCategoriasEnIdx(key,idx,CATEGORIAS_BEBIDAS_CLIENTES), {esEuro:true}));
+    filas.push(calcularMetricasCliente('Nº de abandonos potenciales — '+etiqueta, (idx)=>abandonosEnIdx(key,idx), {esConteo:true, menorEsMejor:true}));
+    filas.push(calcularMetricasCliente('Nº de abandonos anulados — '+etiqueta, (idx)=>abandonosAnuladosEnIdx(key,idx), {esConteo:true}));
+  });
+  // abandonos potenciales totales: la suma de los abandonos de los 3 grupos, mes a mes —
+  // no es la media de las 3 filas de arriba, sino la suma real de personas perdidas ese mes.
+  filas.push(calcularMetricasCliente('Nº de abandonos potenciales — Total', (idx)=>SEGMENTOS_CLIENTES_TABLA.reduce((s,[key])=>s+abandonosEnIdx(key,idx),0), {esConteo:true, menorEsMejor:true}));
+  filas.push(calcularMetricasCliente('Nº de abandonos anulados — Total', (idx)=>SEGMENTOS_CLIENTES_TABLA.reduce((s,[key])=>s+abandonosAnuladosEnIdx(key,idx),0), {esConteo:true}));
+  // nuevos clientes repetidos: clientes que ya habían comprado una vez antes, y que esta
+  // es la primera vez que repiten — separados según si esa repetición fue ya con
+  // fidelidad o todavía sin ella.
+  filas.push(calcularMetricasCliente('Nuevos clientes repetidos (sin fidelidad)', (idx)=>nuevosRepetidosEnIdx(idx,false), {esConteo:true}));
+  filas.push(calcularMetricasCliente('Nuevos clientes repetidos (con fidelidad)', (idx)=>nuevosRepetidosEnIdx(idx,true), {esConteo:true}));
+  // clientes que ya venían repitiendo (sin fidelidad) y, por primera vez, han empezado a
+  // usar la fidelidad este mes
+  filas.push(calcularMetricasCliente('Pasaron de repetido sin fidelidad a con fidelidad', (idx)=>pasoARepetidoConFidelidadEnIdx(idx), {esConteo:true}));
+
+  return { filas, mesReferencia };
 }
 function calcularSeguimientoVentas(){
   const allLines = getAllSalesLinesRaw();
