@@ -226,7 +226,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.304</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.307</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -267,6 +267,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div id="filterbar">
       <div class="filter-group"><label>Desde</label><input type="date" id="fDesde"></div>
       <div class="filter-group"><label>Hasta</label><input type="date" id="fHasta"></div>
+      <div class="filter-group">
+        <label>Ver por</label>
+        <select id="globalGranularidad"><option value="mes">Mes</option><option value="semana">Semana</option></select>
+      </div>
       <div class="filter-group">
         <label>Categoría</label>
         <div class="ms" id="ms-categoria">
@@ -490,8 +494,10 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <div class="card" style="margin-top:14px;"><h3>% de ventas por tipo de cliente</h3><div class="chart-wrap tall"><canvas id="chartClientesTendenciaPct"></canvas></div></div>
 
         <div class="section-title">Seguimiento de clientes</div>
-        <p class="hint" style="margin-bottom:8px;">Para cada tipo de cliente identificable (Nuevo, Repetido sin fidelidad, Con fidelidad): gasto medio por visita, frecuencia de visita, % de gasto en Brunch, gasto en Pastry y en bebidas por visita, abandonos potenciales (visitas previas y no ha vuelto este mes — "potenciales" porque si vuelve un mes más tarde, deja de serlo) y abandonos anulados (había un hueco, y este mes ha vuelto) — con dos filas finales de totales, sumando los 3 grupos. Al final, "Nuevos clientes repetidos" cuenta, por separado con y sin fidelidad, a quienes están haciendo su primera repetición de siempre este mes (no la 3ª, 4ª... visita). Los clientes no identificables (pagos en efectivo, sin tarjeta) no se incluyen aquí, ya que no hay forma de saber si es el mismo cliente entre visitas. En la mayoría de las métricas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) — salvo en abandonos potenciales, donde es al revés.</p>
+        <p class="hint" style="margin-bottom:8px;">Agrupado por métrica: cada bloque (p.ej. "Gasto medio por visita") tiene debajo una fila por tipo de cliente identificable (<span style="background:var(--verdigris-soft);color:#9CCFBC;padding:1px 7px;border-radius:5px;font-weight:700;">Nuevo</span>, <span style="background:rgba(167,154,133,.18);color:var(--text-muted);padding:1px 7px;border-radius:5px;font-weight:700;">Repetido sin fidelidad</span>, <span style="background:var(--copper-soft);color:#E3B486;padding:1px 7px;border-radius:5px;font-weight:700;">Con fidelidad</span>). Incluye gasto medio, frecuencia de visita, % y € de gasto en Brunch, gasto en Pastry y en bebidas, abandonos potenciales (visitas previas y no ha vuelto este mes — "potenciales" porque si vuelve un mes más tarde, deja de serlo) y abandonos anulados (había un hueco, y este mes ha vuelto), estos dos últimos con una fila de Total sumando los 3 tipos. Al final, "Nuevos clientes repetidos" cuenta, por separado con y sin fidelidad, a quienes están haciendo su primera repetición de siempre este mes (no la 3ª, 4ª... visita). Los clientes no identificables (pagos en efectivo, sin tarjeta) no se incluyen, ya que no hay forma de saber si es el mismo cliente entre visitas. En la mayoría de las métricas, subir es <span style="color:var(--positive);font-weight:600;">verde</span> (bueno) — salvo en abandonos potenciales, donde es al revés.</p>
         <div class="card"><div id="tablaSeguimientoClientes" style="overflow-x:auto;"></div></div>
+        <p class="hint" style="margin:14px 0 8px;">Evolución mensual de cada una de las métricas de arriba:</p>
+        <div id="graficosSeguimientoClientes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;"></div>
       </div>
 
       <!-- PNL -->
@@ -1560,7 +1566,7 @@ const STATE = {
   session: null,                 // {accessToken, refreshToken, expiresAt, email}
   index: { periods: [] },        // metadata de periodos (cacheado) — se obtiene con SELECT a Supabase
   periodsData: {},               // periodId -> {cats, arts, lines, tickets}
-  filters: { desde:null, hasta:null, categoria:[], articulo:[], segmento:[], franjaTipo:'negocio', diaTipo:'', diaSemana:'', metrica:'absoluto' },
+  filters: { desde:null, hasta:null, categoria:[], articulo:[], segmento:[], franjaTipo:'negocio', diaTipo:'', diaSemana:'', metrica:'absoluto', granularidadGlobal:'mes' },
   charts: {},
   ticketsClassified: null,       // cache de clasificación (se invalida al cambiar datos)
   ventasSeguimientoOcultas: [],  // filas quitadas de la tabla "Seguimiento de ventas"
@@ -2507,6 +2513,21 @@ setupMultiSelect('segmento', ['nuevo','repetido','fidelidad','noident'], v=>SEGM
 ['fDesde','fHasta'].forEach(id=>{
   const el = document.getElementById(id);
   el.addEventListener('click', ()=>{ if(el.showPicker) el.showPicker(); });
+});
+// desplegables de granularidad que solo tienen Mes/Semana (no "Diario", "Trimestral" ni
+// "Anual") — son los que sigue el selector global "Ver por". Los que sí tienen más
+// opciones (Ventas por periodo, Nº de tickets, COGS, Mermas) se dejan aparte, ya que
+// forzarlos a solo mes/semana quitaría opciones que ya tenían.
+const GRANULARIDAD_GLOBAL_SYNC_IDS = ['ventasTendenciaGranularidad','productosGranularidad','clGranularidad','pnlGranularidad','perfGranularidad'];
+// al cargar la página, estos 5 desplegables se ponen al mismo valor que el selector
+// global ("Mes" por defecto) — antes tenían valores por defecto distintos entre sí
+// (algunos "Semanal", otros "Mensual"), lo cual era justo la experiencia fragmentada que
+// se quería evitar.
+GRANULARIDAD_GLOBAL_SYNC_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value = document.getElementById('globalGranularidad').value; });
+document.getElementById('globalGranularidad').addEventListener('change', (e)=>{
+  STATE.filters.granularidadGlobal = e.target.value;
+  GRANULARIDAD_GLOBAL_SYNC_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value = e.target.value; });
+  renderAll();
 });
 ['fDesde','fHasta','fFranjaTipo','fDiaTipo','fDiaSemana','fMetrica'].forEach(id=>{
   document.getElementById(id).addEventListener('change', ()=>{
@@ -3914,12 +3935,46 @@ function renderClientes(lines, tickets){
 
   try{
     const tablaClientesEl = document.getElementById('tablaSeguimientoClientes');
-    if(tablaClientesEl){ const { filas } = calcularSeguimientoClientes(); tablaClientesEl.innerHTML = construirTablaSeguimientoClientesHtml(filas); }
+    const resultadoClientes = calcularSeguimientoClientes();
+    if(tablaClientesEl) tablaClientesEl.innerHTML = construirTablaSeguimientoClientesHtml(resultadoClientes.grupos);
+    renderGraficosSeguimientoClientes(resultadoClientes);
   }catch(e){
     console.error('Error en calcularSeguimientoClientes:', e);
     const tablaClientesEl = document.getElementById('tablaSeguimientoClientes');
     if(tablaClientesEl) tablaClientesEl.innerHTML = '<p class="hint" style="padding:20px;color:var(--negative);">No se pudo calcular la tabla de Seguimiento de clientes. Detalle: '+escapeHtml(e.message||String(e))+'</p>';
   }
+}
+/* dibuja un mini-gráfico de línea por cada métrica de "Seguimiento de clientes" — reusa
+   la serie mensual completa que ya calcula calcularSeguimientoClientes() para cada fila,
+   en vez de solo el resumen de 4 columnas de la tabla. */
+function renderGraficosSeguimientoClientes({ grupos, mesesLabels }){
+  const gridEl = document.getElementById('graficosSeguimientoClientes');
+  if(!gridEl) return;
+  // se aplanan los grupos (métrica -> tipos de cliente) en una lista única de gráficos,
+  // combinando "métrica — tipo de cliente" como título de cada mini-gráfico.
+  const filasConDatos = [];
+  grupos.forEach(g=>{
+    g.filas.forEach(f=>{
+      if(f.noAplica || !f.serieMensual || f.serieMensual.length===0) return;
+      filasConDatos.push({ ...f, tituloCompleto: g.filas.length>1 ? g.metrica+' — '+f.categoria : g.metrica });
+    });
+  });
+  if(filasConDatos.length===0){ gridEl.innerHTML = ''; return; }
+  const c2 = chartColors();
+  gridEl.innerHTML = filasConDatos.map((f,i)=>`
+    <div class="card">
+      <div style="font-size:11px;font-weight:600;margin-bottom:6px;">${escapeHtml(f.tituloCompleto)}</div>
+      <div class="chart-wrap" style="height:120px;"><canvas id="clienteMetricaMini_${i}"></canvas></div>
+    </div>`).join('');
+  filasConDatos.forEach((f,i)=>{
+    destroyChart('clienteMetricaMini_'+i);
+    const sufijo = f.esEuro?'€':(f.esPct?'%':'');
+    STATE.charts['clienteMetricaMini_'+i] = safeNewChart('clienteMetricaMini_'+i, {
+      type:'line',
+      data:{ labels:mesesLabels, datasets:[{ data:f.serieMensual, borderColor:CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:2 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:8}, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}, callback:v=>v+sufijo}, grid:{color:c2.grid} } } }
+    });
+  });
 }
 
 function renderClientesTendencia(){
@@ -13028,8 +13083,16 @@ const CATEGORIAS_BEBIDAS_CLIENTES = ['Coffee for here','Coffee to go','Hot drink
    mayoría de las métricas, subir es bueno (verde) — salvo en "Nº de abandonos", donde es
    al revés (bajar es bueno). Las filas "no aplica" (No identificable) muestran "-" en
    todo salvo la propia etiqueta. */
-function construirTablaSeguimientoClientesHtml(filas){
-  if(filas.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de clientes todavía.</p>';
+/* colores de fondo/texto por tipo de cliente en esta tabla — los mismos que ya usan las
+   "pill" de tipo de cliente en el resto de la app, para que sea coherente. */
+const COLOR_TIPO_CLIENTE = {
+  'Nuevo': { bg:'var(--verdigris-soft)', color:'#9CCFBC' },
+  'Repetido sin fidelidad': { bg:'rgba(167,154,133,.18)', color:'var(--text-muted)' },
+  'Con fidelidad': { bg:'var(--copper-soft)', color:'#E3B486' },
+  'Total': { bg:'var(--surface-2)', color:'var(--text)' },
+};
+function construirTablaSeguimientoClientesHtml(grupos){
+  if(grupos.length===0) return '<p class="hint" style="padding:20px;text-align:center;">Sin datos de clientes todavía.</p>';
   const fmtEuro = (v)=>eur(Math.round(v*100));
   const fmtEuroConSigno = (v)=>(v>=0?'+':'')+fmtEuro(v);
   const fmtDecimal = (v)=>v.toFixed(1);
@@ -13038,33 +13101,44 @@ function construirTablaSeguimientoClientesHtml(filas){
   const fmtConteoConSigno = (v)=>(v>=0?'+':'')+fmtConteo(v);
   const fmtPct = (v)=>v.toFixed(1)+'%';
   const fmtBps = (v)=>(v>=0?'+':'')+Math.round(v)+' bps';
-  const filasHtml = filas.map(f=>{
-    const fmtValor = f.esEuro?fmtEuro : f.esConteo?fmtConteo : f.esPct?fmtPct : fmtDecimal;
-    const fmtValorConSigno = f.esEuro?fmtEuroConSigno : f.esConteo?fmtConteoConSigno : f.esPct?fmtBps : fmtDecimalConSigno;
-    // en esta tabla, subir suele ser bueno (verde) — salvo en abandonos, donde es al revés
-    const colorDif = (v)=>{
-      if(v===null) return 'var(--text-muted)';
-      const sube = v>0, baja = v<0;
-      const esBueno = f.menorEsMejor ? baja : sube;
-      const esMalo = f.menorEsMejor ? sube : baja;
-      return esBueno ? 'var(--positive)' : (esMalo ? 'var(--negative)' : 'var(--text)');
-    };
-    return `<tr>
-      <td>${escapeHtml(f.categoria)}</td>
-      <td class="num">${f.ultimoMesEuros===null?'-':fmtValor(f.ultimoMesEuros)}</td>
-      <td class="num" style="color:${colorDif(f.difMesAnteriorEuros)};font-weight:600;">${f.difMesAnteriorEuros===null?'-':fmtValorConSigno(f.difMesAnteriorEuros)}</td>
-      <td class="num">${f.media3mEuros===null?'-':fmtValor(f.media3mEuros)}</td>
-      <td class="num" style="color:${colorDif(f.dif3mEuros)};font-weight:600;">${f.dif3mEuros===null?'-':fmtValorConSigno(f.dif3mEuros)}</td>
+  const gruposHtml = grupos.map(g=>{
+    // cabecera de la métrica: menos sangrado, en negrita, ocupando toda la fila
+    const filaCabecera = `<tr style="background:var(--surface-2);">
+      <td colspan="5" style="padding-left:8px;font-weight:700;color:var(--text);">${escapeHtml(g.metrica)}</td>
     </tr>`;
+    const filasTipo = g.filas.map(f=>{
+      const fmtValor = f.esEuro?fmtEuro : f.esConteo?fmtConteo : f.esPct?fmtPct : fmtDecimal;
+      const fmtValorConSigno = f.esEuro?fmtEuroConSigno : f.esConteo?fmtConteoConSigno : f.esPct?fmtBps : fmtDecimalConSigno;
+      // en esta tabla, subir suele ser bueno (verde) — salvo en abandonos potenciales,
+      // donde es al revés
+      const colorDif = (v)=>{
+        if(v===null) return 'var(--text-muted)';
+        const sube = v>0, baja = v<0;
+        const esBueno = f.menorEsMejor ? baja : sube;
+        const esMalo = f.menorEsMejor ? sube : baja;
+        return esBueno ? 'var(--positive)' : (esMalo ? 'var(--negative)' : 'var(--text)');
+      };
+      const colorTipo = COLOR_TIPO_CLIENTE[f.categoria] || { bg:'transparent', color:'var(--text)' };
+      // sub-fila de tipo de cliente: más sangrado que la cabecera de la métrica, etiqueta
+      // en negrita con fondo de color propio de ese tipo
+      return `<tr>
+        <td style="padding-left:28px;"><span style="display:inline-block;padding:2px 10px;border-radius:6px;font-weight:700;font-size:11px;background:${colorTipo.bg};color:${colorTipo.color};">${escapeHtml(f.categoria)}</span></td>
+        <td class="num">${f.ultimoMesEuros===null?'-':fmtValor(f.ultimoMesEuros)}</td>
+        <td class="num" style="color:${colorDif(f.difMesAnteriorEuros)};font-weight:600;">${f.difMesAnteriorEuros===null?'-':fmtValorConSigno(f.difMesAnteriorEuros)}</td>
+        <td class="num">${f.media3mEuros===null?'-':fmtValor(f.media3mEuros)}</td>
+        <td class="num" style="color:${colorDif(f.dif3mEuros)};font-weight:600;">${f.dif3mEuros===null?'-':fmtValorConSigno(f.dif3mEuros)}</td>
+      </tr>`;
+    }).join('');
+    return filaCabecera + filasTipo;
   }).join('');
-  return `<table><thead><tr><th>Métrica</th><th class="num">Último mes</th><th class="num">vs mes anterior</th><th class="num">Media últ. 3 meses</th><th class="num">vs 3 meses ant.</th></tr></thead><tbody>${filasHtml}</tbody></table>`;
+  return `<table><thead><tr><th>Métrica / tipo de cliente</th><th class="num">Último mes</th><th class="num">vs mes anterior</th><th class="num">Media últ. 3 meses</th><th class="num">vs 3 meses ant.</th></tr></thead><tbody>${gruposHtml}</tbody></table>`;
 }
 function calcularSeguimientoClientes(){
   const allLines = getAllSalesLinesRaw();
-  if(allLines.length===0) return { filas:[], mesReferencia:null };
+  if(allLines.length===0) return { grupos:[], mesReferencia:null };
   const fechas = allLines.map(l=>l.fecha).sort();
   const buckets = monthBucketsInRange(fechas[0], fechas[fechas.length-1]);
-  if(buckets.length===0) return { filas:[], mesReferencia:null };
+  if(buckets.length===0) return { grupos:[], mesReferencia:null };
 
   const bucketIndexPorFecha = (fecha) => buckets.findIndex(b=>fecha>=b.dateMin && fecha<=b.dateMax);
   const classified = classifyCustomers();
@@ -13207,7 +13281,7 @@ function calcularSeguimientoClientes(){
   // por igual sin importar cuántos tickets tuviera, lo cual es lo que se quiere aquí).
   function calcularMetricasCliente(etiqueta, valorEnIdx, extra){
     if(extra && extra.noAplica){
-      return { categoria:etiqueta, ultimoMesEuros:null, difMesAnteriorEuros:null, media3mEuros:null, dif3mEuros:null, ...extra };
+      return { categoria:etiqueta, ultimoMesEuros:null, difMesAnteriorEuros:null, media3mEuros:null, dif3mEuros:null, serieMensual:[], ...extra };
     }
     const ultimoMesValor = valorEnIdx(idxUltimo);
     let sumaValor3 = 0; for(let i=idxDesde3;i<=idxUltimo;i++) sumaValor3 += valorEnIdx(i);
@@ -13220,35 +13294,39 @@ function calcularSeguimientoClientes(){
       const media3mAntValor = sumaValor3Ant/nMeses3Ant;
       dif3mValor = media3mValor - media3mAntValor;
     }
-    return { categoria:etiqueta, ultimoMesEuros:ultimoMesValor, difMesAnteriorEuros:difMesAnteriorValor, media3mEuros:media3mValor, dif3mEuros:dif3mValor, ...(extra||{}) };
+    // serie mensual completa (todos los meses con datos, no solo el resumen de 4
+    // columnas) — se usa para pintar un gráfico de línea por métrica, en vez de solo la
+    // tabla de comparativas.
+    const serieMensual = buckets.map((b,i)=>+valorEnIdx(i).toFixed(2));
+    return { categoria:etiqueta, ultimoMesEuros:ultimoMesValor, difMesAnteriorEuros:difMesAnteriorValor, media3mEuros:media3mValor, dif3mEuros:dif3mValor, serieMensual, ...(extra||{}) };
   }
 
   const SEGMENTOS_CLIENTES_TABLA = [ ['nuevo','Nuevo'], ['repetido','Repetido sin fidelidad'], ['fidelidad','Con fidelidad'] ];
-  const filas = [];
-  SEGMENTOS_CLIENTES_TABLA.forEach(([key,etiqueta])=>{
-    filas.push(calcularMetricasCliente('Gasto medio por visita — '+etiqueta, (idx)=>gastoMedioEnIdx(key,idx), {esEuro:true}));
-    filas.push(calcularMetricasCliente('Visitas por semana — '+etiqueta, (idx)=>visitasPorSemanaEnIdx(key,idx), {esDecimal:true}));
-    filas.push(calcularMetricasCliente('Visitas por mes — '+etiqueta, (idx)=>visitasPorMesEnIdx(key,idx), {esDecimal:true}));
-    filas.push(calcularMetricasCliente('% gasto en Brunch por visita — '+etiqueta, (idx)=>pctBrunchEnIdx(key,idx), {esPct:true}));
-    filas.push(calcularMetricasCliente('Gasto en Pastry por visita — '+etiqueta, (idx)=>gastoCategoriasEnIdx(key,idx,['Pastry']), {esEuro:true}));
-    filas.push(calcularMetricasCliente('Gasto en bebidas por visita — '+etiqueta, (idx)=>gastoCategoriasEnIdx(key,idx,CATEGORIAS_BEBIDAS_CLIENTES), {esEuro:true}));
-    filas.push(calcularMetricasCliente('Nº de abandonos potenciales — '+etiqueta, (idx)=>abandonosEnIdx(key,idx), {esConteo:true, menorEsMejor:true}));
-    filas.push(calcularMetricasCliente('Nº de abandonos anulados — '+etiqueta, (idx)=>abandonosAnuladosEnIdx(key,idx), {esConteo:true}));
-  });
-  // abandonos potenciales totales: la suma de los abandonos de los 3 grupos, mes a mes —
-  // no es la media de las 3 filas de arriba, sino la suma real de personas perdidas ese mes.
-  filas.push(calcularMetricasCliente('Nº de abandonos potenciales — Total', (idx)=>SEGMENTOS_CLIENTES_TABLA.reduce((s,[key])=>s+abandonosEnIdx(key,idx),0), {esConteo:true, menorEsMejor:true}));
-  filas.push(calcularMetricasCliente('Nº de abandonos anulados — Total', (idx)=>SEGMENTOS_CLIENTES_TABLA.reduce((s,[key])=>s+abandonosAnuladosEnIdx(key,idx),0), {esConteo:true}));
-  // nuevos clientes repetidos: clientes que ya habían comprado una vez antes, y que esta
-  // es la primera vez que repiten — separados según si esa repetición fue ya con
-  // fidelidad o todavía sin ella.
-  filas.push(calcularMetricasCliente('Nuevos clientes repetidos (sin fidelidad)', (idx)=>nuevosRepetidosEnIdx(idx,false), {esConteo:true}));
-  filas.push(calcularMetricasCliente('Nuevos clientes repetidos (con fidelidad)', (idx)=>nuevosRepetidosEnIdx(idx,true), {esConteo:true}));
-  // clientes que ya venían repitiendo (sin fidelidad) y, por primera vez, han empezado a
-  // usar la fidelidad este mes
-  filas.push(calcularMetricasCliente('Pasaron de repetido sin fidelidad a con fidelidad', (idx)=>pasoARepetidoConFidelidadEnIdx(idx), {esConteo:true}));
+  // cada "grupo" es una métrica (p.ej. "Gasto medio por visita"), con una fila por tipo
+  // de cliente debajo — y, en las que tiene sentido sumarlas, una fila más de "Total".
+  const grupos = [];
+  function grupoPorSegmento(metricaLabel, valorEnIdxPorSeg, extra, conTotal){
+    const filasSeg = SEGMENTOS_CLIENTES_TABLA.map(([key,etiqueta])=>calcularMetricasCliente(etiqueta, (idx)=>valorEnIdxPorSeg(key,idx), extra));
+    if(conTotal){
+      filasSeg.push(calcularMetricasCliente('Total', (idx)=>SEGMENTOS_CLIENTES_TABLA.reduce((s,[key])=>s+valorEnIdxPorSeg(key,idx),0), extra));
+    }
+    grupos.push({ metrica:metricaLabel, filas:filasSeg });
+  }
+  grupoPorSegmento('Gasto medio por visita', gastoMedioEnIdx, {esEuro:true});
+  grupoPorSegmento('Visitas por semana', visitasPorSemanaEnIdx, {esDecimal:true});
+  grupoPorSegmento('Visitas por mes', visitasPorMesEnIdx, {esDecimal:true});
+  grupoPorSegmento('% gasto en Brunch por visita', pctBrunchEnIdx, {esPct:true});
+  grupoPorSegmento('Gasto en Brunch por visita', (key,idx)=>gastoCategoriasEnIdx(key,idx,['Brunch']), {esEuro:true});
+  grupoPorSegmento('Gasto en Pastry por visita', (key,idx)=>gastoCategoriasEnIdx(key,idx,['Pastry']), {esEuro:true});
+  grupoPorSegmento('Gasto en bebidas por visita', (key,idx)=>gastoCategoriasEnIdx(key,idx,CATEGORIAS_BEBIDAS_CLIENTES), {esEuro:true});
+  grupoPorSegmento('Nº de abandonos potenciales', abandonosEnIdx, {esConteo:true, menorEsMejor:true}, true);
+  grupoPorSegmento('Nº de abandonos anulados', abandonosAnuladosEnIdx, {esConteo:true}, true);
+  // métricas sin desglose por tipo de cliente — un único grupo, con una sola fila
+  grupos.push({ metrica:'Nuevos clientes repetidos (sin fidelidad)', filas:[calcularMetricasCliente('Total', (idx)=>nuevosRepetidosEnIdx(idx,false), {esConteo:true})] });
+  grupos.push({ metrica:'Nuevos clientes repetidos (con fidelidad)', filas:[calcularMetricasCliente('Total', (idx)=>nuevosRepetidosEnIdx(idx,true), {esConteo:true})] });
+  grupos.push({ metrica:'Pasaron de repetido sin fidelidad a con fidelidad', filas:[calcularMetricasCliente('Total', (idx)=>pasoARepetidoConFidelidadEnIdx(idx), {esConteo:true})] });
 
-  return { filas, mesReferencia };
+  return { grupos, mesReferencia, mesesLabels: buckets.map(b=>b.label) };
 }
 function calcularSeguimientoVentas(){
   const allLines = getAllSalesLinesRaw();
