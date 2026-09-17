@@ -10,6 +10,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
 :root{
   --bg:#17130F;
@@ -226,7 +228,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.307</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.311</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1182,17 +1184,26 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
       <div class="tabpanel" id="tab-recetario">
         <div class="card" style="margin-bottom:14px;">
           <h3>Subir archivo de recetas</h3>
-          <p class="hint" style="margin-bottom:10px;">Sube un CSV con una fila por cada ingrediente de cada receta, repitiendo el nombre de la receta en todas sus filas. Columnas esperadas: <code>Receta,Ingrediente,Cantidad,Unidad</code>. Ejemplo:</p>
+          <p class="hint" style="margin-bottom:10px;">Sube un CSV o Excel con una fila por cada ingrediente de cada receta, repitiendo el nombre de la receta en todas sus filas. Columnas esperadas: <code>Receta,Ingrediente,Cantidad,Unidad</code>. Ejemplo:</p>
           <pre class="hint" style="background:var(--bg);padding:10px 14px;border-radius:8px;overflow:auto;margin-bottom:10px;">Receta,Ingrediente,Cantidad,Unidad
 Tostada de aguacate,Pan de masa madre,2,unidad
 Tostada de aguacate,Aguacate,1,unidad
 Tostada de aguacate,Huevo,1,unidad
 Bowl de acai,Acai,150,g</pre>
           <p class="hint" style="margin-bottom:10px;">Si una receta que subes ya existía, se sustituyen sus ingredientes por los nuevos del archivo (no se duplican).</p>
-          <input type="file" id="recetarioImportFile" accept=".csv" style="display:none;">
-          <button class="btn secondary" id="recetarioImportBtn">Elegir archivo CSV</button>
+          <input type="file" id="recetarioImportFile" accept=".csv,.xlsx,.xls" style="display:none;">
+          <button class="btn secondary" id="recetarioImportBtn">Elegir archivo CSV o Excel</button>
           <p class="hint" id="recetarioImportStatus" style="margin-top:8px;"></p>
         </div>
+
+        <div class="card" style="margin-bottom:14px;">
+          <h3>Subir documento (Word o PDF)</h3>
+          <p class="hint" style="margin-bottom:10px;">Sube un documento .docx o .pdf con tus recetas — el nombre de cada receta como línea suelta, seguido de sus ingredientes (uno por línea, con la cantidad y unidad en el formato que sea, p.ej. "150g de acai" o "Pan de masa madre - 2 unidades"). Esto usa un lector de patrones de texto, no una lectura inteligente del documento, así que antes de guardar se muestra una vista previa editable para corregir lo que no detecte bien.</p>
+          <input type="file" id="recetarioImportDocFile" accept=".docx,.doc,.pdf" style="display:none;">
+          <button class="btn secondary" id="recetarioImportDocBtn">Elegir documento Word/PDF</button>
+          <p class="hint" id="recetarioImportDocStatus" style="margin-top:8px;"></p>
+        </div>
+        <div id="recetarioVistaPreviaDoc" style="margin-bottom:14px;"></div>
 
         <div class="section-title">Historial de archivos subidos</div>
         <div class="card" style="margin-bottom:26px;">
@@ -1202,8 +1213,41 @@ Bowl de acai,Acai,150,g</pre>
         </div>
 
         <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Costes de ingredientes</span>
+          <button class="btn secondary" id="ingredienteCosteAddBtn" style="padding:6px 12px;font-size:12px;">+ Añadir coste</button>
+        </div>
+        <p class="hint" style="margin-bottom:8px;">Cuánto cuesta cada ingrediente, referido a una cantidad concreta (p.ej. "1 kg de café = 12,50 €") — con esto se calcula el coste de cada receta más abajo, y el simulador de ahorro.</p>
+        <div class="card" style="margin-bottom:26px;">
+          <table id="tablaIngredientesCostes"><thead><tr><th>Ingrediente</th><th>Cantidad de referencia</th><th>Coste de esa cantidad</th><th>Coste por unidad</th><th></th></tr></thead><tbody></tbody></table>
+        </div>
+
+        <div class="section-title">Simulador de ahorro por bajada de precio</div>
+        <p class="hint" style="margin-bottom:8px;">Elige un ingrediente con coste guardado, el nuevo coste que conseguirías, y un periodo — se calcula cuánto se habría ahorrado en ese periodo, según el consumo teórico real (mismo cálculo que usa Rotación de Stock).</p>
+        <div class="card" style="margin-bottom:26px;">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+            <div class="filter-group"><label>Ingrediente</label><select id="simAhorroIngrediente"></select></div>
+            <div class="filter-group"><label>Nuevo coste por unidad <span id="simAhorroUnidadHint" class="hint"></span></label><input type="number" id="simAhorroNuevoCoste" step="0.001" min="0" placeholder="0.00" style="width:110px;"></div>
+            <div class="filter-group"><label>Desde</label><input type="date" id="simAhorroDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="simAhorroHasta"></div>
+            <button class="btn" id="simAhorroCalcularBtn" style="padding:9px 18px;">Calcular ahorro</button>
+          </div>
+          <div id="simAhorroResultado"></div>
+        </div>
+
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
           <span>Recetas</span>
           <button class="btn secondary" id="recetarioAddRecetaBtn" style="padding:6px 12px;font-size:12px;">+ Añadir receta a mano</button>
+        </div>
+        <div class="filter-group" style="margin-bottom:14px;">
+          <label>Ver receta(s)</label>
+          <div class="ms" id="ms-recetario">
+            <button type="button" class="ms-btn" id="ms-recetario-btn">Todas</button>
+            <div class="ms-panel" id="ms-recetario-panel">
+              <label class="ms-item"><input type="checkbox" id="ms-recetario-all" checked> <b>Todas</b></label>
+              <div class="ms-sep"></div>
+              <div id="ms-recetario-list"></div>
+            </div>
+          </div>
         </div>
         <div id="recetarioListaRecetas"></div>
       </div>
@@ -1561,6 +1605,10 @@ Bowl de acai,Acai,150,g</pre>
 /* =========================================================
    ESTADO GLOBAL
    ========================================================= */
+// pdf.js necesita saber dónde está su "worker" (el script que hace el trabajo pesado en
+// segundo plano) — si esto falla al cargar (sin conexión, CDN bloqueado...), la subida de
+// PDFs al Recetario avisará del problema en el momento, en vez de fallar en silencio.
+if(typeof pdfjsLib!=='undefined'){ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; }
 const STATE = {
   config: { url:'', anonKey:'' },
   session: null,                 // {accessToken, refreshToken, expiresAt, email}
@@ -1825,6 +1873,7 @@ async function loadAllData(){
     STATE.stockIngredientesLista = (await sbList('stock_ingredientes_lista', 'select=*')).map(r=>({ id:r.id, tipo:r.tipo, ingrediente:r.ingrediente, unidad:r.unidad||'' }));
     STATE.pnlFootnotesGuardadas = (await sbList('pnl_footnotes_guardadas', 'select=*&order=texto.asc')).map(r=>({ id:r.id, texto:r.texto }));
     STATE.recetaIngredientes = (await sbList('receta_ingredientes', 'select=*')).map(r=>({ id:r.id, recetaId:r.receta_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad }));
+    STATE.ingredientesCostes = (await sbList('ingredientes_costes', 'select=*&order=ingrediente.asc')).map(r=>({ id:r.id, ingrediente:r.ingrediente, cantidadReferencia:parseFloat(r.cantidad_referencia), unidad:r.unidad, costeTotal:parseFloat(r.coste_total) }));
     STATE.recetasHistorial = (await sbList('recetas_archivos_historial', 'select=*&order=fecha_subida.desc')).map(r=>({ id:r.id, nombreArchivo:r.nombre_archivo, fechaSubida:r.fecha_subida, numRecetas:r.num_recetas, numIngredientes:r.num_ingredientes }));
     STATE.inventarios = (await sbList('inventarios', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, nota:r.nota }));
     STATE.inventarioItems = (await sbList('inventario_items', 'select=*')).map(r=>({ id:r.id, inventarioId:r.inventario_id, ingrediente:r.ingrediente, cantidad:parseFloat(r.cantidad), unidad:r.unidad, tipo:r.tipo||'cocina' }));
@@ -6733,29 +6782,178 @@ document.getElementById('simopAplicarPeriodoBtn').addEventListener('click', asyn
 /* =========================================================
    RECETARIO — recetas de brunch con sus ingredientes, y su historial de subidas
    ========================================================= */
-function parseRecetarioCSV(text){
-  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  if(lines.length<2) return { recetas:{}, errores:['El archivo está vacío o no tiene filas de datos.'] };
-  const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
+/* guarda un conjunto de recetas (nombre -> [{ingrediente,cantidad,unidad}]) en Supabase,
+   sustituyendo los ingredientes de las que ya existieran — la usan tanto la subida de CSV
+   como la de documentos Word/PDF, para no duplicar esta lógica. */
+async function guardarRecetasEnBD(recetas){
+  const nombresRecetas = Object.keys(recetas);
+  let totalIngredientes = 0;
+  for(const nombreReceta of nombresRecetas){
+    let recetaExistente = STATE.recetas.find(r=>r.nombre.toLowerCase()===nombreReceta.toLowerCase());
+    let recetaId;
+    if(recetaExistente){
+      recetaId = recetaExistente.id;
+      const idsABorrar = STATE.recetaIngredientes.filter(ri=>ri.recetaId===recetaId).map(ri=>ri.id);
+      for(const idBorrar of idsABorrar) await sbDelete('receta_ingredientes', idBorrar);
+      STATE.recetaIngredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId!==recetaId);
+    } else {
+      const saved = await sbInsert('recetas', { nombre:nombreReceta });
+      recetaId = saved.id;
+      STATE.recetas.push({ id:recetaId, nombre:nombreReceta });
+    }
+    for(const ing of recetas[nombreReceta]){
+      const saved = await sbInsert('receta_ingredientes', { receta_id:recetaId, ingrediente:ing.ingrediente, cantidad:ing.cantidad, unidad:ing.unidad });
+      STATE.recetaIngredientes.push({ id:saved.id, recetaId, ingrediente:ing.ingrediente, cantidad:ing.cantidad, unidad:ing.unidad });
+      totalIngredientes++;
+    }
+  }
+  return { numRecetas:nombresRecetas.length, numIngredientes:totalIngredientes };
+}
+/* valida y agrupa por receta un conjunto de filas ya separadas en celdas — cada fila es
+   un array [receta, ingrediente, cantidad, unidad, ...] en el mismo orden que las
+   columnas detectadas. La usan tanto el CSV como el Excel, para no duplicar la lógica. */
+function parseRecetarioFilas(filas, filaCabecera){
+  if(filas.length<2) return { recetas:{}, errores:['El archivo está vacío o no tiene filas de datos.'] };
+  const header = filaCabecera.map(h=>String(h||'').trim().toLowerCase());
   const idxReceta = header.indexOf('receta');
   const idxIngrediente = header.indexOf('ingrediente');
   const idxCantidad = header.indexOf('cantidad');
   const idxUnidad = header.indexOf('unidad');
   if(idxReceta===-1 || idxIngrediente===-1 || idxCantidad===-1){
-    return { recetas:{}, errores:['Faltan columnas obligatorias. Se esperaba: Receta,Ingrediente,Cantidad,Unidad. Encontrado: '+lines[0]] };
+    return { recetas:{}, errores:['Faltan columnas obligatorias. Se esperaba: Receta,Ingrediente,Cantidad,Unidad. Encontrado: '+header.join(', ')] };
   }
   const recetas = {};
   const errores = [];
-  for(let i=1;i<lines.length;i++){
-    const cols = lines[i].split(',').map(c=>c.trim());
+  for(let i=0;i<filas.length;i++){
+    const cols = filas[i].map(c=>String(c===undefined||c===null?'':c).trim());
     const receta = cols[idxReceta], ingrediente = cols[idxIngrediente];
     const cantidad = parseFloat(cols[idxCantidad]);
     const unidad = idxUnidad!==-1 ? (cols[idxUnidad]||'unidad') : 'unidad';
-    if(!receta || !ingrediente || isNaN(cantidad)){ errores.push('Fila '+(i+1)+' incompleta o con cantidad inválida, se ha saltado.'); continue; }
+    if(!receta || !ingrediente || isNaN(cantidad)){ errores.push('Fila '+(i+2)+' incompleta o con cantidad inválida, se ha saltado.'); continue; }
     if(!recetas[receta]) recetas[receta] = [];
     recetas[receta].push({ ingrediente, cantidad, unidad });
   }
   return { recetas, errores };
+}
+function parseRecetarioCSV(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(lines.length<1) return { recetas:{}, errores:['El archivo está vacío.'] };
+  const filas = lines.slice(1).map(l=>l.split(','));
+  return parseRecetarioFilas(filas, lines[0].split(','));
+}
+/* mismo formato que el CSV (columnas Receta,Ingrediente,Cantidad,Unidad) pero en un
+   archivo Excel — usa la misma librería (xlsx.js) que ya usa el resto de la app para
+   leer extractos bancarios y similares. */
+function parseRecetarioExcel(arrayBuffer){
+  const wb = XLSX.read(arrayBuffer, { type:'array' });
+  const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1 });
+  if(filas.length<1) return { recetas:{}, errores:['El archivo está vacío.'] };
+  return parseRecetarioFilas(filas.slice(1), filas[0]);
+}
+/* unidades reconocidas al leer texto libre (Word/PDF) — si una "posible unidad" no está
+   en esta lista, se asume que en realidad es parte del nombre del ingrediente (p.ej. "2
+   huevos" no lleva unidad, "huevos" es el ingrediente). */
+const RECETARIO_UNIDADES_RE = /^(g|gr|grs|gramos|kg|kilos|kilogramos|ml|mililitros|cl|centilitros|l|lt|litro|litros|unidad|unidades|ud|uds|u|taza|tazas|cucharada|cucharadas|cda|cdas|cucharadita|cucharaditas|cdta|cdtas|pizca|pizcas|diente|dientes|hoja|hojas|rodaja|rodajas|rama|ramas|puñado|puñados|rebanada|rebanadas|loncha|lonchas|pieza|piezas|filete|filetes)\.?$/i;
+/* intenta extraer {ingrediente, cantidad, unidad} de una línea de texto libre, probando
+   varios formatos habituales en documentos de recetas. "confianza" indica qué tan segura
+   está la detección — "baja" significa que no se encontró ningún número, así que se
+   asume cantidad 1 y conviene revisarlo a mano en la vista previa. */
+function parseIngredienteLineaLibre(lineaOriginal){
+  let linea = lineaOriginal.replace(/^[-•*\u2022\u25CF\u2023\u2043]\s*/, '').replace(/^\d+[.)]\s*/, '').trim();
+  if(!linea) return null;
+
+  // "150g de acai" / "2 unidades de pan de masa madre" / "1 aguacate"
+  let m = linea.match(/^(\d+(?:[.,]\d+)?)\s*(.+)$/i);
+  if(m){
+    const cantidad = parseFloat(m[1].replace(',','.'));
+    const resto = m[2].trim();
+    const partes = resto.split(/\s+/);
+    const primeraPalabra = partes[0].replace(/\.$/,'').toLowerCase();
+    if(RECETARIO_UNIDADES_RE.test(primeraPalabra+'.')){
+      let ingrediente = partes.slice(1).join(' ').replace(/^de\s+/i,'').trim();
+      return { ingrediente, cantidad, unidad:primeraPalabra, confianza:'alta' };
+    }
+    return { ingrediente:resto, cantidad, unidad:'unidad', confianza:'media' };
+  }
+  // "Pan de masa madre - 2 unidades" / "Pan de masa madre: 2 unidades"
+  m = linea.match(/^(.+?)[\s:–—-]+(\d+(?:[.,]\d+)?)\s*([a-záéíóúñ]+)?\.?\s*$/i);
+  if(m){
+    const unidad = (m[3]||'unidad').toLowerCase().replace(/\.$/,'');
+    return { ingrediente:m[1].trim(), cantidad:parseFloat(m[2].replace(',','.')), unidad:RECETARIO_UNIDADES_RE.test(unidad)?unidad:'unidad', confianza:'alta' };
+  }
+  // "Aguacate (1 unidad)"
+  m = linea.match(/^(.+?)\s*\((\d+(?:[.,]\d+)?)\s*([a-záéíóúñ]+)?\.?\)\s*$/i);
+  if(m){
+    const unidad = (m[3]||'unidad').toLowerCase().replace(/\.$/,'');
+    return { ingrediente:m[1].trim(), cantidad:parseFloat(m[2].replace(',','.')), unidad:RECETARIO_UNIDADES_RE.test(unidad)?unidad:'unidad', confianza:'alta' };
+  }
+  // no se ha encontrado ningún número — se guarda igual, cantidad 1, para revisar a mano
+  return { ingrediente:linea, cantidad:1, unidad:'unidad', confianza:'baja' };
+}
+/* separa un texto libre (extraído de un Word o PDF) en recetas — una línea "normal" (sin
+   viñeta ni número al principio, y sin dígitos) se interpreta como el nombre de una receta
+   nueva; las líneas siguientes, hasta la próxima línea "normal", son sus ingredientes. Es
+   una heurística basada en patrones de texto, no una IA leyendo el documento — por eso la
+   vista previa antes de guardar es editable, para corregir lo que no detecte bien. */
+function parseRecetarioDocumento(texto){
+  const lineas = texto.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const recetas = {};
+  const ordenRecetas = [];
+  let recetaActual = null;
+  const esLineaConBullet = (l) => /^[-•*\u2022\u25CF\u2023\u2043]\s+/.test(l) || /^\d+[.)]\s+/.test(l);
+  lineas.forEach(linea=>{
+    const pareceIngrediente = recetaActual && (esLineaConBullet(linea) || /\d/.test(linea));
+    if(pareceIngrediente){
+      const ing = parseIngredienteLineaLibre(linea);
+      if(ing && ing.ingrediente) recetas[recetaActual].push(ing);
+    } else {
+      const nombre = linea.replace(/^[-•*\u2022\u25CF\u2023\u2043]\s*/, '').replace(/:\s*$/, '').trim();
+      if(!nombre) return;
+      recetaActual = nombre;
+      if(!recetas[recetaActual]){ recetas[recetaActual] = []; ordenRecetas.push(recetaActual); }
+    }
+  });
+  // las recetas detectadas sin ningún ingrediente probablemente eran una línea suelta
+  // mal interpretada como título — se descartan para no ensuciar la vista previa
+  ordenRecetas.forEach(nombre=>{ if(recetas[nombre].length===0) delete recetas[nombre]; });
+  return { recetas, ordenRecetas: ordenRecetas.filter(n=>recetas[n]) };
+}
+/* extrae el texto en crudo de un archivo Word (.docx) o PDF, usando mammoth.js y pdf.js
+   respectivamente (cargados desde CDN) — un .doc antiguo (no .docx) no está soportado por
+   mammoth, así que se avisa de que hay que guardarlo como .docx primero. */
+async function extraerTextoDeDocumento(file){
+  const nombreMin = file.name.toLowerCase();
+  if(nombreMin.endsWith('.docx')){
+    if(typeof mammoth==='undefined') throw new Error('No se pudo cargar la librería de lectura de Word (revisa la conexión).');
+    const arrayBuffer = await file.arrayBuffer();
+    const resultado = await mammoth.extractRawText({ arrayBuffer });
+    return resultado.value;
+  }
+  if(nombreMin.endsWith('.doc')){
+    throw new Error('Los archivos .doc antiguos no están soportados — guarda el documento como .docx desde Word y vuelve a subirlo.');
+  }
+  if(nombreMin.endsWith('.pdf')){
+    if(typeof pdfjsLib==='undefined') throw new Error('No se pudo cargar la librería de lectura de PDF (revisa la conexión).');
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data:arrayBuffer }).promise;
+    let texto = '';
+    for(let i=1;i<=pdf.numPages;i++){
+      const pagina = await pdf.getPage(i);
+      const contenido = await pagina.getTextContent();
+      // items de una misma línea del PDF pueden llegar como fragmentos sueltos — se
+      // agrupan por su posición vertical (Y) para reconstruir las líneas reales
+      const porLinea = {};
+      contenido.items.forEach(item=>{
+        const y = Math.round(item.transform[5]);
+        if(!porLinea[y]) porLinea[y] = [];
+        porLinea[y].push(item.str);
+      });
+      const ys = Object.keys(porLinea).map(Number).sort((a,b)=>b-a);
+      texto += ys.map(y=>porLinea[y].join(' ')).join('\n') + '\n';
+    }
+    return texto;
+  }
+  throw new Error('Formato de archivo no soportado — sube un .docx o un .pdf.');
 }
 document.getElementById('recetarioImportBtn').addEventListener('click', ()=>document.getElementById('recetarioImportFile').click());
 document.getElementById('recetarioImportFile').addEventListener('change', async (e)=>{
@@ -6764,31 +6962,12 @@ document.getElementById('recetarioImportFile').addEventListener('change', async 
   const statusEl = document.getElementById('recetarioImportStatus');
   statusEl.textContent = 'Leyendo archivo...';
   try{
-    const text = await file.text();
-    const { recetas, errores } = parseRecetarioCSV(text);
+    const esExcel = /\.xlsx?$/i.test(file.name);
+    const { recetas, errores } = esExcel ? parseRecetarioExcel(await file.arrayBuffer()) : parseRecetarioCSV(await file.text());
     const nombresRecetas = Object.keys(recetas);
     if(nombresRecetas.length===0){ statusEl.innerHTML = '<span style="color:var(--negative)">No se ha podido extraer ninguna receta. '+(errores[0]||'')+'</span>'; return; }
     statusEl.textContent = 'Guardando '+nombresRecetas.length+' receta(s)...';
-    let totalIngredientes = 0;
-    for(const nombreReceta of nombresRecetas){
-      let recetaExistente = STATE.recetas.find(r=>r.nombre.toLowerCase()===nombreReceta.toLowerCase());
-      let recetaId;
-      if(recetaExistente){
-        recetaId = recetaExistente.id;
-        const idsABorrar = STATE.recetaIngredientes.filter(ri=>ri.recetaId===recetaId).map(ri=>ri.id);
-        for(const idBorrar of idsABorrar) await sbDelete('receta_ingredientes', idBorrar);
-        STATE.recetaIngredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId!==recetaId);
-      } else {
-        const saved = await sbInsert('recetas', { nombre:nombreReceta });
-        recetaId = saved.id;
-        STATE.recetas.push({ id:recetaId, nombre:nombreReceta });
-      }
-      for(const ing of recetas[nombreReceta]){
-        const saved = await sbInsert('receta_ingredientes', { receta_id:recetaId, ingrediente:ing.ingrediente, cantidad:ing.cantidad, unidad:ing.unidad });
-        STATE.recetaIngredientes.push({ id:saved.id, recetaId, ingrediente:ing.ingrediente, cantidad:ing.cantidad, unidad:ing.unidad });
-        totalIngredientes++;
-      }
-    }
+    const { numRecetas, numIngredientes: totalIngredientes } = await guardarRecetasEnBD(recetas);
     const histSaved = await sbInsert('recetas_archivos_historial', { nombre_archivo:file.name, num_recetas:nombresRecetas.length, num_ingredientes:totalIngredientes });
     STATE.recetasHistorial.unshift({ id:histSaved.id, nombreArchivo:file.name, fechaSubida:histSaved.fecha_subida, numRecetas:nombresRecetas.length, numIngredientes:totalIngredientes });
     statusEl.innerHTML = '<span style="color:var(--positive)">Listo: '+nombresRecetas.length+' receta(s), '+totalIngredientes+' ingrediente(s) guardados.</span>'+(errores.length?' <span class="hint">('+errores.length+' fila(s) con avisos)</span>':'');
@@ -6798,6 +6977,140 @@ document.getElementById('recetarioImportFile').addEventListener('change', async 
   }
   e.target.value = '';
 });
+/* ---- subida de documento Word/PDF: extraer -> parsear -> vista previa editable -> guardar ---- */
+document.getElementById('recetarioImportDocBtn').addEventListener('click', ()=>document.getElementById('recetarioImportDocFile').click());
+document.getElementById('recetarioImportDocFile').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('recetarioImportDocStatus');
+  statusEl.textContent = 'Leyendo documento...';
+  try{
+    const texto = await extraerTextoDeDocumento(file);
+    const { recetas, ordenRecetas } = parseRecetarioDocumento(texto);
+    if(ordenRecetas.length===0){
+      statusEl.innerHTML = '<span style="color:var(--negative)">No se ha detectado ninguna receta en el documento. Revisa que cada receta empiece en una línea propia, seguida de sus ingredientes.</span>';
+      return;
+    }
+    STATE.recetarioPreviewNombreArchivo = file.name;
+    STATE.recetarioPreview = { recetas, ordenRecetas };
+    statusEl.textContent = '';
+    renderRecetarioVistaPrevia();
+  }catch(err){
+    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+err.message+'</span>';
+  }
+  e.target.value = '';
+});
+function renderRecetarioVistaPrevia(){
+  const cont = document.getElementById('recetarioVistaPreviaDoc');
+  if(!cont) return;
+  const preview = STATE.recetarioPreview;
+  if(!preview){ cont.innerHTML = ''; return; }
+  const totalIngredientes = preview.ordenRecetas.reduce((s,n)=>s+preview.recetas[n].length,0);
+  const totalBaja = preview.ordenRecetas.reduce((s,n)=>s+preview.recetas[n].filter(i=>i.confianza==='baja').length,0);
+  cont.innerHTML = `<div class="card" style="border:1px solid var(--copper);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0;">Vista previa — ${escapeHtml(STATE.recetarioPreviewNombreArchivo||'')}</h3>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" id="recetarioPreviewGuardarBtn">Guardar todo</button>
+        <button class="btn secondary" id="recetarioPreviewDescartarBtn">Descartar</button>
+      </div>
+    </div>
+    <p class="hint" style="margin-bottom:10px;">${preview.ordenRecetas.length} receta(s), ${totalIngredientes} ingrediente(s) detectados.${totalBaja>0?' <span style="color:var(--negative);">'+totalBaja+' sin cantidad clara detectada (marcados abajo) — revísalos antes de guardar.</span>':''} Revisa y corrige lo que haga falta — nada se guarda todavía.</p>
+    ${preview.ordenRecetas.map(nombre=>{
+      const ings = preview.recetas[nombre];
+      return `<div class="card" style="margin-bottom:10px;background:var(--surface-2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <b data-preview-nombre-receta="${escapeHtml(nombre)}" style="cursor:pointer;" title="Click para renombrar">${escapeHtml(nombre)} ✏️</b>
+          <button class="btn danger" data-preview-borrar-receta="${escapeHtml(nombre)}" style="padding:2px 8px;font-size:10px;">✕ Quitar receta</button>
+        </div>
+        <table><thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th></th><th></th></tr></thead>
+        <tbody>${ings.map((ing,i)=>`
+          <tr${ing.confianza==='baja'?' style="background:rgba(193,97,63,.12);"':''}>
+            <td>${escapeHtml(ing.ingrediente)}</td><td class="num">${ing.cantidad}</td><td>${escapeHtml(ing.unidad)}</td>
+            <td>${ing.confianza==='baja'?'<span class="hint" style="color:var(--negative);" title="No se detectó ninguna cantidad en esta línea — se asumió 1 unidad">⚠️ revisar</span>':''}</td>
+            <td><button class="btn secondary" data-preview-editar="${escapeHtml(nombre)}|${i}" style="padding:2px 8px;font-size:10px;">✏️</button> <button class="btn danger" data-preview-borrar-ing="${escapeHtml(nombre)}|${i}" style="padding:2px 8px;font-size:10px;">✕</button></td>
+          </tr>`).join('') || '<tr><td colspan="5" class="hint">Sin ingredientes detectados.</td></tr>'}</tbody></table>
+        <button class="btn secondary" data-preview-anadir-ing="${escapeHtml(nombre)}" style="margin-top:8px;padding:4px 10px;font-size:11px;">+ Añadir ingrediente</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  cont.querySelectorAll('[data-preview-nombre-receta]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const nombreActual = el.getAttribute('data-preview-nombre-receta');
+      const nuevoNombre = prompt('Nombre de la receta:', nombreActual);
+      if(!nuevoNombre || nuevoNombre===nombreActual) return;
+      if(STATE.recetarioPreview.recetas[nuevoNombre]){ toast('Ya hay otra receta con ese nombre en la vista previa.', true); return; }
+      STATE.recetarioPreview.recetas[nuevoNombre] = STATE.recetarioPreview.recetas[nombreActual];
+      delete STATE.recetarioPreview.recetas[nombreActual];
+      STATE.recetarioPreview.ordenRecetas = STATE.recetarioPreview.ordenRecetas.map(n=>n===nombreActual?nuevoNombre:n);
+      renderRecetarioVistaPrevia();
+    });
+  });
+  cont.querySelectorAll('[data-preview-borrar-receta]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nombre = btn.getAttribute('data-preview-borrar-receta');
+      if(!confirm('¿Quitar "'+nombre+'" de esta vista previa? (Solo afecta a la vista previa, no borra nada guardado)')) return;
+      delete STATE.recetarioPreview.recetas[nombre];
+      STATE.recetarioPreview.ordenRecetas = STATE.recetarioPreview.ordenRecetas.filter(n=>n!==nombre);
+      renderRecetarioVistaPrevia();
+    });
+  });
+  cont.querySelectorAll('[data-preview-editar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [nombre, idxStr] = btn.getAttribute('data-preview-editar').split('|');
+      const idx = parseInt(idxStr);
+      const ing = STATE.recetarioPreview.recetas[nombre][idx];
+      const nuevoNombre = prompt('Nombre del ingrediente:', ing.ingrediente);
+      if(!nuevoNombre) return;
+      const nuevaCantidad = parseFloat(prompt('Cantidad:', ing.cantidad));
+      if(isNaN(nuevaCantidad)){ toast('Cantidad no válida.', true); return; }
+      const nuevaUnidad = prompt('Unidad:', ing.unidad) || ing.unidad;
+      STATE.recetarioPreview.recetas[nombre][idx] = { ingrediente:nuevoNombre, cantidad:nuevaCantidad, unidad:nuevaUnidad, confianza:'alta' };
+      renderRecetarioVistaPrevia();
+    });
+  });
+  cont.querySelectorAll('[data-preview-borrar-ing]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [nombre, idxStr] = btn.getAttribute('data-preview-borrar-ing').split('|');
+      STATE.recetarioPreview.recetas[nombre].splice(parseInt(idxStr),1);
+      renderRecetarioVistaPrevia();
+    });
+  });
+  cont.querySelectorAll('[data-preview-anadir-ing]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nombre = btn.getAttribute('data-preview-anadir-ing');
+      const ingrediente = prompt('Nombre del ingrediente:');
+      if(!ingrediente) return;
+      const cantidad = parseFloat(prompt('Cantidad:', '1'));
+      if(isNaN(cantidad)){ toast('Cantidad no válida.', true); return; }
+      const unidad = prompt('Unidad:', 'unidad') || 'unidad';
+      STATE.recetarioPreview.recetas[nombre].push({ ingrediente, cantidad, unidad, confianza:'alta' });
+      renderRecetarioVistaPrevia();
+    });
+  });
+  document.getElementById('recetarioPreviewGuardarBtn').addEventListener('click', async ()=>{
+    const preview = STATE.recetarioPreview;
+    const btnGuardar = document.getElementById('recetarioPreviewGuardarBtn');
+    btnGuardar.disabled = true; btnGuardar.textContent = 'Guardando...';
+    try{
+      const { numRecetas, numIngredientes } = await guardarRecetasEnBD(preview.recetas);
+      const histSaved = await sbInsert('recetas_archivos_historial', { nombre_archivo:STATE.recetarioPreviewNombreArchivo, num_recetas:numRecetas, num_ingredientes:numIngredientes });
+      STATE.recetasHistorial.unshift({ id:histSaved.id, nombreArchivo:STATE.recetarioPreviewNombreArchivo, fechaSubida:histSaved.fecha_subida, numRecetas, numIngredientes });
+      toast('Guardado: '+numRecetas+' receta(s), '+numIngredientes+' ingrediente(s).');
+      STATE.recetarioPreview = null;
+      renderRecetario();
+    }catch(err){
+      toast('Error al guardar: '+err.message, true);
+      btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar todo';
+    }
+  });
+  document.getElementById('recetarioPreviewDescartarBtn').addEventListener('click', ()=>{
+    if(!confirm('¿Descartar esta vista previa sin guardar nada?')) return;
+    STATE.recetarioPreview = null;
+    renderRecetarioVistaPrevia();
+  });
+}
 function renderRecetarioHistorial(){
   const tbody = document.querySelector('#tablaRecetarioHistorial tbody');
   if(!tbody) return;
@@ -6805,27 +7118,225 @@ function renderRecetarioHistorial(){
     <tr><td>${h.nombreArchivo}</td><td class="hint">${fechaLocalISO(new Date(h.fechaSubida))}</td><td class="num">${h.numRecetas}</td><td class="num">${h.numIngredientes}</td></tr>
   `).join('') || '<tr><td colspan="4" class="hint">Sin archivos subidos todavía.</td></tr>';
 }
+/* filtro de "Ver receta(s)" de Recetario — independiente del multi-select genérico de
+   filtros de ventas (setupMultiSelect), ya que este no filtra datos de ventas sino qué
+   tarjetas de receta se muestran en pantalla, y no debe disparar un renderAll() completo. */
+/* ---- Costes de ingredientes: unidades base, conversión, búsqueda de coste, coste de receta ---- */
+// unidad "base" a la que se reduce cada unidad de peso/volumen para poder comparar y
+// convertir entre ellas (p.ej. kg <-> g); las unidades de conteo (unidad, cucharada,
+// pizca...) no tienen conversión entre sí, cada una es su propia base.
+const RECETARIO_UNIDAD_BASE = { g:'g',gr:'g',grs:'g',gramos:'g',kg:'g',kilos:'g',kilogramos:'g', ml:'ml',mililitros:'ml',cl:'ml',centilitros:'ml',l:'ml',lt:'ml',litro:'ml',litros:'ml', unidad:'unidad',unidades:'unidad',ud:'unidad',uds:'unidad',u:'unidad' };
+const RECETARIO_UNIDAD_FACTOR = { g:1,gr:1,grs:1,gramos:1,kg:1000,kilos:1000,kilogramos:1000, ml:1,mililitros:1,cl:10,centilitros:10,l:1000,lt:1000,litro:1000,litros:1000, unidad:1,unidades:1,ud:1,uds:1,u:1 };
+/* convierte una cantidad de una unidad a otra — solo si ambas son de la misma "familia"
+   (las dos de peso, o las dos de volumen, o las dos de conteo); si no son convertibles
+   (p.ej. gramos a cucharadas) devuelve null. */
+function convertirCantidadUnidad(cantidad, unidadOrigen, unidadDestino){
+  const uo = (unidadOrigen||'').toLowerCase().replace(/\.$/,''), ud = (unidadDestino||'').toLowerCase().replace(/\.$/,'');
+  if(uo===ud) return cantidad;
+  const bo = RECETARIO_UNIDAD_BASE[uo], bd = RECETARIO_UNIDAD_BASE[ud];
+  const fo = RECETARIO_UNIDAD_FACTOR[uo], fd = RECETARIO_UNIDAD_FACTOR[ud];
+  if(bo && bd && bo===bd && fo!==undefined && fd!==undefined) return cantidad*fo/fd;
+  return null;
+}
+/* busca el coste por unidad de un ingrediente, en la unidad que haga falta — convierte
+   automáticamente entre unidades de la misma familia (kg/g, l/ml...) si hiciera falta. */
+function costoPorUnidadIngrediente(nombreIngrediente, unidadNecesaria){
+  const entradas = STATE.ingredientesCostes.filter(c=>c.ingrediente.toLowerCase()===(nombreIngrediente||'').toLowerCase());
+  for(const entrada of entradas){
+    const cantidadEnUnidadNecesaria = convertirCantidadUnidad(entrada.cantidadReferencia, entrada.unidad, unidadNecesaria);
+    if(cantidadEnUnidadNecesaria!==null && cantidadEnUnidadNecesaria>0) return entrada.costeTotal/cantidadEnUnidadNecesaria;
+  }
+  return null;
+}
+/* coste total de una receta — suma, para cada ingrediente, cantidad_en_receta × coste
+   por unidad. Si algún ingrediente no tiene coste guardado (o su unidad no es
+   convertible a la que se guardó), esa línea cuenta como coste desconocido y el total se
+   marca como incompleto, en vez de dar una cifra engañosamente baja. */
+function calcularCosteReceta(recetaId){
+  const ingredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId===recetaId);
+  let costeTotal = 0, completo = true;
+  const detalle = ingredientes.map(ing=>{
+    const costoUnitario = costoPorUnidadIngrediente(ing.ingrediente, ing.unidad);
+    if(costoUnitario===null){ completo = false; return { ...ing, costeLinea:null }; }
+    const costeLinea = costoUnitario*ing.cantidad;
+    costeTotal += costeLinea;
+    return { ...ing, costeLinea };
+  });
+  return { costeTotal, completo, detalle };
+}
+/* tabla de "Costes de ingredientes" — añadir/editar/borrar cuánto cuesta una cantidad de
+   referencia de cada ingrediente (p.ej. "1 kg de café = 12,50 €"); de ahí se deriva el
+   coste por unidad que usan el coste de receta y el simulador de ahorro. */
+function renderIngredientesCostesTabla(){
+  const tbody = document.querySelector('#tablaIngredientesCostes tbody');
+  if(!tbody) return;
+  const ordenadas = [...STATE.ingredientesCostes].sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  tbody.innerHTML = ordenadas.map(c=>{
+    const costePorUnidad = c.cantidadReferencia>0 ? c.costeTotal/c.cantidadReferencia : 0;
+    return `<tr>
+      <td>${escapeHtml(c.ingrediente)}</td>
+      <td class="num">${c.cantidadReferencia} ${escapeHtml(c.unidad)}</td>
+      <td class="num">${eur(Math.round(c.costeTotal*100))}</td>
+      <td class="num">${eur(Math.round(costePorUnidad*100))}/${escapeHtml(c.unidad)}</td>
+      <td><button class="btn secondary" data-editar-coste-ing="${c.id}" style="padding:2px 8px;font-size:10px;">✏️</button> <button class="btn danger" data-borrar-coste-ing="${c.id}" style="padding:2px 8px;font-size:10px;">✕</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="hint">Sin costes de ingredientes todavía.</td></tr>';
+
+  tbody.querySelectorAll('[data-editar-coste-ing]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const c = STATE.ingredientesCostes.find(x=>x.id===btn.getAttribute('data-editar-coste-ing'));
+      if(!c) return;
+      const cantidad = parseFloat(prompt('Cantidad de referencia:', c.cantidadReferencia));
+      if(isNaN(cantidad)||cantidad<=0){ toast('Cantidad no válida.', true); return; }
+      const unidad = prompt('Unidad (g, kg, ml, l, unidad...):', c.unidad) || c.unidad;
+      const coste = parseFloat(prompt('Coste de esa cantidad (€):', c.costeTotal));
+      if(isNaN(coste)||coste<0){ toast('Coste no válido.', true); return; }
+      try{
+        await sbUpdate('ingredientes_costes', c.id, { cantidad_referencia:cantidad, unidad, coste_total:coste });
+        c.cantidadReferencia = cantidad; c.unidad = unidad; c.costeTotal = coste;
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+  tbody.querySelectorAll('[data-borrar-coste-ing]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-borrar-coste-ing');
+      if(!confirm('¿Borrar este coste? Las recetas que usen este ingrediente dejarán de tener su coste calculado.')) return;
+      try{
+        await sbDelete('ingredientes_costes', id);
+        STATE.ingredientesCostes = STATE.ingredientesCostes.filter(x=>x.id!==id);
+        renderRecetario();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
+}
+document.getElementById('ingredienteCosteAddBtn').addEventListener('click', async ()=>{
+  const ingrediente = prompt('Nombre del ingrediente (tal cual aparece en las recetas):');
+  if(!ingrediente) return;
+  const cantidad = parseFloat(prompt('Cantidad de referencia (p.ej. 1 para "1 kg"):', '1'));
+  if(isNaN(cantidad)||cantidad<=0){ toast('Cantidad no válida.', true); return; }
+  const unidad = prompt('Unidad (g, kg, ml, l, unidad...):', 'kg') || 'kg';
+  const coste = parseFloat(prompt('Coste de esa cantidad, en €:'));
+  if(isNaN(coste)||coste<0){ toast('Coste no válido.', true); return; }
+  try{
+    const saved = await sbInsert('ingredientes_costes', { ingrediente, cantidad_referencia:cantidad, unidad, coste_total:coste });
+    STATE.ingredientesCostes.push({ id:saved.id, ingrediente, cantidadReferencia:cantidad, unidad, costeTotal:coste });
+    renderRecetario();
+  }catch(e){ toast('Error: '+e.message, true); }
+});
+/* ---- Simulador de ahorro por bajada de precio de un ingrediente ---- */
+function renderSimuladorAhorroSelectIngrediente(){
+  const sel = document.getElementById('simAhorroIngrediente');
+  if(!sel) return;
+  const ingredientesConCoste = [...new Set(STATE.ingredientesCostes.map(c=>c.ingrediente))].sort((a,b)=>a.localeCompare(b,'es'));
+  const valorActual = sel.value;
+  sel.innerHTML = '<option value="">Elegir...</option>' + ingredientesConCoste.map(i=>`<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
+  if(ingredientesConCoste.includes(valorActual)) sel.value = valorActual;
+  sel.onchange = ()=>{
+    const hint = document.getElementById('simAhorroUnidadHint');
+    const filaReceta = STATE.recetaIngredientes.find(ri=>ri.ingrediente.toLowerCase()===sel.value.toLowerCase());
+    hint.textContent = filaReceta ? '(en €/'+filaReceta.unidad+', la unidad que usan las recetas)' : (sel.value ? '(este ingrediente no aparece en ninguna receta)' : '');
+  };
+}
+document.getElementById('simAhorroCalcularBtn').addEventListener('click', ()=>{
+  const ingrediente = document.getElementById('simAhorroIngrediente').value;
+  const nuevoCoste = parseFloat(document.getElementById('simAhorroNuevoCoste').value);
+  const desde = document.getElementById('simAhorroDesde').value;
+  const hasta = document.getElementById('simAhorroHasta').value;
+  const resultadoEl = document.getElementById('simAhorroResultado');
+  if(!ingrediente){ resultadoEl.innerHTML = '<p class="hint" style="color:var(--negative);">Elige un ingrediente.</p>'; return; }
+  if(isNaN(nuevoCoste) || nuevoCoste<0){ resultadoEl.innerHTML = '<p class="hint" style="color:var(--negative);">Introduce un nuevo coste por unidad válido.</p>'; return; }
+  if(!desde || !hasta){ resultadoEl.innerHTML = '<p class="hint" style="color:var(--negative);">Elige un periodo (Desde/Hasta).</p>'; return; }
+
+  // se usa la unidad que emplean las RECETAS para este ingrediente (no la unidad en la
+  // que se guardó su coste, que puede ser distinta — p.ej. coste guardado "por kg" pero
+  // usado "en gramos" dentro de las recetas) — consumoTeoricoCocina() calcula el consumo
+  // justo en esa unidad de receta, así que el coste por unidad tiene que estar en la
+  // misma, o el resultado sale mal (p.ej. gramos multiplicados por un coste por kg).
+  const filaRecetaConIngrediente = STATE.recetaIngredientes.find(ri=>ri.ingrediente.toLowerCase()===ingrediente.toLowerCase());
+  if(!filaRecetaConIngrediente){ resultadoEl.innerHTML = '<p class="hint" style="color:var(--negative);">Este ingrediente no aparece en ninguna receta todavía.</p>'; return; }
+  const unidad = filaRecetaConIngrediente.unidad;
+  const costeActualPorUnidad = costoPorUnidadIngrediente(ingrediente, unidad);
+  if(costeActualPorUnidad===null){ resultadoEl.innerHTML = '<p class="hint" style="color:var(--negative);">El coste guardado para este ingrediente no se puede convertir a la unidad que usan las recetas ("'+unidad+'").</p>'; return; }
+
+  // consumoTeoricoCocina espera "desde" EXCLUSIVO y "hasta" INCLUSIVO — para que el
+  // "Desde" elegido por el usuario SÍ cuente, se usa el día anterior como límite exclusivo.
+  const desdeExclusivo = new Date(desde+'T00:00:00'); desdeExclusivo.setDate(desdeExclusivo.getDate()-1);
+  const consumoTotal = consumoTeoricoCocina(ingrediente, fechaLocalISO(desdeExclusivo), hasta);
+
+  const gastoActual = consumoTotal*costeActualPorUnidad;
+  const gastoNuevo = consumoTotal*nuevoCoste;
+  const ahorro = gastoActual-gastoNuevo;
+  const ahorroPct = gastoActual>0 ? (ahorro/gastoActual*100) : 0;
+
+  resultadoEl.innerHTML = `<div class="grid kpi">
+    <div class="card"><div class="hint">Consumo teórico en el periodo</div><div style="font-size:20px;font-weight:700;">${consumoTotal.toFixed(1)} ${unidad}</div></div>
+    <div class="card"><div class="hint">Gasto actual (a ${eur(Math.round(costeActualPorUnidad*100))}/${unidad})</div><div style="font-size:20px;font-weight:700;">${eur(Math.round(gastoActual*100))}</div></div>
+    <div class="card"><div class="hint">Gasto con el nuevo coste (a ${eur(Math.round(nuevoCoste*100))}/${unidad})</div><div style="font-size:20px;font-weight:700;">${eur(Math.round(gastoNuevo*100))}</div></div>
+    <div class="card"><div class="hint">Ahorro potencial</div><div style="font-size:20px;font-weight:700;color:${ahorro>=0?'var(--positive)':'var(--negative)'};">${eur(Math.round(ahorro*100))} (${ahorroPct.toFixed(1)}%)</div></div>
+  </div>`;
+});
+function renderRecetarioFiltro(){
+  const list = document.getElementById('ms-recetario-list');
+  const btn = document.getElementById('ms-recetario-btn');
+  const allCb = document.getElementById('ms-recetario-all');
+  if(!list || !btn || !allCb) return;
+  if(!STATE.recetarioFiltroSeleccion) STATE.recetarioFiltroSeleccion = [];
+  const recetasOrdenadas = [...STATE.recetas].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  // reconstruir la lista solo si ha cambiado el número de recetas, para no perder el
+  // estado de los checkboxes en cada render
+  if(list.childElementCount !== recetasOrdenadas.length){
+    list.innerHTML = recetasOrdenadas.map(r=>`<label class="ms-item"><input type="checkbox" value="${r.id}" checked> ${escapeHtml(r.nombre)}</label>`).join('');
+    STATE.recetarioFiltroSeleccion = [];
+  }
+  function actualizarEtiquetaBoton(){
+    const boxes = [...list.querySelectorAll('input')];
+    const marcadas = boxes.filter(b=>b.checked);
+    if(marcadas.length===boxes.length || marcadas.length===0){ btn.textContent = 'Todas'; STATE.recetarioFiltroSeleccion = []; }
+    else if(marcadas.length===1){ btn.textContent = marcadas[0].parentElement.textContent.trim(); STATE.recetarioFiltroSeleccion = [marcadas[0].value]; }
+    else { btn.textContent = marcadas.length+' seleccionadas'; STATE.recetarioFiltroSeleccion = marcadas.map(m=>m.value); }
+  }
+  allCb.onchange = ()=>{ list.querySelectorAll('input').forEach(cb=>cb.checked=allCb.checked); actualizarEtiquetaBoton(); renderRecetario(); };
+  list.onchange = ()=>{ allCb.checked = [...list.querySelectorAll('input')].every(b=>b.checked); actualizarEtiquetaBoton(); renderRecetario(); };
+  btn.onclick = (e)=>{ e.stopPropagation(); document.querySelectorAll('.ms-panel.open').forEach(p=>{ if(p.id!=='ms-recetario-panel') p.classList.remove('open'); }); document.getElementById('ms-recetario-panel').classList.toggle('open'); };
+  actualizarEtiquetaBoton();
+}
 function renderRecetario(){
   renderRecetarioHistorial();
+  renderIngredientesCostesTabla();
+  renderRecetarioFiltro();
+  renderRecetarioVistaPrevia();
+  renderSimuladorAhorroSelectIngrediente();
   const cont = document.getElementById('recetarioListaRecetas');
   if(!cont) return;
-  const recetasOrdenadas = [...STATE.recetas].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  let recetasOrdenadas = [...STATE.recetas].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   if(recetasOrdenadas.length===0){ cont.innerHTML = '<p class="hint">Sin recetas todavía — sube un archivo o añade una a mano.</p>'; return; }
+  // filtro de "Ver receta(s)" — vacío o con todo marcado significa "ver todas"
+  const seleccion = STATE.recetarioFiltroSeleccion||[];
+  if(seleccion.length>0 && seleccion.length<recetasOrdenadas.length){
+    recetasOrdenadas = recetasOrdenadas.filter(r=>seleccion.includes(r.id));
+  }
+  if(recetasOrdenadas.length===0){ cont.innerHTML = '<p class="hint">Ninguna receta seleccionada.</p>'; return; }
   cont.innerHTML = recetasOrdenadas.map(r=>{
     const ingredientes = STATE.recetaIngredientes.filter(ri=>ri.recetaId===r.id).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+    const { costeTotal, completo, detalle } = calcularCosteReceta(r.id);
+    const costeLineaPorIngrediente = {};
+    detalle.forEach(d=>{ costeLineaPorIngrediente[d.id] = d.costeLinea; });
     return `<div class="card" style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <h3 style="margin:0;">${r.nombre}</h3>
         <div style="display:flex;gap:6px;">
           <button class="btn secondary" data-renombrar-receta="${r.id}" style="padding:3px 10px;font-size:11px;">✏️ Renombrar</button>
           <button class="btn danger" data-borrar-receta="${r.id}" style="padding:3px 10px;font-size:11px;">✕ Borrar receta</button>
         </div>
       </div>
-      <table><thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th></th></tr></thead>
+      <p class="hint" style="margin-bottom:10px;">Coste de la receta: <b style="color:var(--text);">${eur(Math.round(costeTotal*100))}</b>${completo?'':' <span style="color:var(--negative);">(incompleto — falta el coste de algún ingrediente, marcado abajo)</span>'}</p>
+      <table><thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Coste</th><th></th></tr></thead>
       <tbody>${ingredientes.map(ing=>`
         <tr><td>${ing.ingrediente}</td><td class="num">${ing.cantidad}</td><td>${ing.unidad}</td>
+        <td class="num">${costeLineaPorIngrediente[ing.id]===null?'<span class="hint" style="color:var(--negative);">sin coste</span>':eur(Math.round(costeLineaPorIngrediente[ing.id]*100))}</td>
         <td><button class="btn secondary" data-editar-ingrediente="${ing.id}" style="padding:2px 8px;font-size:10px;">✏️</button> <button class="btn danger" data-borrar-ingrediente="${ing.id}" style="padding:2px 8px;font-size:10px;">✕</button></td></tr>
-      `).join('') || '<tr><td colspan="4" class="hint">Sin ingredientes todavía.</td></tr>'}</tbody></table>
+      `).join('') || '<tr><td colspan="5" class="hint">Sin ingredientes todavía.</td></tr>'}</tbody></table>
       <button class="btn secondary" data-anadir-ingrediente="${r.id}" style="margin-top:10px;padding:5px 12px;font-size:12px;">+ Añadir ingrediente</button>
     </div>`;
   }).join('');
@@ -13213,6 +13724,10 @@ function calcularSeguimientoClientes(){
       if(anteriores.length===0) return;
       const ultimaAntes = anteriores[anteriores.length-1];
       if(ultimaAntes.segmento!==seg) return;
+      // solo cuenta en el PRIMER mes que falta (la última visita fue justo el mes
+      // anterior) — si ya llevaba varios meses sin venir, no se vuelve a contar cada mes
+      // que sigue ausente, solo la primera vez que se detecta la ausencia.
+      if(ultimaAntes.bucketIdx !== bIdx-1) return;
       const vinoEsteMes = visitas.some(v=>v.bucketIdx===bIdx);
       if(!vinoEsteMes) count++;
     });
