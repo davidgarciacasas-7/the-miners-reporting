@@ -228,7 +228,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.311</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.313</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1451,6 +1451,7 @@ Bowl de acai,Acai,150,g</pre>
           <div class="config-field"><label>Nota (opcional)</label><input type="text" id="facNota"></div>
           <p class="hint" id="facResumen" style="margin:10px 0;font-size:14px;"></p>
           <button class="btn" id="facGuardarBtn">Guardar factura y descargar PDF</button>
+          <button class="btn secondary" id="facCancelarEdicionBtn" style="display:none;">Cancelar edición</button>
           <p class="hint" id="facStatus" style="margin-top:8px;"></p>
         </div>
 
@@ -4021,7 +4022,7 @@ function renderGraficosSeguimientoClientes({ grupos, mesesLabels }){
     STATE.charts['clienteMetricaMini_'+i] = safeNewChart('clienteMetricaMini_'+i, {
       type:'line',
       data:{ labels:mesesLabels, datasets:[{ data:f.serieMensual, borderColor:CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length], backgroundColor:CAJA_CHART_PALETTE[i%CAJA_CHART_PALETTE.length], tension:.3, pointRadius:2 }] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:8}, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}, callback:v=>v+sufijo}, grid:{color:c2.grid} } } }
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted, font:{size:8}, maxRotation:45}, grid:{display:false} }, y:{ ticks:{color:c2.muted, font:{size:9}, callback:v=>(Math.round(v*100)/100)+sufijo}, grid:{color:c2.grid} } } }
     });
   });
 }
@@ -11593,6 +11594,7 @@ STATE.empresaEmisora = null;
 STATE.cuentasBancarias = [];
 STATE.clientesFacturacion = [];
 STATE.facturas = [];
+STATE.facturaEditandoId = null; // id de la factura en edición, o null si se está creando una nueva
 async function loadAndRenderFacturas(){
   try{
     const rows = await sbList('empresa_emisora', 'select=*&order=updated_at.desc&limit=1');
@@ -11833,6 +11835,24 @@ document.getElementById('facGuardarBtn').addEventListener('click', async ()=>{
     importe_base:base, iva_porcentaje:ivaPct, iva_importe:ivaImporte, total, nota: nota||null
   };
   try{
+    if(STATE.facturaEditandoId){
+      const idEditando = STATE.facturaEditandoId;
+      await sbUpdate('facturas', idEditando, registro);
+      const idx = STATE.facturas.findIndex(x=>x.id===idEditando);
+      const facturaActualizada = {
+        id:idEditando, numero, fecha, concepto:concepto||null,
+        emisorNombre:e.nombre, emisorCif:e.cif, emisorDireccion:e.direccion, emisorEmail:e.email, emisorTelefono:e.telefono,
+        bancoNombre: banco?banco.nombre:null, bancoIban: banco?banco.iban:null,
+        clienteNombre:cliente.nombre, clienteCif:cliente.cif, clienteDireccion:cliente.direccion, clienteEmail:cliente.email, clienteTelefono:cliente.telefono,
+        importeBase:base, ivaPorcentaje:ivaPct, ivaImporte, total, nota:nota||null
+      };
+      if(idx!==-1) STATE.facturas[idx] = facturaActualizada;
+      renderFacturasHistorico();
+      generarFacturaPDF(facturaActualizada);
+      salirDeModoEdicionFactura();
+      toast('Factura actualizada y PDF descargado.');
+      return;
+    }
     const saved = await sbInsert('facturas', registro);
     const facturaObj = {
       id:saved.id, numero:saved.numero, fecha:saved.fecha, concepto:saved.concepto,
@@ -11851,13 +11871,60 @@ document.getElementById('facGuardarBtn').addEventListener('click', async ()=>{
   }catch(e){ toast('Error: '+e.message, true); }
 });
 
+/* pone el formulario de "Nueva factura" en modo edición, con los datos de una factura ya
+   guardada — al pulsar "Guardar cambios" se actualiza esa misma factura en vez de crear
+   una nueva. La factura guarda una "foto" del cliente y del banco en el momento de
+   crearla (no una referencia), así que aquí se busca el cliente/cuenta actual que mejor
+   coincida para dejarlo preseleccionado — si no hay coincidencia exacta (p.ej. el
+   cliente se borró o renombró después), se avisa en vez de dejarlo mal seleccionado en
+   silencio. */
+function entrarEnModoEdicionFactura(f){
+  STATE.facturaEditandoId = f.id;
+  document.getElementById('facNumero').value = f.numero;
+  document.getElementById('facFecha').value = f.fecha;
+  document.getElementById('facConcepto').value = f.concepto||'';
+  document.getElementById('facImporteBase').value = f.importeBase;
+  document.getElementById('facIva').value = f.ivaPorcentaje;
+  document.getElementById('facNota').value = f.nota||'';
+
+  const clienteMatch = STATE.clientesFacturacion.find(c=>c.nombre===f.clienteNombre && (c.cif||null)===(f.clienteCif||null))
+    || STATE.clientesFacturacion.find(c=>c.nombre===f.clienteNombre);
+  if(clienteMatch) document.getElementById('facCliente').value = clienteMatch.id;
+
+  const bancoMatch = STATE.cuentasBancarias.find(b=>b.iban===f.bancoIban) || STATE.cuentasBancarias.find(b=>b.nombre===f.bancoNombre);
+  if(bancoMatch) document.getElementById('facCuentaBancaria').value = bancoMatch.id;
+
+  actualizarResumenFactura();
+  document.getElementById('facGuardarBtn').textContent = 'Guardar cambios';
+  document.getElementById('facCancelarEdicionBtn').style.display = '';
+  document.getElementById('facNumero').closest('.card')?.scrollIntoView?.({ behavior:'smooth', block:'start' });
+  // un solo toast — si el cliente no coincide exactamente, ese aviso es más importante y
+  // sustituye al mensaje genérico de "editando factura", en vez de que uno tape al otro.
+  if(!clienteMatch) toast('No se ha encontrado el cliente exacto de esta factura ("'+(f.clienteNombre||'')+'") en la lista actual — revisa el desplegable de Cliente.', true);
+  else toast('Editando la factura '+f.numero+' — al guardar se actualizará en vez de crear una nueva.');
+}
+function salirDeModoEdicionFactura(){
+  STATE.facturaEditandoId = null;
+  document.getElementById('facGuardarBtn').textContent = 'Guardar factura y descargar PDF';
+  document.getElementById('facCancelarEdicionBtn').style.display = 'none';
+  document.getElementById('facConcepto').value=''; document.getElementById('facImporteBase').value=''; document.getElementById('facNota').value='';
+  actualizarResumenFactura();
+  sugerirNumeroFactura();
+}
+document.getElementById('facCancelarEdicionBtn').addEventListener('click', salirDeModoEdicionFactura);
 function renderFacturasHistorico(){
   const tbody = document.querySelector('#tablaFacturas tbody');
   if(!tbody) return;
   tbody.innerHTML = STATE.facturas.map(f=>`
     <tr><td>${f.numero}</td><td>${f.fecha}</td><td>${f.clienteNombre||''}</td><td class="num">${eur(Math.round(f.importeBase*100))}</td><td class="num">${eur(Math.round(f.ivaImporte*100))}</td><td class="num"><b>${eur(Math.round(f.total*100))}</b></td>
-    <td style="white-space:nowrap;"><button class="btn secondary" data-pdf-factura="${f.id}" style="padding:3px 8px;font-size:11px;">PDF</button> <button class="btn danger" data-del-factura="${f.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
+    <td style="white-space:nowrap;"><button class="btn secondary" data-editar-factura="${f.id}" style="padding:3px 8px;font-size:11px;">✏️</button> <button class="btn secondary" data-pdf-factura="${f.id}" style="padding:3px 8px;font-size:11px;">PDF</button> <button class="btn danger" data-del-factura="${f.id}" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
   `).join('') || '<tr><td colspan="7" class="hint">Sin facturas todavía.</td></tr>';
+  tbody.querySelectorAll('[data-editar-factura]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const f = STATE.facturas.find(x=>x.id===btn.getAttribute('data-editar-factura'));
+      if(f) entrarEnModoEdicionFactura(f);
+    });
+  });
   tbody.querySelectorAll('[data-pdf-factura]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const f = STATE.facturas.find(x=>x.id===btn.getAttribute('data-pdf-factura'));
