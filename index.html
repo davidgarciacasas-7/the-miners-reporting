@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <style>
@@ -228,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.313</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.316</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -430,9 +431,17 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <div class="subfilter">
               <select id="rankOrder"><option value="desc">Más vendidos primero</option><option value="asc">Menos vendidos primero</option></select>
               <select id="rankBy"><option value="unidades">Por unidades</option><option value="ventas">Por ventas</option></select>
+              <button class="btn secondary" id="tablaArticulosExportarImgBtn" style="padding:6px 12px;font-size:12px;">Exportar imagen</button>
+              <button class="btn secondary" id="tablaArticulosExportarPdfBtn" style="padding:6px 12px;font-size:12px;">Exportar PDF</button>
             </div>
-            <div style="max-height:320px;overflow:auto;">
-              <table id="tablaArticulos"><thead><tr><th>Artículo</th><th>Categoría</th><th>Uds.</th><th>Ventas</th></tr></thead><tbody></tbody></table>
+            <div class="subfilter" style="margin-top:8px;align-items:center;">
+              <div class="filter-group"><label>Combos (Nombre del precio = "Menu")</label><select id="rankComboModo"><option value="no">No repartir</option><option value="uds">Repartir solo unidades</option><option value="udsVentas">Repartir unidades y ventas</option></select></div>
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;"><input type="checkbox" id="rankComboOcultar" disabled> Ocultar línea del combo</label>
+              <button class="btn secondary" id="rankComboConfigBtn" style="padding:6px 12px;font-size:12px;">Nombres de combo</button>
+            </div>
+            <div id="rankComboConfigPanel" style="display:none;margin-top:8px;"></div>
+            <div id="tablaArticulosWrap" style="max-height:320px;overflow:auto;">
+              <table id="tablaArticulos"><thead><tr><th>Artículo</th><th>Categoría</th><th>Uds.</th><th>Ventas</th><th>Uds (media mensual)</th><th>Ventas (media mensual)</th><th>Uds (% uds Brunch)</th><th>Ventas (% ventas Brunch)</th></tr></thead><tbody></tbody></table>
             </div>
           </div>
         </div>
@@ -774,6 +783,26 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         </div>
         <p class="hint" style="margin-bottom:14px;">Categorías consideradas "bebida" (editable en Configuración): <span id="bebidaCategoriasResumen"></span>. Arrastra una tarjeta por su título (✥) para reordenarla.</p>
         <div id="perfWidgetsContainer" class="grid split"></div>
+
+        <div class="section-title" style="margin-top:26px;">Reseñas de Google</div>
+        <p class="hint" style="margin-bottom:10px;">Número de reseñas por semana/mes, nota media del periodo, y clasificación de cada reseña por lo que menciona (precio, servicio, producto, ambiente, limpieza), diferenciando menciones buenas de malas. La clasificación se hace por patrones de texto (no por una IA leyendo cada reseña), así que puede equivocarse en frases que mezclan varias cosas — el texto original de cada reseña siempre queda guardado para poder revisarlo.</p>
+        <div class="card" style="margin-bottom:14px;">
+          <div id="googleReviewsEstadoConexion" style="margin-bottom:10px;"></div>
+          <button class="btn secondary" id="googleReviewsConectarBtn">Conectar con Google</button>
+          <button class="btn secondary" id="googleReviewsSincronizarBtn">Sincronizar reseñas</button>
+          <p class="hint" id="googleReviewsSyncStatus" style="margin-top:8px;"></p>
+        </div>
+        <div class="topbar" style="margin-bottom:10px;">
+          <div class="subfilter" style="margin-bottom:0;">
+            <div class="filter-group"><label>Desde</label><input type="date" id="googleReviewsDesde"></div>
+            <div class="filter-group"><label>Hasta</label><input type="date" id="googleReviewsHasta"></div>
+            <div class="filter-group"><label>Ver por</label><select id="googleReviewsGranularidad"><option value="semana">Semana</option><option value="mes" selected>Mes</option></select></div>
+          </div>
+        </div>
+        <div class="grid kpi" id="googleReviewsResumenKpis" style="margin-bottom:14px;"></div>
+        <div class="card" style="margin-bottom:14px;"><div class="chart-wrap"><canvas id="chartGoogleReviewsPorPeriodo"></canvas></div></div>
+        <div class="card" style="margin-bottom:14px;"><div id="tablaGoogleReviewsCategorias" style="overflow-x:auto;"></div></div>
+        <div class="card"><h3>Últimas reseñas</h3><div id="listaGoogleReviewsTexto" style="max-height:400px;overflow:auto;"></div></div>
       </div>
 
       <!-- PRODUCCIÓN (pedido vs completado, desde la app de mermas) -->
@@ -1804,6 +1833,13 @@ async function sbDelete(table, id){
    Project URL/anon key la primera vez en cada navegador. El login (email+contraseña)
    sigue siendo la protección real; esta clave es pública y ya era visible en el navegador. */
 const DEFAULT_CONFIG = { url:'https://huigdaacnetpxcxvjmmw.supabase.co', anonKey:'sb_publishable_SWrKrQT9Wn9isW_JOQZmWw_ZwxR3-EX' };
+/* Client ID de las credenciales OAuth creadas en Google Cloud Console (paso 2 de la guía
+   de conexión) — a diferencia del "Client Secret" (que vive SOLO en las variables de
+   entorno de Vercel, nunca aquí), el Client ID es público por diseño en OAuth y puede ir
+   en el propio código del navegador sin problema. Sustituir por el vuestro cuando lo
+   tengáis creado. */
+const GOOGLE_OAUTH_CLIENT_ID = 'TU_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_OAUTH_REDIRECT_URI = window.location.origin + '/api/google-oauth-callback';
 function loadConfig(){
   STATE.config = LS.get('miners_config', DEFAULT_CONFIG);
   const params = new URLSearchParams(window.location.search);
@@ -1956,6 +1992,10 @@ function parseSquareCSV(text, filename){
     const nombreCliente = get('Nombre del cliente');
     const marca = get('Marca de la tarjeta');
     const pan = get('Sufijo PAN');
+    // opcional — solo algunos exports de Square la traen. "Carta" = precio normal,
+    // "Menu" = va dentro de un combo (su propio precio aparece como 0€, ya que el
+    // combo entero se cobra en su propia línea aparte).
+    const nombrePrecio = get('Nombre del precio');
 
     if(tipoEvento!=='Pago' && tipoEvento!=='Reembolso'){
       eventosDesconocidos[tipoEvento||'(vacío)'] = (eventosDesconocidos[tipoEvento||'(vacío)']||0)+1;
@@ -1989,7 +2029,8 @@ function parseSquareCSV(text, filename){
       cant, ventasBrutas, ventasNetas,
       ticketMap[transId].idx,
       tipoEvento==='Pago' ? 1 : 0,
-      servicio==='Para llevar' ? 0 : 1
+      servicio==='Para llevar' ? 0 : 1,
+      nombrePrecio
     ]);
   }
 
@@ -2430,7 +2471,7 @@ function getFilteredLines(){
     const pd = STATE.periodsData[periodId];
     const segByTicket = classes[periodId] || {};
     for(const row of pd.lines){
-      const [fecha, hora, catIdx, artIdx, cant, bruto, neto, ticketIdx, esPago, esComerAqui] = row;
+      const [fecha, hora, catIdx, artIdx, cant, bruto, neto, ticketIdx, esPago, esComerAqui, nombrePrecio] = row;
       if(f.desde && fecha < f.desde) continue;
       if(f.hasta && fecha > f.hasta) continue;
       const dInfo = diaSemanaInfo(fecha);
@@ -2450,7 +2491,7 @@ function getFilteredLines(){
       // Square ya envía cant/ventas_brutas/ventas_netas en negativo para los reembolsos,
       // así que se usan tal cual, sin aplicar otro cambio de signo encima.
       const ticketRef = (pd.tickets[ticketIdx] && pd.tickets[ticketIdx][2]) || '';
-      out.push({ periodId, fecha, hora, categoria, articulo, cant, bruto, neto, ticketIdx, ticketRef, segmento, esPago, esComerAqui, franja: franjaLabelFor(hora, f.franjaTipo), diaSemana: dInfo.nombre, esFinde: dInfo.esFinde });
+      out.push({ periodId, fecha, hora, categoria, articulo, cant, bruto, neto, ticketIdx, ticketRef, segmento, esPago, esComerAqui, nombrePrecio, franja: franjaLabelFor(hora, f.franjaTipo), diaSemana: dInfo.nombre, esFinde: dInfo.esFinde });
     }
   }
   return out;
@@ -2636,7 +2677,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       if(STATE.mermas.length===0) loadAndRenderMermas().then(renderCostes);
       else renderCostes();
     }
-    if(item.dataset.tab==='performance') renderPerformanceEquipo();
+    if(item.dataset.tab==='performance'){ renderPerformanceEquipo(); initGoogleReviewsSeccion(); }
     if(item.dataset.tab==='rentabilidad'){
       const desdeInp = document.getElementById('rentDesde'), hastaInp = document.getElementById('rentHasta'), plantillaInp = document.getElementById('rentPlantillaDia');
       if(!desdeInp.value){
@@ -3774,6 +3815,135 @@ document.getElementById('categoriaGruposGuardarBtn').addEventListener('click', (
   renderProductos(lines);
 });
 
+/* número de meses del periodo elegido, con decimales (p.ej. 1.5 meses) — se usa para las
+   columnas de "media mensual" de la tabla de artículos. Si hay un Desde/Hasta explícito
+   en el filtro global se usa ese rango; si no, se deriva del rango real de fechas
+   presente en las líneas ya filtradas. Se usa una media de 365.25/12 días por mes (para
+   tener en cuenta los años bisiestos), no simplemente "30 días", para que el resultado
+   sea consistente durante todo el año. */
+/* captura la tabla de Ranking de artículos entera como imagen — el contenedor tiene un
+   scroll limitado en pantalla (max-height), así que se expande sin límite justo antes de
+   la captura (para que salgan TODAS las filas, no solo las visibles en ese momento) y se
+   vuelve a dejar como estaba justo después. */
+async function capturarTablaArticulosCanvas(){
+  const el = document.getElementById('tablaArticulosWrap');
+  const maxHeightOriginal = el.style.maxHeight, overflowOriginal = el.style.overflow;
+  el.style.maxHeight = 'none'; el.style.overflow = 'visible';
+  const canvas = await html2canvas(el, { backgroundColor: getComputedStyle(document.body).backgroundColor, scale:2 });
+  el.style.maxHeight = maxHeightOriginal; el.style.overflow = overflowOriginal;
+  return canvas;
+}
+async function exportarTablaArticulosImagen(){
+  const canvas = await capturarTablaArticulosCanvas();
+  const link = document.createElement('a');
+  link.download = 'ranking-articulos-'+fechaLocalISO(new Date())+'.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+async function exportarTablaArticulosPDF(){
+  const canvas = await capturarTablaArticulosCanvas();
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  const { jsPDF } = window.jspdf;
+  // horizontal, ya que la tabla es ancha (8 columnas)
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
+  const margin = 10;
+  const ratio = canvas.height/canvas.width;
+  let imgW = pageW-margin*2, imgH = imgW*ratio;
+  if(imgH > pageH-margin*2){ imgH = pageH-margin*2; imgW = imgH/ratio; }
+  doc.addImage(imgData, 'JPEG', margin, margin, imgW, imgH);
+  doc.save('ranking-articulos-'+fechaLocalISO(new Date())+'.pdf');
+}
+document.getElementById('tablaArticulosExportarImgBtn').addEventListener('click', exportarTablaArticulosImagen);
+document.getElementById('tablaArticulosExportarPdfBtn').addEventListener('click', exportarTablaArticulosPDF);
+/* nombres de artículo que son combos (p.ej. "Menu Brunch") — configurable, ya que no hay
+   forma de saberlo solo a partir del export de Square. */
+STATE.rankComboNombres = LS.get('miners_rank_combo_nombres', []);
+STATE.rankComboModo = 'no';
+STATE.rankComboOcultar = false;
+/* reparte el valor de los combos entre sus componentes individuales — las UNIDADES de
+   cada componente YA se cuentan correctamente sin necesidad de nada especial (al
+   coincidir el nombre del artículo entre la venta suelta y la línea dentro del combo, se
+   suman solas al agrupar por artículo); lo que hace falta repartir es la parte de VENTAS
+   que le corresponde a cada componente, ya que esa línea concreta llega con 0€ (el precio
+   entero se cobra en la línea del propio combo). Se reparte a partes iguales por unidad,
+   dentro de cada ticket, ya que no hay ninguna otra pista de precio para cada componente
+   cuando va dentro de un combo. */
+function aplicarRepartoCombos(lines, byArt){
+  const modo = STATE.rankComboModo;
+  if(modo==='no') return;
+  const combosNombres = new Set(STATE.rankComboNombres||[]);
+  if(combosNombres.size===0) return;
+
+  if(modo==='udsVentas'){
+    const porTicket = {};
+    lines.forEach(l=>{
+      const key = l.periodId+'|'+l.ticketIdx;
+      (porTicket[key] = porTicket[key]||[]).push(l);
+    });
+    Object.values(porTicket).forEach(lineasTicket=>{
+      const lineasCombo = lineasTicket.filter(l=>combosNombres.has(l.articulo));
+      if(lineasCombo.length===0) return;
+      const comboBrutoTotal = lineasCombo.reduce((s,l)=>s+l.bruto,0);
+      const lineasComponentes = lineasTicket.filter(l=>l.nombrePrecio==='Menu');
+      if(lineasComponentes.length===0) return;
+      const totalUdsComponentes = lineasComponentes.reduce((s,l)=>s+l.cant,0) || 1;
+      const precioPorUnidad = comboBrutoTotal/totalUdsComponentes;
+      lineasComponentes.forEach(l=>{
+        if(byArt[l.articulo]) byArt[l.articulo].ventas += l.cant*precioPorUnidad;
+      });
+    });
+  }
+
+  if(modo==='udsVentas' && STATE.rankComboOcultar){
+    combosNombres.forEach(nombre=>{ delete byArt[nombre]; });
+  }
+}
+function renderRankComboConfigPanel(){
+  const panel = document.getElementById('rankComboConfigPanel');
+  panel.innerHTML = `<div class="card">
+    <p class="hint" style="margin-bottom:8px;">Un nombre de artículo (tal cual aparece en "Artículo") por línea — los que sean combos, como "Menu Brunch".</p>
+    <textarea id="rankComboNombresTextarea" style="width:100%;min-height:70px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:8px 10px;">${STATE.rankComboNombres.join('\n')}</textarea>
+    <button class="btn secondary" id="rankComboNombresGuardarBtn" style="margin-top:8px;padding:5px 12px;font-size:12px;">Guardar</button>
+  </div>`;
+  document.getElementById('rankComboNombresGuardarBtn').addEventListener('click', ()=>{
+    STATE.rankComboNombres = document.getElementById('rankComboNombresTextarea').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    LS.set('miners_rank_combo_nombres', STATE.rankComboNombres);
+    toast('Nombres de combo guardados.');
+    const {lines} = currentDataset();
+    renderProductos(lines);
+  });
+}
+document.getElementById('rankComboConfigBtn').addEventListener('click', ()=>{
+  const panel = document.getElementById('rankComboConfigPanel');
+  const abrir = panel.style.display==='none';
+  if(abrir) renderRankComboConfigPanel();
+  panel.style.display = abrir ? 'block' : 'none';
+});
+document.getElementById('rankComboModo').addEventListener('change', (e)=>{
+  STATE.rankComboModo = e.target.value;
+  const ocultarCb = document.getElementById('rankComboOcultar');
+  ocultarCb.disabled = STATE.rankComboModo!=='udsVentas';
+  if(ocultarCb.disabled){ ocultarCb.checked = false; STATE.rankComboOcultar = false; }
+  const {lines} = currentDataset();
+  renderProductos(lines);
+});
+document.getElementById('rankComboOcultar').addEventListener('change', (e)=>{
+  STATE.rankComboOcultar = e.target.checked;
+  const {lines} = currentDataset();
+  renderProductos(lines);
+});
+function calcularNumMesesPeriodo(lines){
+  let desde = STATE.filters.desde, hasta = STATE.filters.hasta;
+  if(!desde || !hasta){
+    if(lines.length===0) return 1;
+    const fechas = lines.map(l=>l.fecha).sort();
+    desde = fechas[0]; hasta = fechas[fechas.length-1];
+  }
+  const dias = (new Date(hasta+'T00:00:00') - new Date(desde+'T00:00:00'))/86400000 + 1;
+  const diasPorMes = 365.25/12;
+  return Math.max(dias/diasPorMes, dias>0 ? 1/24 : 1); // evita dividir por un numero de meses absurdamente pequeño o por 0
+}
 function renderProductos(lines){
   const byCat = {};
   const byArt = {};
@@ -3784,6 +3954,7 @@ function renderProductos(lines){
     byArt[l.articulo].uds += l.cant;
     byArt[l.articulo].ventas += l.bruto;
   });
+  aplicarRepartoCombos(lines, byArt);
 
   const c = chartColors();
   const totalBrutoAll = lines.reduce((s,l)=>s+l.bruto,0);
@@ -3804,11 +3975,25 @@ function renderProductos(lines){
   const totalVentasAll = artEntries.reduce((s,a)=>s+a.ventas,0) || 1;
   const metrica = currentMetrica();
 
+  // número de meses del periodo seleccionado (con decimales, p.ej. 1.5 meses) — se usa
+  // para las columnas de media mensual. Si no hay un Desde/Hasta explícito en el filtro
+  // global, se deriva del rango real de fechas presente en los datos filtrados.
+  const numMesesPeriodo = calcularNumMesesPeriodo(lines);
+  // total de la categoría "Brunch" en el periodo, para las columnas de "% Brunch" — se
+  // usa la categoría en crudo (la misma que se muestra en la columna "Categoría" de esta
+  // tabla), no la reagrupada, para que ambas cifras sean coherentes entre sí.
+  const totalBrunchUds = lines.filter(l=>l.categoria==='Brunch').reduce((s,l)=>s+l.cant,0);
+  const totalBrunchVentas = lines.filter(l=>l.categoria==='Brunch').reduce((s,l)=>s+l.bruto,0);
+
   document.querySelector('#tablaArticulos tbody').innerHTML = artEntries.map(a=>{
     const barPct = Math.max(2, (rankState.by==='unidades'? a.uds : a.ventas)/maxVal*100);
     const udsDisplay = metrica==='porcentual' ? (a.uds/totalUdsAll*100).toFixed(1)+'%' : a.uds.toFixed(1);
     const ventasDisplay = metrica==='porcentual' ? (a.ventas/totalVentasAll*100).toFixed(1)+'%' : eur(a.ventas);
-    return `<tr><td class="bar-cell"><div class="bar" style="width:${barPct}%"></div><span>${a.name}</span></td><td>${a.cat}</td><td class="num">${udsDisplay}</td><td class="num">${ventasDisplay}</td></tr>`;
+    const udsMediaMensual = (a.uds/numMesesPeriodo).toFixed(1);
+    const ventasMediaMensual = eur(a.ventas/numMesesPeriodo);
+    const pctUdsBrunch = totalBrunchUds>0 ? (a.uds/totalBrunchUds*100).toFixed(1)+'%' : '-';
+    const pctVentasBrunch = totalBrunchVentas>0 ? (a.ventas/totalBrunchVentas*100).toFixed(1)+'%' : '-';
+    return `<tr><td class="bar-cell"><div class="bar" style="width:${barPct}%"></div><span>${a.name}</span></td><td>${a.cat}</td><td class="num">${udsDisplay}</td><td class="num">${ventasDisplay}</td><td class="num">${udsMediaMensual}</td><td class="num">${ventasMediaMensual}</td><td class="num">${pctUdsBrunch}</td><td class="num">${pctVentasBrunch}</td></tr>`;
   }).join('');
 
   try{ renderCategoriasTendencia(lines); mostrarDiagnosticoSiVacio('chartCategoriasTendencia','categoriasTendencia'); }catch(e){ console.error('Error en renderCategoriasTendencia:', e); mostrarDiagnosticoError('chartCategoriasTendencia', e); }
@@ -4578,6 +4763,149 @@ function renderPerformanceEquipo(){
   attachPerfDragHandlers();
 }
 document.getElementById('perfDesde').addEventListener('change', renderPerformanceEquipo);
+/* ============ Reseñas de Google (Performance del equipo) ============ */
+STATE.googleReviews = [];
+STATE.googleReviewsConectado = false;
+let googleReviewsSeccionInicializada = false;
+async function initGoogleReviewsSeccion(){
+  if(!googleReviewsSeccionInicializada){
+    googleReviewsSeccionInicializada = true;
+    document.getElementById('googleReviewsConectarBtn').addEventListener('click', conectarConGoogle);
+    document.getElementById('googleReviewsSincronizarBtn').addEventListener('click', sincronizarResenasGoogle);
+    document.getElementById('googleReviewsDesde').addEventListener('change', renderGoogleReviewsSeccion);
+    document.getElementById('googleReviewsHasta').addEventListener('change', renderGoogleReviewsSeccion);
+    document.getElementById('googleReviewsGranularidad').addEventListener('change', renderGoogleReviewsSeccion);
+    if(!document.getElementById('googleReviewsDesde').value){
+      const hace3Meses = new Date(); hace3Meses.setMonth(hace3Meses.getMonth()-3);
+      document.getElementById('googleReviewsDesde').value = fechaLocalISO(hace3Meses);
+      document.getElementById('googleReviewsHasta').value = fechaLocalISO(new Date());
+    }
+  }
+  await cargarEstadoConexionGoogle();
+  await cargarGoogleReviews();
+  renderGoogleReviewsSeccion();
+
+  // si venimos de la redirección de éxito tras conectar (ver google-oauth-callback.js),
+  // avisar y limpiar el parámetro de la URL para que no se quede ahí para siempre
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('google_conectado')==='1'){
+    toast('Cuenta de Google conectada correctamente ✓');
+    params.delete('google_conectado');
+    window.history.replaceState({}, '', window.location.pathname+(params.toString()?'?'+params.toString():''));
+  }
+}
+async function cargarEstadoConexionGoogle(){
+  const estadoEl = document.getElementById('googleReviewsEstadoConexion');
+  try{
+    const resp = await fetch('/api/google-connection-status');
+    const data = await resp.json();
+    STATE.googleReviewsConectado = !!data.conectado;
+    estadoEl.innerHTML = data.conectado
+      ? '<span style="color:var(--positive);">✓ Conectado</span>'+(data.actualizadoEn?' · conectado el '+new Date(data.actualizadoEn).toLocaleDateString('es-ES'):'')
+      : '<span class="hint">Sin conectar todavía.</span>';
+  }catch(e){
+    estadoEl.innerHTML = '<span class="hint">No se pudo comprobar el estado de conexión — revisa que las funciones de /api estén desplegadas en Vercel.</span>';
+    STATE.googleReviewsConectado = false;
+  }
+}
+function conectarConGoogle(){
+  const params = new URLSearchParams({
+    client_id: GOOGLE_OAUTH_CLIENT_ID,
+    redirect_uri: GOOGLE_OAUTH_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/business.manage',
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
+}
+async function sincronizarResenasGoogle(){
+  const statusEl = document.getElementById('googleReviewsSyncStatus');
+  statusEl.textContent = 'Sincronizando...';
+  try{
+    const resp = await fetch('/api/google-reviews-sync');
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error||'Error desconocido');
+    statusEl.textContent = 'Sincronizado: '+data.numReviews+' reseña(s) en total.';
+    await cargarGoogleReviews();
+    renderGoogleReviewsSeccion();
+  }catch(e){
+    statusEl.innerHTML = '<span style="color:var(--negative);">Error: '+e.message+'</span>';
+  }
+}
+async function cargarGoogleReviews(){
+  try{
+    STATE.googleReviews = (await sbList('google_reviews', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, nota:r.nota, texto:r.texto, autor:r.autor, categorias:r.categorias||{} }));
+  }catch(e){ STATE.googleReviews = STATE.googleReviews||[]; }
+}
+const CATEGORIAS_REVIEWS_GOOGLE = ['precio','servicio','producto','ambiente','limpieza'];
+function renderGoogleReviewsSeccion(){
+  const desde = document.getElementById('googleReviewsDesde').value;
+  const hasta = document.getElementById('googleReviewsHasta').value;
+  const gran = document.getElementById('googleReviewsGranularidad').value;
+  if(!desde || !hasta) return;
+
+  const reviewsEnPeriodo = (STATE.googleReviews||[]).filter(r=>{
+    const f = (r.fecha||'').slice(0,10);
+    return f>=desde && f<=hasta;
+  });
+
+  const notaMedia = reviewsEnPeriodo.length ? reviewsEnPeriodo.reduce((s,r)=>s+r.nota,0)/reviewsEnPeriodo.length : null;
+  let totalBuenas=0, totalMalas=0;
+  reviewsEnPeriodo.forEach(r=>{
+    CATEGORIAS_REVIEWS_GOOGLE.forEach(cat=>{
+      if(r.categorias[cat]==='buena') totalBuenas++;
+      else if(r.categorias[cat]==='mala') totalMalas++;
+    });
+  });
+  document.getElementById('googleReviewsResumenKpis').innerHTML = `
+    <div class="card"><div class="hint">Nº de reseñas</div><div style="font-size:22px;font-weight:700;">${reviewsEnPeriodo.length}</div></div>
+    <div class="card"><div class="hint">Nota media del periodo</div><div style="font-size:22px;font-weight:700;">${notaMedia===null?'-':notaMedia.toFixed(2)+' ★'}</div></div>
+    <div class="card"><div class="hint">Menciones buenas (total)</div><div style="font-size:22px;font-weight:700;color:var(--positive);">${totalBuenas}</div></div>
+    <div class="card"><div class="hint">Menciones malas (total)</div><div style="font-size:22px;font-weight:700;color:var(--negative);">${totalMalas}</div></div>
+  `;
+
+  const buckets = gran==='mes' ? monthBucketsInRange(desde,hasta) : weekBucketsInRange(desde,hasta);
+  const porBucket = buckets.map(b=>reviewsEnPeriodo.filter(r=>{ const f=(r.fecha||'').slice(0,10); return f>=b.dateMin && f<=b.dateMax; }).length);
+  destroyChart('googleReviewsPorPeriodo');
+  const c2 = chartColors();
+  STATE.charts.googleReviewsPorPeriodo = safeNewChart('chartGoogleReviewsPorPeriodo', {
+    type:'bar',
+    data:{ labels:buckets.map(b=>b.label), datasets:[{ label:'Nº de reseñas', data:porBucket, backgroundColor:CAJA_CHART_PALETTE[0] }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{color:c2.muted}, grid:{display:false} }, y:{ ticks:{color:c2.muted, stepSize:1}, grid:{color:c2.grid} } } }
+  });
+
+  const filasHtml = CATEGORIAS_REVIEWS_GOOGLE.map(cat=>{
+    let buenas=0, malas=0;
+    reviewsEnPeriodo.forEach(r=>{ if(r.categorias[cat]==='buena') buenas++; else if(r.categorias[cat]==='mala') malas++; });
+    const total = buenas+malas;
+    return `<tr>
+      <td style="text-transform:capitalize;">${cat}</td>
+      <td class="num" style="color:var(--positive);">${buenas}</td>
+      <td class="num" style="color:var(--negative);">${malas}</td>
+      <td class="num">${total}</td>
+      <td class="num">${total>0?(buenas/total*100).toFixed(0)+'%':'-'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tablaGoogleReviewsCategorias').innerHTML = `<table><thead><tr><th>Categoría</th><th class="num">Buenas</th><th class="num">Malas</th><th class="num">Total</th><th class="num">% buenas</th></tr></thead><tbody>${filasHtml}
+    <tr style="font-weight:700;background:var(--surface-2);">
+      <td>Total</td>
+      <td class="num" style="color:var(--positive);">${totalBuenas}</td>
+      <td class="num" style="color:var(--negative);">${totalMalas}</td>
+      <td class="num">${totalBuenas+totalMalas}</td>
+      <td class="num">${(totalBuenas+totalMalas)>0?(totalBuenas/(totalBuenas+totalMalas)*100).toFixed(0)+'%':'-'}</td>
+    </tr>
+  </tbody></table>`;
+
+  document.getElementById('listaGoogleReviewsTexto').innerHTML = reviewsEnPeriodo.slice(0,50).map(r=>{
+    const cats = CATEGORIAS_REVIEWS_GOOGLE.filter(c=>r.categorias[c]).map(c=>`<span class="pill ${r.categorias[c]==='buena'?'nuevo':'noident'}" style="margin-right:4px;font-size:10px;">${c}: ${r.categorias[c]}</span>`).join('');
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--line);">
+      <div style="display:flex;justify-content:space-between;"><b>${'★'.repeat(r.nota)}${'☆'.repeat(5-r.nota)}</b><span class="hint">${r.fecha?new Date(r.fecha).toLocaleDateString('es-ES'):''}${r.autor?' · '+escapeHtml(r.autor):''}</span></div>
+      <p style="margin:6px 0;">${escapeHtml(r.texto||'(sin texto)')}</p>
+      <div>${cats||'<span class="hint">Sin categoría detectada</span>'}</div>
+    </div>`;
+  }).join('') || '<p class="hint">Sin reseñas en este periodo.</p>';
+}
 document.getElementById('perfHasta').addEventListener('change', renderPerformanceEquipo);
 document.getElementById('perfChartTypeSelect').addEventListener('change', (e)=>onChartTypeChange(e.target.value));
 document.getElementById('perfGranularidad').addEventListener('change', renderPerformanceEquipo);
