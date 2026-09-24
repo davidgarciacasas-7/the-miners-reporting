@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.316</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.318</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -441,9 +441,17 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             </div>
             <div id="rankComboConfigPanel" style="display:none;margin-top:8px;"></div>
             <div id="tablaArticulosWrap" style="max-height:320px;overflow:auto;">
-              <table id="tablaArticulos"><thead><tr><th>Artículo</th><th>Categoría</th><th>Uds.</th><th>Ventas</th><th>Uds (media mensual)</th><th>Ventas (media mensual)</th><th>Uds (% uds Brunch)</th><th>Ventas (% ventas Brunch)</th></tr></thead><tbody></tbody></table>
+              <table id="tablaArticulos"><thead><tr><th>Artículo</th><th>Categoría</th><th>Uds.</th><th>Ventas</th><th>Uds (media mensual)</th><th>Ventas (media mensual)</th><th>Uds (% uds Brunch)</th><th>Ventas (% ventas Brunch)</th><th class="no-print"></th></tr></thead><tbody></tbody></table>
             </div>
           </div>
+        </div>
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Artículos ocultos de "Ranking de artículos"</span>
+          <span class="hint" id="rankArticulosOcultosCount"></span>
+        </div>
+        <div class="card">
+          <p class="hint" style="margin-bottom:8px;">Artículos quitados de la tabla de arriba — solo afecta a cómo se ve esta tabla, no borra ningún dato.</p>
+          <table id="tablaArticulosOcultos"><thead><tr><th>Artículo</th><th>Categoría</th><th></th></tr></thead><tbody></tbody></table>
         </div>
         <div class="section-title">Reagrupar categorías (solo afecta al gráfico "Categorías por ventas")</div>
         <div class="card">
@@ -3829,7 +3837,13 @@ async function capturarTablaArticulosCanvas(){
   const el = document.getElementById('tablaArticulosWrap');
   const maxHeightOriginal = el.style.maxHeight, overflowOriginal = el.style.overflow;
   el.style.maxHeight = 'none'; el.style.overflow = 'visible';
+  // la columna de "quitar" (✕) es solo para la pantalla — se oculta un instante durante
+  // la captura, ya que html2canvas no respeta las reglas de @media print por su cuenta.
+  const noPrintEls = el.querySelectorAll('.no-print');
+  const displaysOriginales = Array.from(noPrintEls).map(e=>e.style.display);
+  noPrintEls.forEach(e=>{ e.style.display = 'none'; });
   const canvas = await html2canvas(el, { backgroundColor: getComputedStyle(document.body).backgroundColor, scale:2 });
+  noPrintEls.forEach((e,i)=>{ e.style.display = displaysOriginales[i]; });
   el.style.maxHeight = maxHeightOriginal; el.style.overflow = overflowOriginal;
   return canvas;
 }
@@ -3861,6 +3875,10 @@ document.getElementById('tablaArticulosExportarPdfBtn').addEventListener('click'
 STATE.rankComboNombres = LS.get('miners_rank_combo_nombres', []);
 STATE.rankComboModo = 'no';
 STATE.rankComboOcultar = false;
+/* artículos quitados de "Ranking de artículos" — solo afecta a esta vista, no borra
+   ningún dato; se guardan por nombre de artículo, no por fila, así que se ocultan en
+   cualquier periodo/filtro donde aparezcan. */
+STATE.rankArticulosOcultos = LS.get('miners_rank_articulos_ocultos', []);
 /* reparte el valor de los combos entre sus componentes individuales — las UNIDADES de
    cada componente YA se cuentan correctamente sin necesidad de nada especial (al
    coincidir el nombre del artículo entre la venta suelta y la línea dentro del combo, se
@@ -3872,8 +3890,13 @@ STATE.rankComboOcultar = false;
 function aplicarRepartoCombos(lines, byArt){
   const modo = STATE.rankComboModo;
   if(modo==='no') return;
-  const combosNombres = new Set(STATE.rankComboNombres||[]);
-  if(combosNombres.size===0) return;
+  // comparación sin distinguir mayúsculas/minúsculas ni espacios de más al principio/final
+  // — para que un nombre escrito de forma ligeramente distinta (p.ej. "menu brunch " con
+  // un espacio de más) siga coincidiendo con el artículo real del export de Square.
+  const normalizar = (s) => (s||'').trim().toLowerCase();
+  const combosNombresNormalizados = new Set((STATE.rankComboNombres||[]).map(normalizar));
+  if(combosNombresNormalizados.size===0) return;
+  const esCombo = (articulo) => combosNombresNormalizados.has(normalizar(articulo));
 
   if(modo==='udsVentas'){
     const porTicket = {};
@@ -3882,7 +3905,7 @@ function aplicarRepartoCombos(lines, byArt){
       (porTicket[key] = porTicket[key]||[]).push(l);
     });
     Object.values(porTicket).forEach(lineasTicket=>{
-      const lineasCombo = lineasTicket.filter(l=>combosNombres.has(l.articulo));
+      const lineasCombo = lineasTicket.filter(l=>esCombo(l.articulo));
       if(lineasCombo.length===0) return;
       const comboBrutoTotal = lineasCombo.reduce((s,l)=>s+l.bruto,0);
       const lineasComponentes = lineasTicket.filter(l=>l.nombrePrecio==='Menu');
@@ -3896,7 +3919,7 @@ function aplicarRepartoCombos(lines, byArt){
   }
 
   if(modo==='udsVentas' && STATE.rankComboOcultar){
-    combosNombres.forEach(nombre=>{ delete byArt[nombre]; });
+    Object.keys(byArt).forEach(nombreArt=>{ if(esCombo(nombreArt)) delete byArt[nombreArt]; });
   }
 }
 function renderRankComboConfigPanel(){
@@ -3968,6 +3991,11 @@ function renderProductos(lines){
   });
 
   let artEntries = Object.entries(byArt).map(([name,v])=>({name, ...v}));
+  // se filtran los artículos ocultos ANTES de calcular máximos/totales, para que la barra
+  // y los % (si la vista está en modo porcentual) reflejen solo lo que se ve en la tabla
+  const ocultosSet = new Set((STATE.rankArticulosOcultos||[]).map(n=>n.trim().toLowerCase()));
+  const artEntriesOcultos = artEntries.filter(a=>ocultosSet.has(a.name.trim().toLowerCase()));
+  artEntries = artEntries.filter(a=>!ocultosSet.has(a.name.trim().toLowerCase()));
   artEntries.sort((a,b)=> rankState.by==='unidades' ? b.uds-a.uds : b.ventas-a.ventas);
   if(rankState.order==='asc') artEntries.reverse();
   const maxVal = Math.max(...artEntries.map(a=> rankState.by==='unidades'?a.uds:a.ventas), 1);
@@ -3981,7 +4009,9 @@ function renderProductos(lines){
   const numMesesPeriodo = calcularNumMesesPeriodo(lines);
   // total de la categoría "Brunch" en el periodo, para las columnas de "% Brunch" — se
   // usa la categoría en crudo (la misma que se muestra en la columna "Categoría" de esta
-  // tabla), no la reagrupada, para que ambas cifras sean coherentes entre sí.
+  // tabla), no la reagrupada, para que ambas cifras sean coherentes entre sí. Se calcula
+  // sobre TODAS las líneas (sin filtrar por ocultos), ya que ocultar un artículo de la
+  // vista no debe cambiar el total real de Brunch contra el que se compara el resto.
   const totalBrunchUds = lines.filter(l=>l.categoria==='Brunch').reduce((s,l)=>s+l.cant,0);
   const totalBrunchVentas = lines.filter(l=>l.categoria==='Brunch').reduce((s,l)=>s+l.bruto,0);
 
@@ -3993,8 +4023,31 @@ function renderProductos(lines){
     const ventasMediaMensual = eur(a.ventas/numMesesPeriodo);
     const pctUdsBrunch = totalBrunchUds>0 ? (a.uds/totalBrunchUds*100).toFixed(1)+'%' : '-';
     const pctVentasBrunch = totalBrunchVentas>0 ? (a.ventas/totalBrunchVentas*100).toFixed(1)+'%' : '-';
-    return `<tr><td class="bar-cell"><div class="bar" style="width:${barPct}%"></div><span>${a.name}</span></td><td>${a.cat}</td><td class="num">${udsDisplay}</td><td class="num">${ventasDisplay}</td><td class="num">${udsMediaMensual}</td><td class="num">${ventasMediaMensual}</td><td class="num">${pctUdsBrunch}</td><td class="num">${pctVentasBrunch}</td></tr>`;
+    return `<tr><td class="bar-cell"><div class="bar" style="width:${barPct}%"></div><span>${a.name}</span></td><td>${a.cat}</td><td class="num">${udsDisplay}</td><td class="num">${ventasDisplay}</td><td class="num">${udsMediaMensual}</td><td class="num">${ventasMediaMensual}</td><td class="num">${pctUdsBrunch}</td><td class="num">${pctVentasBrunch}</td><td class="no-print"><button class="btn danger" data-ocultar-articulo="${escapeHtml(a.name)}" style="padding:1px 6px;font-size:10px;" title="Quitar de esta tabla">✕</button></td></tr>`;
   }).join('');
+  document.querySelectorAll('[data-ocultar-articulo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nombre = btn.getAttribute('data-ocultar-articulo');
+      if(!STATE.rankArticulosOcultos.some(n=>n.trim().toLowerCase()===nombre.trim().toLowerCase())){
+        STATE.rankArticulosOcultos.push(nombre);
+        LS.set('miners_rank_articulos_ocultos', STATE.rankArticulosOcultos);
+      }
+      renderProductos(lines);
+    });
+  });
+
+  document.getElementById('rankArticulosOcultosCount').textContent = artEntriesOcultos.length>0 ? '('+artEntriesOcultos.length+')' : '';
+  document.querySelector('#tablaArticulosOcultos tbody').innerHTML = artEntriesOcultos.length===0
+    ? '<tr><td colspan="3" class="hint">Ningún artículo oculto.</td></tr>'
+    : artEntriesOcultos.map(a=>`<tr><td>${a.name}</td><td>${a.cat}</td><td><button class="btn secondary" data-recuperar-articulo="${escapeHtml(a.name)}" style="padding:2px 8px;font-size:11px;">↺ Recuperar</button></td></tr>`).join('');
+  document.querySelectorAll('[data-recuperar-articulo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const nombre = btn.getAttribute('data-recuperar-articulo');
+      STATE.rankArticulosOcultos = STATE.rankArticulosOcultos.filter(n=>n.trim().toLowerCase()!==nombre.trim().toLowerCase());
+      LS.set('miners_rank_articulos_ocultos', STATE.rankArticulosOcultos);
+      renderProductos(lines);
+    });
+  });
 
   try{ renderCategoriasTendencia(lines); mostrarDiagnosticoSiVacio('chartCategoriasTendencia','categoriasTendencia'); }catch(e){ console.error('Error en renderCategoriasTendencia:', e); mostrarDiagnosticoError('chartCategoriasTendencia', e); }
   try{ renderArticulosCategoriaTendencia(lines); }catch(e){ console.error('Error en renderArticulosCategoriaTendencia:', e); mostrarDiagnosticoError('chartArticulosCategoriaUds', e); mostrarDiagnosticoError('chartArticulosCategoriaEuros', e); }
