@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.321</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.322</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1970,6 +1970,10 @@ function parseSquareCSV(text, filename){
   const headers = lines[0].split('\t').map(h=>h.trim());
   const idx = {};
   headers.forEach((h,i)=>idx[h]=i);
+  // diagnóstico: qué variante de "Nombre del precio" (si alguna) se ha encontrado en la
+  // cabecera real del archivo — para poder confirmar en el momento de subir el archivo si
+  // esa columna llega o no, en vez de tener que deducirlo indirectamente más tarde.
+  const columnaNombrePrecioEncontrada = ['Nombre del precio','Nombre de precio','Nombre del Precio','Nombre precio'].find(n=>n in idx) || null;
 
   const need = ['Fecha','Hora','Categoría','Artículo','Cant.','Ventas netas','Ventas brutas','ID de transacción','Tipo de evento'];
   for(const n of need){ if(!(n in idx)) throw new Error('Falta la columna esperada: '+n); }
@@ -2047,7 +2051,7 @@ function parseSquareCSV(text, filename){
   const ticketsArr = ticketOrder.map(t=>[t.tarjeta, t.miner, t.transId]);
 
   return {
-    meta: { filename, dateMin, dateMax, rowCount: lineRows.length, ticketCount: ticketsArr.length, uploadedAt: new Date().toISOString(), eventosDesconocidos, idsRaros },
+    meta: { filename, dateMin, dateMax, rowCount: lineRows.length, ticketCount: ticketsArr.length, uploadedAt: new Date().toISOString(), eventosDesconocidos, idsRaros, headers, columnaNombrePrecioEncontrada },
     data: { cats, arts, lines: lineRows, tickets: ticketsArr }
   };
 }
@@ -2161,6 +2165,14 @@ async function handleUpload(file){
     console.error(e);
     statusEl.innerHTML = '<p class="hint warn">Error leyendo el archivo: '+e.message+'</p>';
     return;
+  }
+
+  // diagnóstico de la columna "Nombre del precio" (para el reparto de combos en Ranking
+  // de artículos) — se muestra aquí, en el momento de la subida, en vez de tener que
+  // deducirlo indirectamente desde otra pestaña más tarde.
+  if(!parsed.meta.columnaNombrePrecioEncontrada){
+    statusEl.innerHTML = '<p class="hint warn">Atención: este archivo NO trae ninguna columna de "Nombre del precio" (usada para repartir los combos en Ranking de artículos). Las columnas que sí trae tu archivo son: '+parsed.meta.headers.join(', ')+'. Si tu archivo sí debería tener esa columna con otro nombre, dímelo tal cual aparece ahí y lo ajusto. Continuando con la subida...</p>';
+    await sleep(4500);
   }
 
   const desconocidos = parsed.meta.eventosDesconocidos;
