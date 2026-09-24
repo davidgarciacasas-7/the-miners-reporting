@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.320</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.321</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -3913,12 +3913,21 @@ function aplicarRepartoCombos(lines, byArt){
   const preciosMenuNormalizados = new Set((STATE.rankComboPreciosMenu||[]).map(normalizar));
   const esLineaDeComponente = (l) => preciosMenuNormalizados.has(normalizar(l.nombrePrecio));
 
-  // diagnóstico: si no hay NINGUNA línea con un "Nombre del precio" de combo en los
-  // datos, lo más probable es que el archivo de Square subido no traiga esa columna (o
-  // se llame distinto) — se avisa aquí, en vez de repartir 0€ en silencio sin decir por qué.
+  // diagnóstico — se distingue entre 2 causas distintas, que se confunden fácilmente:
+  // 1) la columna "Nombre del precio" no llega en absoluto (ninguna línea trae NADA en
+  //    ese campo) -> normalmente porque aún no se ha vuelto a subir el export de Square
+  //    con esa columna, o se llama de otra forma en el archivo.
+  // 2) la columna SÍ llega, pero con valores distintos a los configurados -> en ese caso
+  //    se muestran los valores reales encontrados, para poder compararlos y corregir la
+  //    configuración con un dato real, en vez de tener que adivinar.
+  const valoresRealesEncontrados = [...new Set(lines.map(l=>(l.nombrePrecio||'').trim()).filter(Boolean))].sort();
+  if(valoresRealesEncontrados.length===0){
+    if(diagEl) diagEl.innerHTML = '<span style="color:var(--negative);">Ninguna línea de este periodo trae NADA en el campo "Nombre del precio" (ni "Carta" ni ningún otro valor) — la columna no está llegando desde tu archivo. Revisa que hayas vuelto a subir tu export de Square DESPUÉS de que esta función se añadiera, y que la columna se llame "Nombre del precio" en tu archivo.</span>';
+    return;
+  }
   const hayLineasDeComponente = lines.some(esLineaDeComponente);
   if(!hayLineasDeComponente){
-    if(diagEl) diagEl.innerHTML = '<span style="color:var(--negative);">No se ha encontrado ninguna línea con un "Nombre del precio" de combo ('+(STATE.rankComboPreciosMenu||[]).join(', ')+') en los datos de este periodo. Revisa que hayas vuelto a subir tu export de Square DESPUÉS de que esta función se añadiera, y que la columna se llame "Nombre del precio" en tu archivo.</span>';
+    if(diagEl) diagEl.innerHTML = '<span style="color:var(--negative);">La columna "Nombre del precio" sí llega, pero ninguna línea de este periodo tiene alguno de los valores configurados como combo ('+(STATE.rankComboPreciosMenu||[]).join(', ')+'). Los valores reales que sí aparecen en tus datos de este periodo son: <b>'+valoresRealesEncontrados.join(', ')+'</b> — compáralos con lo que escribiste en el segundo cuadro de "Nombres de combo" y corrígelo si hace falta.</span>';
     return;
   }
   const hayComboConocido = lines.some(l=>esCombo(l.articulo));
