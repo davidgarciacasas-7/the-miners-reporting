@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.318</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.320</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -440,6 +440,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
               <button class="btn secondary" id="rankComboConfigBtn" style="padding:6px 12px;font-size:12px;">Nombres de combo</button>
             </div>
             <div id="rankComboConfigPanel" style="display:none;margin-top:8px;"></div>
+            <p class="hint" id="rankComboDiagnostico" style="margin-top:6px;"></p>
             <div id="tablaArticulosWrap" style="max-height:320px;overflow:auto;">
               <table id="tablaArticulos"><thead><tr><th>Artículo</th><th>Categoría</th><th>Uds.</th><th>Ventas</th><th>Uds (media mensual)</th><th>Ventas (media mensual)</th><th>Uds (% uds Brunch)</th><th>Ventas (% ventas Brunch)</th><th class="no-print"></th></tr></thead><tbody></tbody></table>
             </div>
@@ -2002,8 +2003,9 @@ function parseSquareCSV(text, filename){
     const pan = get('Sufijo PAN');
     // opcional — solo algunos exports de Square la traen. "Carta" = precio normal,
     // "Menu" = va dentro de un combo (su propio precio aparece como 0€, ya que el
-    // combo entero se cobra en su propia línea aparte).
-    const nombrePrecio = get('Nombre del precio');
+    // combo entero se cobra en su propia línea aparte). Se prueban varias formas
+    // habituales del nombre de esta columna, por si el nombre exacto varía.
+    const nombrePrecio = get('Nombre del precio') || get('Nombre de precio') || get('Nombre del Precio') || get('Nombre precio');
 
     if(tipoEvento!=='Pago' && tipoEvento!=='Reembolso'){
       eventosDesconocidos[tipoEvento||'(vacío)'] = (eventosDesconocidos[tipoEvento||'(vacío)']||0)+1;
@@ -3873,6 +3875,10 @@ document.getElementById('tablaArticulosExportarPdfBtn').addEventListener('click'
 /* nombres de artículo que son combos (p.ej. "Menu Brunch") — configurable, ya que no hay
    forma de saberlo solo a partir del export de Square. */
 STATE.rankComboNombres = LS.get('miners_rank_combo_nombres', []);
+/* valores de "Nombre del precio" que indican que esa línea va dentro de ALGÚN combo —
+   no es solo "Menu", cada tipo de combo puede tener su propio valor. Configurable, con
+   estos 5 como valores por defecto. */
+STATE.rankComboPreciosMenu = LS.get('miners_rank_combo_precios_menu', ['Menu','Menu Ligero','CLASICO','GOURMET','LIGERO']);
 STATE.rankComboModo = 'no';
 STATE.rankComboOcultar = false;
 /* artículos quitados de "Ranking de artículos" — solo afecta a esta vista, no borra
@@ -3888,6 +3894,8 @@ STATE.rankArticulosOcultos = LS.get('miners_rank_articulos_ocultos', []);
    dentro de cada ticket, ya que no hay ninguna otra pista de precio para cada componente
    cuando va dentro de un combo. */
 function aplicarRepartoCombos(lines, byArt){
+  const diagEl = document.getElementById('rankComboDiagnostico');
+  if(diagEl) diagEl.innerHTML = '';
   const modo = STATE.rankComboModo;
   if(modo==='no') return;
   // comparación sin distinguir mayúsculas/minúsculas ni espacios de más al principio/final
@@ -3895,8 +3903,29 @@ function aplicarRepartoCombos(lines, byArt){
   // un espacio de más) siga coincidiendo con el artículo real del export de Square.
   const normalizar = (s) => (s||'').trim().toLowerCase();
   const combosNombresNormalizados = new Set((STATE.rankComboNombres||[]).map(normalizar));
-  if(combosNombresNormalizados.size===0) return;
+  if(combosNombresNormalizados.size===0){
+    if(diagEl) diagEl.innerHTML = '<span style="color:var(--negative);">No has configurado ningún nombre de combo todavía — pulsa "Nombres de combo" arriba.</span>';
+    return;
+  }
   const esCombo = (articulo) => combosNombresNormalizados.has(normalizar(articulo));
+  // "Nombre del precio" no es solo "Menu" — cada tipo de combo puede tener el suyo
+  // (Menu, Menu Ligero, CLASICO, GOURMET, LIGERO...), configurable en "Nombres de combo".
+  const preciosMenuNormalizados = new Set((STATE.rankComboPreciosMenu||[]).map(normalizar));
+  const esLineaDeComponente = (l) => preciosMenuNormalizados.has(normalizar(l.nombrePrecio));
+
+  // diagnóstico: si no hay NINGUNA línea con un "Nombre del precio" de combo en los
+  // datos, lo más probable es que el archivo de Square subido no traiga esa columna (o
+  // se llame distinto) — se avisa aquí, en vez de repartir 0€ en silencio sin decir por qué.
+  const hayLineasDeComponente = lines.some(esLineaDeComponente);
+  if(!hayLineasDeComponente){
+    if(diagEl) diagEl.innerHTML = '<span style="color:var(--negative);">No se ha encontrado ninguna línea con un "Nombre del precio" de combo ('+(STATE.rankComboPreciosMenu||[]).join(', ')+') en los datos de este periodo. Revisa que hayas vuelto a subir tu export de Square DESPUÉS de que esta función se añadiera, y que la columna se llame "Nombre del precio" en tu archivo.</span>';
+    return;
+  }
+  const hayComboConocido = lines.some(l=>esCombo(l.articulo));
+  if(!hayComboConocido){
+    if(diagEl) diagEl.innerHTML = '<span style="color:var(--negative);">Hay líneas de combo en los datos, pero ninguna coincide con los nombres de combo configurados — revisa que el nombre escrito en "Nombres de combo" sea exactamente el del artículo del combo (p.ej. "Menu Brunch").</span>';
+    return;
+  }
 
   if(modo==='udsVentas'){
     const porTicket = {};
@@ -3908,7 +3937,7 @@ function aplicarRepartoCombos(lines, byArt){
       const lineasCombo = lineasTicket.filter(l=>esCombo(l.articulo));
       if(lineasCombo.length===0) return;
       const comboBrutoTotal = lineasCombo.reduce((s,l)=>s+l.bruto,0);
-      const lineasComponentes = lineasTicket.filter(l=>l.nombrePrecio==='Menu');
+      const lineasComponentes = lineasTicket.filter(esLineaDeComponente);
       if(lineasComponentes.length===0) return;
       const totalUdsComponentes = lineasComponentes.reduce((s,l)=>s+l.cant,0) || 1;
       const precioPorUnidad = comboBrutoTotal/totalUdsComponentes;
@@ -3925,14 +3954,18 @@ function aplicarRepartoCombos(lines, byArt){
 function renderRankComboConfigPanel(){
   const panel = document.getElementById('rankComboConfigPanel');
   panel.innerHTML = `<div class="card">
-    <p class="hint" style="margin-bottom:8px;">Un nombre de artículo (tal cual aparece en "Artículo") por línea — los que sean combos, como "Menu Brunch".</p>
+    <p class="hint" style="margin-bottom:6px;">Un nombre de artículo (tal cual aparece en "Artículo") por línea — los que sean combos, como "Menu Brunch".</p>
     <textarea id="rankComboNombresTextarea" style="width:100%;min-height:70px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:8px 10px;">${STATE.rankComboNombres.join('\n')}</textarea>
+    <p class="hint" style="margin:12px 0 6px;">Valores de "Nombre del precio" que indican que una línea va dentro de un combo (uno por línea) — no es solo "Menu", cada tipo de combo puede tener el suyo.</p>
+    <textarea id="rankComboPreciosMenuTextarea" style="width:100%;min-height:70px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px;color:var(--text);font-size:12px;padding:8px 10px;">${STATE.rankComboPreciosMenu.join('\n')}</textarea>
     <button class="btn secondary" id="rankComboNombresGuardarBtn" style="margin-top:8px;padding:5px 12px;font-size:12px;">Guardar</button>
   </div>`;
   document.getElementById('rankComboNombresGuardarBtn').addEventListener('click', ()=>{
     STATE.rankComboNombres = document.getElementById('rankComboNombresTextarea').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    STATE.rankComboPreciosMenu = document.getElementById('rankComboPreciosMenuTextarea').value.split('\n').map(s=>s.trim()).filter(Boolean);
     LS.set('miners_rank_combo_nombres', STATE.rankComboNombres);
-    toast('Nombres de combo guardados.');
+    LS.set('miners_rank_combo_precios_menu', STATE.rankComboPreciosMenu);
+    toast('Configuración de combos guardada.');
     const {lines} = currentDataset();
     renderProductos(lines);
   });
