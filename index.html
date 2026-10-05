@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.323</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.326</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -527,6 +527,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
             <input type="file" id="pnlImportFile" accept=".csv" style="display:none;">
             <button class="btn secondary" id="pnlImportWideBtn" style="padding:6px 12px;font-size:12px;">Importar mi propio PNL (CSV/Excel)</button>
             <input type="file" id="pnlImportWideFile" accept=".csv,.xlsx,.xls" style="display:none;">
+            <button class="btn secondary" id="pnlDescargarPlantillaBtn" style="padding:6px 12px;font-size:12px;">Descargar plantilla (Excel)</button>
           </div>
           <div>
             <button class="btn secondary" id="pnlExportBtn">Exportar CSV</button>
@@ -556,6 +557,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
         <p class="hint" style="margin-top:10px;">El periodo Desde/Hasta se ajusta siempre a meses completos (en vista Mensual) o semanas completas (en vista Semanal) — elige cualquier día dentro del primer y el último mes/semana que quieras ver.</p>
         <p class="hint">Formato de importación CSV (una fila por importe/periodo): columnas <code>Nombre,Tipo,Fecha_inicio,Fecha_fin,Importe</code> — Tipo debe ser <code>ingreso</code> o <code>coste</code>, fechas en formato AAAA-MM-DD.</p>
         <p class="hint">Formato "Importar mi propio PNL" (tu hoja habitual, una columna por mes): cabecera <code>Nombre,Tipo,2026-01,2026-02,2026-03...</code> (los meses en formato AAAA-MM) y una fila por cada línea de tu PNL, con el importe de cada mes en su columna. Se crean las líneas que falten automáticamente.</p>
+        <p class="hint">"Descargar plantilla (Excel)" genera un Excel ya en ese formato, con una columna por mes del periodo Desde/Hasta actual (en vista Mensual) y una fila por cada línea manual que ya tengas en el PNL (con sus importes guardados, si los hay) — para rellenarla o corregirla y volver a subirla con "Importar mi propio PNL". No incluye las líneas que se calculan solas (COGS, Wages, Accountant...), porque esas no se pueden editar a mano.</p>
 
         <div class="section-title">Evolución de una línea del PNL</div>
         <div class="card" style="margin-bottom:14px;">
@@ -9935,18 +9937,31 @@ function costeLaboralParaBucket(bucket){
 const PNL_COGS_CATEGORIAS_CAJA = ['bebidas', 'alimentos'];
 const PNL_WAGES_CATEGORIAS_CAJA = ['nominas'];
 function sumaCajaCategorias(bucket, categoriasNormalizadas){
+  // Usa los mismos helpers que Caja (cajaCategoriaDeGastoDe / cajaAporteGasto) para que
+  // esta suma SIEMPRE coincida con lo que se ve en Caja — incluye los gastos normales de
+  // la categoría Y los ingresos marcados como "resta de categoría" hacia ella (ver
+  // cajaSetRestaCategoria), que restan de su total de gasto en lugar de sumar como ingreso.
   let suma = 0;
   (STATE.caja?.savedMonths||[]).forEach(entry=>{
     (entry.movements||[]).forEach(m=>{
-      if(m.amount>=0) return; // solo gastos
-      const cat = String(m.category||'').trim().toLowerCase();
+      const catGasto = cajaCategoriaDeGastoDe(m);
+      if(catGasto===null) return; // ingreso normal: no aporta a ningún gasto
+      const cat = String(catGasto||'').trim().toLowerCase();
       if(!categoriasNormalizadas.includes(cat)) return;
+      const aporte = cajaAporteGasto(m); // + gasto normal, - ingreso redirigido (resta)
       if(m.fechaDia){
-        if(m.fechaDia>=bucket.dateMin && m.fechaDia<=bucket.dateMax) suma += Math.abs(m.amount);
+        if(m.fechaDia>=bucket.dateMin && m.fechaDia<=bucket.dateMax) suma += aporte;
       } else if(m.month && m.month!=='Sin fecha'){
-        // sin fecha exacta dentro del mes: se usa el mes completo como aproximación
-        const mesInicio = m.month+'-01', mesFin = m.month+'-31';
-        if(!(mesFin<bucket.dateMin || mesInicio>bucket.dateMax)) suma += Math.abs(m.amount);
+        // Sin fecha exacta dentro del mes (ej. ajustes de "simplificación socios"): se
+        // reparte proporcionalmente por días entre el/los buckets con los que se solape,
+        // en vez de sumar el importe COMPLETO en cada uno — si no, en vista Semanal el
+        // mismo importe se contaba entero en cada una de las ~4-5 semanas del mes,
+        // multiplicando el coste real por 4 o 5 (y desincronizando el PNL semanal del
+        // gráfico de EBITDA, que siempre es mensual).
+        const [y,mm] = m.month.split('-').map(Number);
+        const mesInicio = fechaLocalISO(new Date(y, mm-1, 1));
+        const mesFin = fechaLocalISO(new Date(y, mm, 0));
+        suma += allocateToBucket(mesInicio, mesFin, bucket.dateMin, bucket.dateMax, aporte);
       }
     });
   });
@@ -9955,7 +9970,9 @@ function sumaCajaCategorias(bucket, categoriasNormalizadas){
 function cogsDesdeCaja(bucket){ return sumaCajaCategorias(bucket, PNL_COGS_CATEGORIAS_CAJA); }
 function mantenimientoDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['mantenimiento']); }
 function operatingSuppliesDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['consumibles operacionales']); }
-function accountantDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['gestion']); }
+/* "Accountant" = coste de la categoría "Gestoría" en Caja. Se admiten varias variantes de
+   acentuación/escritura por si la categoría se escribió sin tilde en algún movimiento. */
+function accountantDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['gestoría', 'gestoria', 'gestión', 'gestion']); }
 function eventsDesdeCaja(bucket){ return sumaCajaCategorias(bucket, ['eventos']); }
 /* Wages usa la categoría que se haya elegido como "categoría de nóminas" en
    Caja → Tendencias (la misma que usan la tarta, la tabla de detalle y "Gastos
@@ -11476,6 +11493,28 @@ document.getElementById('pnlImportWideFile').addEventListener('change', async (e
   }
   document.getElementById('pnlImportWideFile').value='';
 });
+document.getElementById('pnlDescargarPlantillaBtn').addEventListener('click', ()=>{
+  const { desde, hasta } = pnlRango();
+  const buckets = monthBucketsInRange(desde, hasta);
+  const lineasManual = [...STATE.pnlLines].filter(l=>!l.esTitulo && !l.esAuto && !l.esRecurrente).sort((a,b)=>a.orden-b.orden);
+  const filas = lineasManual.map(line=>{
+    const fila = { Nombre: line.name, Tipo: line.tipo==='coste'?'coste':'ingreso' };
+    buckets.forEach(b=>{
+      const v = STATE.pnlValues.find(vv=>vv.lineId===line.id && !(b.dateMax<vv.dateMin || b.dateMin>vv.dateMax));
+      fila[b.label] = v ? v.amount : '';
+    });
+    return fila;
+  });
+  if(filas.length===0){
+    const ejemplo = { Nombre:'(ejemplo) Mi línea', Tipo:'coste' };
+    filas.push(ejemplo);
+  }
+  const headerOrder = ['Nombre','Tipo', ...buckets.map(b=>b.label)];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(filas, { header: headerOrder });
+  XLSX.utils.book_append_sheet(wb, ws, 'PNL');
+  XLSX.writeFile(wb, 'plantilla-pnl-'+desde.slice(0,7)+'_'+hasta.slice(0,7)+'.xlsx');
+});
 document.getElementById('pnlExportBtn').addEventListener('click', ()=>{
   const rows = [['Nombre','Tipo','Fecha_inicio','Fecha_fin','Importe']];
   STATE.pnlValues.forEach(v=>{
@@ -12447,16 +12486,52 @@ async function cajaAplicarRevisionCategorizacionProveedores(){
   toast('Categorías corregidas en '+Object.keys(porMes).length+' balance(s).');
   renderCajaTabContent();
 }
+/* Un movimiento de ingreso se puede marcar con "restaDeCategoria" (el nombre de una
+   categoría de GASTO) para que, en vez de contar como ingreso aparte, se reste del gasto
+   total de esa categoría — por ejemplo, la devolución de un proveedor de "Alimentos" que
+   no se quiere ver como un ingreso suelto, sino como menos gasto real en Alimentos ese
+   mes. Estas 3 funciones son el ÚNICO sitio que traduce ese campo a su efecto en los
+   totales — todo cálculo que las use por igual (en vez de mirar m.amount/m.category a
+   mano) queda contabilizado de forma consistente en cualquier sitio: KPIs, tartas,
+   evolución por categoría, Resumen Ejecutivo... */
+function cajaEsIngresoContable(m){
+  // ¿cuenta este movimiento como ingreso normal? No, si se ha marcado para restar de una
+  // categoría de gasto en su lugar.
+  return m.amount>=0 && !m.restaDeCategoria;
+}
+function cajaCategoriaDeGastoDe(m){
+  // ¿a qué categoría de GASTO aporta este movimiento? — la suya propia si es un gasto
+  // normal, o la elegida en "restaDeCategoria" si es un ingreso redirigido. null si no
+  // aporta a ninguna (es un ingreso normal).
+  if(m.restaDeCategoria) return m.restaDeCategoria;
+  if(m.amount<0) return m.category;
+  return null;
+}
+function cajaAporteGasto(m){
+  // cuánto SUMA (positivo) o RESTA (negativo) este movimiento al total de gasto de su
+  // categoría — un gasto normal suma su importe en valor absoluto; un ingreso redirigido
+  // resta el suyo.
+  if(m.restaDeCategoria) return -m.amount;
+  if(m.amount<0) return -m.amount;
+  return 0;
+}
 function cajaRecompute(movements){
   const catT={}, incT={}, provT={};
   let exp=0, inc=0;
   movements.forEach(m=>{
-    if(m.amount<0){
-      exp+=m.amount;
-      catT[m.category]=(catT[m.category]||0)+Math.abs(m.amount);
-      const p=m.concept.length>50?m.concept.slice(0,50)+'…':m.concept;
-      provT[p]=(provT[p]||0)+Math.abs(m.amount);
-    } else {
+    const catGasto = cajaCategoriaDeGastoDe(m);
+    if(catGasto!==null){
+      const aporte = cajaAporteGasto(m);
+      exp -= aporte;
+      catT[catGasto]=(catT[catGasto]||0)+aporte;
+      // el detalle "por proveedor" solo tiene sentido para gastos reales — un ingreso
+      // redirigido no es un proveedor al que se le haya pagado nada.
+      if(m.amount<0){
+        const p=m.concept.length>50?m.concept.slice(0,50)+'…':m.concept;
+        provT[p]=(provT[p]||0)+aporte;
+      }
+    }
+    if(cajaEsIngresoContable(m)){
       inc+=m.amount;
       incT[m.category]=(incT[m.category]||0)+m.amount;
     }
@@ -12565,8 +12640,8 @@ function aplicarSimplificacionSocios(entry){
     entry.totalGastoPersonalSocio = base.filter(m=>m.category==='👤 Gasto personal socio').reduce((s,m)=>s+Math.abs(m.amount),0);
     entry.totalAportacionSocio = base.filter(m=>m.category==='💰 Aportacion socio').reduce((s,m)=>s+m.amount,0);
     entry.diferenciaSocios = entry.totalAportacionSocio - entry.totalGastoPersonalSocio;
-    entry.totalIncome = base.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0);
-    entry.totalExpense = base.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
+    entry.totalIncome = base.filter(cajaEsIngresoContable).reduce((s,m)=>s+m.amount,0);
+    entry.totalExpense = -base.reduce((s,m)=>s+cajaAporteGasto(m),0);
     return;
   }
   if(!entry.movementsOriginal) entry.movementsOriginal = entry.movements;
@@ -12610,8 +12685,8 @@ function aplicarSimplificacionSocios(entry){
       entry.movements = [...otros, ...sinteticos];
     }
   }
-  entry.totalIncome = entry.movements.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0);
-  entry.totalExpense = entry.movements.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
+  entry.totalIncome = entry.movements.filter(cajaEsIngresoContable).reduce((s,m)=>s+m.amount,0);
+  entry.totalExpense = -entry.movements.reduce((s,m)=>s+cajaAporteGasto(m),0);
 }
 
 function cajaUploadZoneHtml(id, label, sublabel, icon, file){
@@ -12872,6 +12947,32 @@ async function cajaSetSubcategoria(movementId, subcatRaw){
   }catch(err){
     console.error('Error en cajaSetSubcategoria:', err);
     toast('Error al guardar la subcategoría: '+err.message, true);
+  }
+}
+/* marca (o quita) que un ingreso, en vez de contar como ingreso, se reste del gasto total
+   de la categoría de gasto elegida — ver cajaRecompute()/cajaCategoriaDeGastoDe() para
+   cómo se traduce esto a los totales. A propósito NO se propaga por proveedor como la
+   subcategoría: es una decisión contable puntual sobre ESTE movimiento concreto, no una
+   regla que deba aplicarse automáticamente a otros parecidos. */
+async function cajaSetRestaCategoria(movementId, categoriaRaw){
+  try{
+    const c = STATE.caja;
+    if(!c.data){ toast('Error: no hay datos de caja cargados (c.data es nulo).', true); return; }
+    const mov = c.data.movements.find(m=>String(m.id)===String(movementId));
+    if(!mov){ toast('Error: no se encontró el movimiento (id='+movementId+').', true); return; }
+    const categoria = (categoriaRaw||'').trim();
+    const updated = c.data.movements.map(m=> String(m.id)===String(movementId) ? {...m, restaDeCategoria: categoria||null} : m);
+    c.data = { ...c.data, movements:updated, ...cajaRecompute(updated) };
+    if(c.data.esEdicionExistente){
+      await cajaSaveMonth();
+      toast(categoria ? 'Este ingreso ahora resta del gasto de "'+categoria+'" — guardado ✓' : 'Vuelve a contar como ingreso — guardado ✓');
+      return;
+    }
+    renderCajaTabContent();
+    toast(categoria ? 'Este ingreso restará del gasto de "'+categoria+'" al guardar el balance.' : 'Vuelve a contar como ingreso.');
+  }catch(err){
+    console.error('Error en cajaSetRestaCategoria:', err);
+    toast('Error al guardar: '+err.message, true);
   }
 }
 function attachCajaCatSelectHandlers(container){
@@ -13279,8 +13380,8 @@ function renderCajaMovimientosTab(el){
   const pendingCount = Object.keys(c.pending).length;
   const flechaOrden = c.sortMovimientos==='desc' ? ' ▼' : (c.sortMovimientos==='asc' ? ' ▲' : '');
   const totalFiltrado = filtered.reduce((s,m)=>s+m.amount,0);
-  const totalIngresosFiltrado = filtered.filter(m=>m.amount>0).reduce((s,m)=>s+m.amount,0);
-  const totalGastosFiltrado = filtered.filter(m=>m.amount<0).reduce((s,m)=>s+m.amount,0);
+  const totalIngresosFiltrado = filtered.filter(cajaEsIngresoContable).reduce((s,m)=>s+m.amount,0);
+  const totalGastosFiltrado = -filtered.reduce((s,m)=>s+cajaAporteGasto(m),0);
   const f = c.manualMovForm;
   const formManualHtml = !c.showManualMovForm
     ? `<button class="btn secondary" id="cajaMostrarManualMovBtn" style="border:2px dashed var(--copper);width:100%;padding:10px 20px;margin-bottom:12px;">+ Añadir movimiento manual</button>`
@@ -13327,7 +13428,7 @@ function renderCajaMovimientosTab(el){
       <span style="font-weight:700;font-family:monospace;color:${totalFiltrado>=0?'var(--positive)':'var(--negative)'};">Total: ${cajaFmt(totalFiltrado)}</span>
     </div>
     <div class="card" style="padding:0;overflow:auto;">
-      <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th><th></th></tr></thead>
+      <table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Subcategoría</th><th title="Para un ingreso: en vez de contar como ingreso, restarlo del gasto total de la categoría de gasto que elijas aquí (p.ej. la devolución de un proveedor).">Resta de gasto</th><th id="cajaOrdenImporte" style="cursor:pointer;user-select:none;" title="Ordenar por importe">Importe${flechaOrden}</th><th></th><th></th></tr></thead>
       <tbody>${filtered.slice(0,400).map(m=>`
         <tr><td class="hint" style="font-family:monospace;white-space:nowrap;">
           <span data-fecha-texto="${m.id}">${m.fechaDia || m.month}</span>
@@ -13336,6 +13437,10 @@ function renderCajaMovimientosTab(el){
         <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(m.concept)}</td>
         <td>${cajaCatSelectHtml(m.id, c.pending[m.id]||'', m.amount<0?cajaGasCatOpts():cajaIncCatOpts(), m.category)}</td>
         <td><input type="text" list="cajaSubcatDatalist" data-subcat-input="${m.id}" value="${escapeHtml(m.subcategory||'')}" placeholder="—" style="background:var(--bg);border:1px solid ${m.subcategory?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:130px;"></td>
+        <td>${m.amount>=0 ? `<select data-resta-categoria="${m.id}" style="background:var(--bg);border:1px solid ${m.restaDeCategoria?'var(--copper)':'var(--line)'};border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;max-width:160px;">
+          <option value="">— cuenta como ingreso —</option>
+          ${cajaGasCatOpts().map(cat=>`<option value="${cat.replace(/"/g,'&quot;')}" ${m.restaDeCategoria===cat?'selected':''}>${cat}</option>`).join('')}
+        </select>` : '<span class="hint">—</span>'}</td>
         <td class="num" style="font-family:monospace;font-weight:700;color:${m.amount<0?'var(--negative)':'var(--positive)'};white-space:nowrap;">${cajaFmt(m.amount)}</td>
         <td style="text-align:center;font-size:11px;">${m.isManual?'✍️':m.autoCat?'🤖':'✋'}</td>
         <td><button class="btn danger" data-caja-borrar-mov="${m.id}" title="Borrar este movimiento" style="padding:3px 8px;font-size:11px;">✕</button></td></tr>
@@ -13396,6 +13501,9 @@ function renderCajaMovimientosTab(el){
   el.querySelectorAll('[data-subcat-input]').forEach(inp=>{
     inp.addEventListener('change', (e)=>{ cajaSetSubcategoria(inp.getAttribute('data-subcat-input'), e.target.value); });
     inp.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); inp.blur(); } });
+  });
+  el.querySelectorAll('[data-resta-categoria]').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{ cajaSetRestaCategoria(sel.getAttribute('data-resta-categoria'), e.target.value); });
   });
   const aplicarBtn2 = document.getElementById('cajaAplicarBtn2'); if(aplicarBtn2) aplicarBtn2.addEventListener('click', cajaApplyPending);
   el.querySelectorAll('[data-fecha-editar]').forEach(btn=>{
@@ -14396,12 +14504,12 @@ async function calcularSeguimientoCostes(){
   const catNomina = getCajaCategoriaNomina();
   const excluirPropinas = getExcluirPropinasNominaCaja();
   const catSet = new Set();
-  ordenados.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
+  ordenados.forEach(m=>(m.movements||[]).forEach(mv=>{ const cat=cajaCategoriaDeGastoDe(mv); if(cat!==null) catSet.add(cat); }));
   const ocultasSc = STATE.caja.categoriasOcultasSeguimientoCostes||[];
   const cats = [...catSet].filter(cat=>!ocultasSc.includes(cat)).sort();
 
   function eurosDeCategoriaEnMes(cat, entry){
-    let euros = (entry.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+    let euros = (entry.movements||[]).filter(mv=>cajaCategoriaDeGastoDe(mv)===cat).reduce((s,mv)=>s+cajaAporteGasto(mv),0);
     if(excluirPropinas && cat===catNomina){ euros = Math.max(0, euros - cajaPropinasDelMes(entry.month, 'pagada')); }
     return euros;
   }
@@ -14780,14 +14888,14 @@ function cajaDetalleCatDataIngresos(){
   if(!c.savedMonths.length) return {months:[], cats:[], table:{}};
   const months = c.savedMonths.map(m=>m.title||m.month);
   const catSet = new Set();
-  c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount>0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
+  c.savedMonths.forEach(m=>(m.movements||[]).filter(cajaEsIngresoContable).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
   const cats = [...catSet].sort();
   const table = {};
   cats.forEach(cat=>{
     table[cat] = {};
     c.savedMonths.forEach(m=>{
       const totalIngreso = m.totalIncome||1;
-      const euros = (m.movements||[]).filter(mv=>mv.amount>0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+mv.amount,0);
+      const euros = (m.movements||[]).filter(mv=>cajaEsIngresoContable(mv) && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+mv.amount,0);
       table[cat][m.title||m.month] = { euros, pct: +(euros/totalIngreso*100).toFixed(1) };
     });
   });
@@ -14798,7 +14906,7 @@ function cajaDetalleCatData(){
   if(!c.savedMonths.length) return {months:[], cats:[], table:{}};
   const months = c.savedMonths.map(m=>m.title||m.month);
   const catSet = new Set();
-  c.savedMonths.forEach(m=>(m.movements||[]).filter(mv=>mv.amount<0).forEach(mv=>catSet.add(mv.category||CAJA_UNCATEGORIZED)));
+  c.savedMonths.forEach(m=>(m.movements||[]).forEach(mv=>{ const cat=cajaCategoriaDeGastoDe(mv); if(cat!==null) catSet.add(cat); }));
   const cats = [...catSet].sort();
   const catNominaDetalle = getCajaCategoriaNomina();
   const excluirPropinas = getExcluirPropinasNominaCaja();
@@ -14808,7 +14916,7 @@ function cajaDetalleCatData(){
     c.savedMonths.forEach(m=>{
       let totalGasto = Math.abs(m.totalExpense)||1;
       if(excluirPropinas && catNominaDetalle){ totalGasto = Math.max(1, totalGasto - cajaPropinasDelMes(m.month, 'pagada')); }
-      let euros = (m.movements||[]).filter(mv=>mv.amount<0 && (mv.category||CAJA_UNCATEGORIZED)===cat).reduce((s,mv)=>s+Math.abs(mv.amount),0);
+      let euros = (m.movements||[]).filter(mv=>cajaCategoriaDeGastoDe(mv)===cat).reduce((s,mv)=>s+cajaAporteGasto(mv),0);
       // se descuentan las propinas PAGADAS de ese mes concreto, solo en la categoría
       // marcada como "nóminas" — igual que en el gráfico "Gastos totales" y en la tarta.
       if(excluirPropinas && cat===catNominaDetalle){ euros = Math.max(0, euros - cajaPropinasDelMes(m.month, 'pagada')); }
@@ -14865,9 +14973,10 @@ function cajaAgregarPorCategoria(entries){
   const catNominaPie = getCajaCategoriaNomina();
   const excluirPropinas = getExcluirPropinasNominaCaja();
   entries.forEach(entry=>{
-    (entry.movements||[]).filter(m=>m.amount<0).forEach(m=>{
-      const k = m.category||CAJA_UNCATEGORIZED;
-      porCategoria[k] = (porCategoria[k]||0) + Math.abs(m.amount);
+    (entry.movements||[]).forEach(m=>{
+      const k = cajaCategoriaDeGastoDe(m);
+      if(k===null) return;
+      porCategoria[k] = (porCategoria[k]||0) + cajaAporteGasto(m);
     });
     if(excluirPropinas && catNominaPie && porCategoria[catNominaPie]!==undefined){
       porCategoria[catNominaPie] = Math.max(0, porCategoria[catNominaPie] - cajaPropinasDelMes(entry.month, 'pagada'));
