@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.327</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.328</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9699,7 +9699,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
     if(w.typeId==='seguimientoVentas'){
      try{
       if(colPendiente){ y += chartH + 16; colPendiente = null; }
-      const resVW = calcularSeguimientoVentas();
+      const resVW = calcularSeguimientoVentas(document.getElementById('reHasta')?.value || null);
       const { filas:filasW, mesReferencia:mesRefVW } = resVW;
       if(filasW.length===0) continue;
 
@@ -9719,7 +9719,7 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
 
       const dibujarCabeceraTablaSv = () => {
         doc.setFont('times','bold'); doc.setFontSize(13); doc.setTextColor(...NEGRO);
-        doc.text('Seguimiento de ventas'+(mesRefVW?' — datos hasta '+(resVW.mesParcial ? 'el '+resVW.diaCorte+' de '+formatMesLargo(mesRefVW).toLowerCase() : formatMesLargo(mesRefVW)+' incluido'):''), margin, y+5);
+        doc.text('Seguimiento de ventas'+(mesRefVW?' — datos hasta '+formatMesLargo(mesRefVW)+(resVW.mesParcial ? ' (incompleto, hasta el día '+resVW.diaCorte+')' : ' incluido'):''), margin, y+5);
         y += 9;
         doc.setFontSize(7); doc.setTextColor(...GRIS); doc.setFont('helvetica','normal');
         doc.text('Métrica', margin, y+3.5);
@@ -10377,7 +10377,7 @@ async function renderSeguimientoVentasWidgetInstance(w){
   const tableEl = document.getElementById('reSeguimientoVentasTabla_'+w.instanceId);
   if(!tableEl) return;
   try{
-    const resSv = calcularSeguimientoVentas();
+    const resSv = calcularSeguimientoVentas(document.getElementById('reHasta')?.value || null);
     const avisoSv = avisoMesParcialVentas(resSv);
     tableEl.innerHTML = (avisoSv ? '<p class="hint" style="margin-bottom:8px;color:var(--copper);">'+escapeHtml(avisoSv)+'</p>' : '') + construirTablaSeguimientoVentasHtml(resSv.filas);
   }catch(e){
@@ -14319,27 +14319,33 @@ function calcularSeguimientoClientes(){
 
   return { grupos, mesReferencia, mesesLabels: buckets.map(b=>b.label) };
 }
-function calcularSeguimientoVentas(){
+/* hastaFecha (opcional, 'AAAA-MM-DD'): filtro "Hasta" del Resumen Ejecutivo. La tabla es
+   SIEMPRE mensual: el "último mes" es el mes de esa fecha (mes completo), y los meses
+   anteriores salen de todo el histórico disponible, aunque el filtro "Desde" sea posterior
+   (si no, no habría 3 meses anteriores ni año anterior con los que comparar). Sin
+   hastaFecha, el último mes es el último con datos. */
+function calcularSeguimientoVentas(hastaFecha){
   const allLines = getAllSalesLinesRaw();
   if(allLines.length===0) return { filas:[], mesReferencia:null };
 
   const fechas = allLines.map(l=>l.fecha).sort();
-  const buckets = monthBucketsInRange(fechas[0], fechas[fechas.length-1]);
+  let buckets = monthBucketsInRange(fechas[0], fechas[fechas.length-1]);
+  if(hastaFecha){
+    const mesHasta = hastaFecha.slice(0,7);
+    buckets = buckets.filter(b=>b.label<=mesHasta);
+  }
   if(buckets.length===0) return { filas:[], mesReferencia:null };
 
   const bucketIndexPorFecha = (fecha) => buckets.findIndex(b=>fecha>=b.dateMin && fecha<=b.dateMax);
   const classified = classifyCustomers();
 
-  // MES EN CURSO A MEDIAS: si los últimos datos subidos no llegan al último día del mes
-  // (ej. ventas hasta el 14 de octubre), comparar octubre-hasta-el-14 contra septiembre
-  // COMPLETO sale todo en rojo sin que haya pasado nada. En ese caso se comparan los
-  // mismos días del mes (1..14) en TODOS los meses — así el último mes incluye todos los
-  // datos subidos y la comparación es justa.
+  // La tabla es mensual: se comparan meses completos. Si el mes de referencia aún no está
+  // completo en los datos subidos (ej. ventas solo hasta el 2 de octubre), no se recorta
+  // nada, pero se avisa de que sus cifras no son comparables con meses enteros.
   const ultimaFechaDatos = fechas[fechas.length-1];
   const bucketUltimoSv = buckets[buckets.length-1];
-  const mesParcial = ultimaFechaDatos < bucketUltimoSv.dateMax;
-  const diaCorte = mesParcial ? parseInt(ultimaFechaDatos.slice(8,10),10) : 31;
-  const dentroDelCorte = (fecha) => parseInt(fecha.slice(8,10),10) <= diaCorte;
+  const mesParcial = ultimaFechaDatos >= bucketUltimoSv.dateMin && ultimaFechaDatos < bucketUltimoSv.dateMax;
+  const diaCorte = mesParcial ? parseInt(ultimaFechaDatos.slice(8,10),10) : null;
 
   const porBucket = buckets.map(()=>({ bruto:0, neto:0, tickets:0, porCategoria:{}, porSegmento:{nuevo:0,repetido:0,fidelidad:0,noident:0} }));
 
@@ -14349,7 +14355,6 @@ function calcularSeguimientoVentas(){
     const porTicket = {};
     pd.lines.forEach(row=>{
       const [fecha,hora,catIdx,artIdx,cant,bruto,neto,ticketIdx,esPago] = row;
-      if(!dentroDelCorte(fecha)) return;
       if(!porTicket[ticketIdx]) porTicket[ticketIdx] = { fecha, bruto:0, neto:0, tienePago:false };
       porTicket[ticketIdx].bruto += bruto;
       porTicket[ticketIdx].neto += neto;
@@ -14369,7 +14374,6 @@ function calcularSeguimientoVentas(){
   // ventas por categoría — por LÍNEA, no por ticket (igual que el resto de gráficos de
   // categoría de la app), ya que un mismo ticket puede tener líneas de varias categorías
   allLines.forEach(l=>{
-    if(!dentroDelCorte(l.fecha)) return;
     const idx = bucketIndexPorFecha(l.fecha);
     if(idx<0) return;
     const cat = displayCategoryFor(l.categoria);
@@ -14466,12 +14470,12 @@ function calcularSeguimientoVentas(){
 
   const ocultasVentas = STATE.ventasSeguimientoOcultas||[];
   const filasVisibles = filas.filter(f=>!ocultasVentas.includes(f.categoria));
-  return { filas:filasVisibles, mesReferencia, mesParcial, diaCorte: mesParcial ? diaCorte : null };
+  return { filas:filasVisibles, mesReferencia, mesParcial, diaCorte };
 }
-/* texto de aviso cuando el último mes está a medias (comparación de los mismos días) */
+/* aviso cuando el mes de referencia está incompleto en los datos subidos */
 function avisoMesParcialVentas(res){
   if(!res || !res.mesParcial) return '';
-  return 'Datos hasta el día '+res.diaCorte+' de '+formatMesLargo(res.mesReferencia).toLowerCase()+': el último mes se compara con los días 1 a '+res.diaCorte+' de los meses anteriores (no con meses completos).';
+  return formatMesLargo(res.mesReferencia)+' está incompleto (ventas subidas solo hasta el día '+res.diaCorte+'), así que sus cifras no son comparables con meses completos. Para comparar meses completos, pon en "Hasta" el último día de un mes terminado.';
 }
 /* construye el HTML de la tabla de Seguimiento de ventas — mismo formato visual que la de
    costes, pero en ventas SUBIR es lo bueno (verde) y BAJAR es lo malo (rojo). Las filas
