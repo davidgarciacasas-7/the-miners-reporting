@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.328</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.329</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -9275,7 +9275,10 @@ document.getElementById('reExportPdfBtn').addEventListener('click', async ()=>{
   doc.rect(0,0,W,H,'F');
 
   const fotoPortada = localStorage.getItem('miners_re_portada_foto');
-  const mesGeneracionRaw = new Date().toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  // el mes de la portada es el del ÚLTIMO mes reportado en el informe (filtro "Hasta"), no el
+  // de la fecha en que se genera el PDF; solo si no hay "Hasta" se usa el mes actual.
+  const fechaMesPortada = /^\d{4}-\d{2}/.test(hasta||'') ? new Date(hasta.slice(0,7)+'-01T00:00:00') : new Date();
+  const mesGeneracionRaw = fechaMesPortada.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
   const mesGeneracion = mesGeneracionRaw.charAt(0).toUpperCase()+mesGeneracionRaw.slice(1);
 
   let anchoFotoPortada = 0, altoFotoPortada = 0;
