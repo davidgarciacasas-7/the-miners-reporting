@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.329</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.332</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1224,17 +1224,17 @@ Tostada de aguacate,Pan de masa madre,2,unidad
 Tostada de aguacate,Aguacate,1,unidad
 Tostada de aguacate,Huevo,1,unidad
 Bowl de acai,Acai,150,g</pre>
-          <p class="hint" style="margin-bottom:10px;">Si una receta que subes ya existía, se sustituyen sus ingredientes por los nuevos del archivo (no se duplican).</p>
-          <input type="file" id="recetarioImportFile" accept=".csv,.xlsx,.xls" style="display:none;">
-          <button class="btn secondary" id="recetarioImportBtn">Elegir archivo CSV o Excel</button>
+          <p class="hint" style="margin-bottom:10px;">Puedes seleccionar varios archivos a la vez. Si una receta que subes ya existía, se sustituyen sus ingredientes por los nuevos del archivo (no se duplican).</p>
+          <input type="file" id="recetarioImportFile" accept=".csv,.xlsx,.xls" multiple style="display:none;">
+          <button class="btn secondary" id="recetarioImportBtn">Elegir archivo(s) CSV o Excel</button>
           <p class="hint" id="recetarioImportStatus" style="margin-top:8px;"></p>
         </div>
 
         <div class="card" style="margin-bottom:14px;">
           <h3>Subir documento (Word o PDF)</h3>
           <p class="hint" style="margin-bottom:10px;">Sube un documento .docx o .pdf con tus recetas — el nombre de cada receta como línea suelta, seguido de sus ingredientes (uno por línea, con la cantidad y unidad en el formato que sea, p.ej. "150g de acai" o "Pan de masa madre - 2 unidades"). Esto usa un lector de patrones de texto, no una lectura inteligente del documento, así que antes de guardar se muestra una vista previa editable para corregir lo que no detecte bien.</p>
-          <input type="file" id="recetarioImportDocFile" accept=".docx,.doc,.pdf" style="display:none;">
-          <button class="btn secondary" id="recetarioImportDocBtn">Elegir documento Word/PDF</button>
+          <input type="file" id="recetarioImportDocFile" accept=".docx,.doc,.pdf" multiple style="display:none;">
+          <button class="btn secondary" id="recetarioImportDocBtn">Elegir documento(s) Word/PDF</button>
           <p class="hint" id="recetarioImportDocStatus" style="margin-top:8px;"></p>
         </div>
         <div id="recetarioVistaPreviaDoc" style="margin-bottom:14px;"></div>
@@ -1250,9 +1250,10 @@ Bowl de acai,Acai,150,g</pre>
           <span>Costes de ingredientes</span>
           <button class="btn secondary" id="ingredienteCosteAddBtn" style="padding:6px 12px;font-size:12px;">+ Añadir coste</button>
         </div>
-        <p class="hint" style="margin-bottom:8px;">Cuánto cuesta cada ingrediente, referido a una cantidad concreta (p.ej. "1 kg de café = 12,50 €") — con esto se calcula el coste de cada receta más abajo, y el simulador de ahorro.</p>
+        <p class="hint" style="margin-bottom:8px;">La lista se rellena sola con todos los ingredientes de las recetas subidas (los que aún no tienen coste salen arriba, en rojo). Para cada uno indica cuánto cuesta una cantidad concreta (p.ej. "1 kg de café = 12,50 €") y pulsa <b>Guardar</b> — con esto se calcula el coste de cada receta más abajo, y el simulador de ahorro.</p>
+        <p class="hint" id="ingredientesCostesResumen" style="margin-bottom:8px;"></p>
         <div class="card" style="margin-bottom:26px;">
-          <table id="tablaIngredientesCostes"><thead><tr><th>Ingrediente</th><th>Cantidad de referencia</th><th>Coste de esa cantidad</th><th>Coste por unidad</th><th></th></tr></thead><tbody></tbody></table>
+          <table id="tablaIngredientesCostes"><thead><tr><th>Ingrediente</th><th>En recetas</th><th>Cantidad de referencia</th><th>Unidad</th><th>Coste de esa cantidad (€)</th><th>Coste por unidad</th><th></th></tr></thead><tbody></tbody></table>
         </div>
 
         <div class="section-title">Simulador de ahorro por bajada de precio</div>
@@ -1374,6 +1375,8 @@ Bowl de acai,Acai,150,g</pre>
             <input type="text" id="vacEmpNuevoNombre" placeholder="Nombre del empleado" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;">
             <button class="btn secondary" id="vacEmpNuevoBtn" style="padding:5px 10px;font-size:12px;">+ Añadir empleado</button>
           </div>
+          <div id="vacEmpLista" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+          <p class="hint" style="margin-top:8px;">Pulsa la ✕ de un empleado para eliminarlo. Se quita de la lista general (también del desplegable de la app de mermas) y te pregunta si quieres borrar también sus registros de vacaciones y horas extras.</p>
         </div>
         <h3 style="margin-bottom:10px;">Vacaciones</h3>
         <div class="card" style="margin-bottom:14px;">
@@ -7259,46 +7262,72 @@ async function extraerTextoDeDocumento(file){
 }
 document.getElementById('recetarioImportBtn').addEventListener('click', ()=>document.getElementById('recetarioImportFile').click());
 document.getElementById('recetarioImportFile').addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
+  const files = [...e.target.files];
+  if(!files.length) return;
   const statusEl = document.getElementById('recetarioImportStatus');
-  statusEl.textContent = 'Leyendo archivo...';
-  try{
-    const esExcel = /\.xlsx?$/i.test(file.name);
-    const { recetas, errores } = esExcel ? parseRecetarioExcel(await file.arrayBuffer()) : parseRecetarioCSV(await file.text());
-    const nombresRecetas = Object.keys(recetas);
-    if(nombresRecetas.length===0){ statusEl.innerHTML = '<span style="color:var(--negative)">No se ha podido extraer ninguna receta. '+(errores[0]||'')+'</span>'; return; }
-    statusEl.textContent = 'Guardando '+nombresRecetas.length+' receta(s)...';
-    const { numRecetas, numIngredientes: totalIngredientes } = await guardarRecetasEnBD(recetas);
-    const histSaved = await sbInsert('recetas_archivos_historial', { nombre_archivo:file.name, num_recetas:nombresRecetas.length, num_ingredientes:totalIngredientes });
-    STATE.recetasHistorial.unshift({ id:histSaved.id, nombreArchivo:file.name, fechaSubida:histSaved.fecha_subida, numRecetas:nombresRecetas.length, numIngredientes:totalIngredientes });
-    statusEl.innerHTML = '<span style="color:var(--positive)">Listo: '+nombresRecetas.length+' receta(s), '+totalIngredientes+' ingrediente(s) guardados.</span>'+(errores.length?' <span class="hint">('+errores.length+' fila(s) con avisos)</span>':'');
-    renderRecetario();
-  }catch(err){
-    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+err.message+'</span>';
+  const mensajes = [];
+  let totalRecetas = 0, totalIng = 0;
+  for(let i=0;i<files.length;i++){
+    const file = files[i];
+    statusEl.textContent = 'Leyendo '+file.name+' ('+(i+1)+'/'+files.length+')...';
+    try{
+      const esExcel = /\.xlsx?$/i.test(file.name);
+      const { recetas, errores } = esExcel ? parseRecetarioExcel(await file.arrayBuffer()) : parseRecetarioCSV(await file.text());
+      const nombresRecetas = Object.keys(recetas);
+      if(nombresRecetas.length===0){ mensajes.push('<span style="color:var(--negative)">'+escapeHtml(file.name)+': no se ha podido extraer ninguna receta. '+escapeHtml(errores[0]||'')+'</span>'); continue; }
+      statusEl.textContent = 'Guardando '+file.name+' ('+nombresRecetas.length+' receta(s))...';
+      const { numIngredientes } = await guardarRecetasEnBD(recetas);
+      const histSaved = await sbInsert('recetas_archivos_historial', { nombre_archivo:file.name, num_recetas:nombresRecetas.length, num_ingredientes:numIngredientes });
+      STATE.recetasHistorial.unshift({ id:histSaved.id, nombreArchivo:file.name, fechaSubida:histSaved.fecha_subida, numRecetas:nombresRecetas.length, numIngredientes });
+      totalRecetas += nombresRecetas.length; totalIng += numIngredientes;
+      mensajes.push('<span style="color:var(--positive)">'+escapeHtml(file.name)+': '+nombresRecetas.length+' receta(s), '+numIngredientes+' ingrediente(s).</span>'+(errores.length?' <span class="hint">('+errores.length+' fila(s) con avisos)</span>':''));
+    }catch(err){
+      mensajes.push('<span style="color:var(--negative)">'+escapeHtml(file.name)+': error — '+escapeHtml(err.message)+'</span>');
+    }
   }
+  statusEl.innerHTML = mensajes.join('<br>') + (files.length>1 ? '<br><b>Total: '+totalRecetas+' receta(s), '+totalIng+' ingrediente(s) guardados.</b>' : '');
+  renderRecetario();
   e.target.value = '';
 });
 /* ---- subida de documento Word/PDF: extraer -> parsear -> vista previa editable -> guardar ---- */
 document.getElementById('recetarioImportDocBtn').addEventListener('click', ()=>document.getElementById('recetarioImportDocFile').click());
 document.getElementById('recetarioImportDocFile').addEventListener('change', async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
+  const files = [...e.target.files];
+  if(!files.length) return;
   const statusEl = document.getElementById('recetarioImportDocStatus');
-  statusEl.textContent = 'Leyendo documento...';
-  try{
-    const texto = await extraerTextoDeDocumento(file);
-    const { recetas, ordenRecetas } = parseRecetarioDocumento(texto);
-    if(ordenRecetas.length===0){
-      statusEl.innerHTML = '<span style="color:var(--negative)">No se ha detectado ninguna receta en el documento. Revisa que cada receta empiece en una línea propia, seguida de sus ingredientes.</span>';
-      return;
+  const avisos = [];
+  const recetasTotal = {}, ordenTotal = [];
+  const nombresArchivos = [];
+  for(let i=0;i<files.length;i++){
+    const file = files[i];
+    statusEl.textContent = 'Leyendo '+file.name+' ('+(i+1)+'/'+files.length+')...';
+    try{
+      const texto = await extraerTextoDeDocumento(file);
+      const { recetas, ordenRecetas } = parseRecetarioDocumento(texto);
+      if(ordenRecetas.length===0){ avisos.push(escapeHtml(file.name)+': no se ha detectado ninguna receta (cada receta debe empezar en una línea propia, seguida de sus ingredientes).'); continue; }
+      nombresArchivos.push(file.name);
+      ordenRecetas.forEach(nombre=>{
+        const yaEsta = ordenTotal.findIndex(n=>n.toLowerCase()===nombre.toLowerCase());
+        if(yaEsta>=0){
+          // misma receta en dos documentos: se queda la del último documento subido
+          avisos.push('La receta "'+escapeHtml(nombre)+'" aparece en más de un documento — se usa la de '+escapeHtml(file.name)+'.');
+          delete recetasTotal[ordenTotal[yaEsta]];
+          ordenTotal.splice(yaEsta,1);
+        }
+        recetasTotal[nombre] = recetas[nombre];
+        ordenTotal.push(nombre);
+      });
+    }catch(err){
+      avisos.push(escapeHtml(file.name)+': error — '+escapeHtml(err.message));
     }
-    STATE.recetarioPreviewNombreArchivo = file.name;
-    STATE.recetarioPreview = { recetas, ordenRecetas };
-    statusEl.textContent = '';
+  }
+  if(ordenTotal.length===0){
+    statusEl.innerHTML = '<span style="color:var(--negative)">'+(avisos.join('<br>')||'No se ha detectado ninguna receta.')+'</span>';
+  } else {
+    STATE.recetarioPreviewNombreArchivo = nombresArchivos.join(', ');
+    STATE.recetarioPreview = { recetas:recetasTotal, ordenRecetas:ordenTotal };
+    statusEl.innerHTML = avisos.length ? '<span class="hint" style="color:var(--negative);">'+avisos.join('<br>')+'</span>' : '';
     renderRecetarioVistaPrevia();
-  }catch(err){
-    statusEl.innerHTML = '<span style="color:var(--negative)">Error: '+err.message+'</span>';
   }
   e.target.value = '';
 });
@@ -7466,44 +7495,136 @@ function calcularCosteReceta(recetaId){
   });
   return { costeTotal, completo, detalle };
 }
-/* tabla de "Costes de ingredientes" — añadir/editar/borrar cuánto cuesta una cantidad de
-   referencia de cada ingrediente (p.ej. "1 kg de café = 12,50 €"); de ahí se deriva el
-   coste por unidad que usan el coste de receta y el simulador de ahorro. */
+/* ingredientes que aparecen en las recetas, agrupados sin distinguir mayúsculas:
+   clave -> { nombre, unidades: Map(unidad->usos), recetas: Set(recetaId) } */
+function ingredientesDeRecetasAgrupados(){
+  const grupos = new Map();
+  STATE.recetaIngredientes.forEach(ri=>{
+    const nombre = (ri.ingrediente||'').trim();
+    if(!nombre) return;
+    const k = nombre.toLowerCase();
+    if(!grupos.has(k)) grupos.set(k, { nombre, unidades:new Map(), recetas:new Set() });
+    const g = grupos.get(k);
+    g.recetas.add(ri.recetaId);
+    g.unidades.set(ri.unidad, (g.unidades.get(ri.unidad)||0)+1);
+  });
+  return grupos;
+}
+/* cantidad/unidad de referencia que se sugiere para un ingrediente sin coste: si las recetas
+   lo usan en g o ml, se sugiere 1 kg / 1 l (como se compra normalmente); si no, 1 de su unidad */
+function referenciaSugeridaIngrediente(grupo){
+  const unidadMasUsada = [...grupo.unidades.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0] || 'unidad';
+  const u = (unidadMasUsada||'').toLowerCase().replace(/\.$/,'');
+  const base = RECETARIO_UNIDAD_BASE[u], factor = RECETARIO_UNIDAD_FACTOR[u];
+  if(base==='g' && factor===1) return { cantidad:1, unidad:'kg' };
+  if(base==='ml' && factor===1) return { cantidad:1, unidad:'l' };
+  return { cantidad:1, unidad:unidadMasUsada };
+}
+/* tabla de "Costes de ingredientes" — se rellena sola con los ingredientes de las recetas
+   (los que aún no tienen coste salen primero, en rojo); cada fila se edita en línea y se
+   guarda con su botón. De ahí se deriva el coste por unidad que usan el coste de receta y
+   el simulador de ahorro. */
 function renderIngredientesCostesTabla(){
   const tbody = document.querySelector('#tablaIngredientesCostes tbody');
   if(!tbody) return;
-  const ordenadas = [...STATE.ingredientesCostes].sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
-  tbody.innerHTML = ordenadas.map(c=>{
-    const costePorUnidad = c.cantidadReferencia>0 ? c.costeTotal/c.cantidadReferencia : 0;
-    return `<tr>
-      <td>${escapeHtml(c.ingrediente)}</td>
-      <td class="num">${c.cantidadReferencia} ${escapeHtml(c.unidad)}</td>
-      <td class="num">${eur(Math.round(c.costeTotal*100))}</td>
-      <td class="num">${eur(Math.round(costePorUnidad*100))}/${escapeHtml(c.unidad)}</td>
-      <td><button class="btn secondary" data-editar-coste-ing="${c.id}" style="padding:2px 8px;font-size:10px;">✏️</button> <button class="btn danger" data-borrar-coste-ing="${c.id}" style="padding:2px 8px;font-size:10px;">✕</button></td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="5" class="hint">Sin costes de ingredientes todavía.</td></tr>';
+  const grupos = ingredientesDeRecetasAgrupados();
+  const clavesConCoste = new Set(STATE.ingredientesCostes.map(c=>(c.ingrediente||'').trim().toLowerCase()));
+  const pendientes = [...grupos.entries()].filter(([k])=>!clavesConCoste.has(k)).map(([k,g])=>({ clave:k, grupo:g }))
+    .sort((a,b)=>a.grupo.nombre.localeCompare(b.grupo.nombre,'es'));
+  const guardadas = [...STATE.ingredientesCostes].sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  const inpStyle = 'background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font-size:12px;';
 
-  tbody.querySelectorAll('[data-editar-coste-ing]').forEach(btn=>{
+  const filasPend = pendientes.map(({clave,grupo})=>{
+    const ref = referenciaSugeridaIngrediente(grupo);
+    const usado = [...grupo.unidades.keys()].join(', ');
+    return `<tr data-fila-pend="${escapeHtml(clave)}" style="background:rgba(193,97,63,.08);">
+      <td>${escapeHtml(grupo.nombre)} <span class="pill noident" style="font-size:9px;color:var(--negative);">sin coste</span></td>
+      <td class="hint">${grupo.recetas.size} receta(s) · en ${escapeHtml(usado)}</td>
+      <td><input type="number" step="any" min="0" data-campo="cantidad" value="${ref.cantidad}" style="${inpStyle}width:80px;"></td>
+      <td><input type="text" data-campo="unidad" value="${escapeHtml(ref.unidad)}" style="${inpStyle}width:70px;"></td>
+      <td><input type="number" step="any" min="0" data-campo="coste" placeholder="€" style="${inpStyle}width:90px;"></td>
+      <td class="num hint">—</td>
+      <td><button class="btn" data-guardar-pend="${escapeHtml(clave)}" style="padding:3px 10px;font-size:11px;">Guardar</button></td>
+    </tr>`;
+  });
+  const filasGuard = guardadas.map(c=>{
+    const clave = (c.ingrediente||'').trim().toLowerCase();
+    const g = grupos.get(clave);
+    const costePorUnidad = c.cantidadReferencia>0 ? c.costeTotal/c.cantidadReferencia : 0;
+    // ¿alguna unidad que usan las recetas no se puede convertir a la de este coste?
+    const unidadesNoConvertibles = g ? [...g.unidades.keys()].filter(u=>costoPorUnidadIngrediente(c.ingrediente, u)===null) : [];
+    const aviso = unidadesNoConvertibles.length ? ` <span class="pill noident" style="font-size:9px;color:var(--negative);" title="Las recetas lo usan en ${escapeHtml(unidadesNoConvertibles.join(', '))}, que no se puede convertir a ${escapeHtml(c.unidad)}. Cambia la unidad de referencia o la de la receta.">unidad no convertible</span>` : '';
+    return `<tr data-fila-ing="${c.id}">
+      <td>${escapeHtml(c.ingrediente)}${aviso}</td>
+      <td class="hint">${g ? (g.recetas.size+' receta(s)') : 'ninguna receta'}</td>
+      <td><input type="number" step="any" min="0" data-campo="cantidad" value="${c.cantidadReferencia}" style="${inpStyle}width:80px;"></td>
+      <td><input type="text" data-campo="unidad" value="${escapeHtml(c.unidad)}" style="${inpStyle}width:70px;"></td>
+      <td><input type="number" step="any" min="0" data-campo="coste" value="${c.costeTotal}" style="${inpStyle}width:90px;"></td>
+      <td class="num">${eur(Math.round(costePorUnidad*100))}/${escapeHtml(c.unidad)}</td>
+      <td><button class="btn secondary" data-guardar-coste-ing="${c.id}" style="padding:3px 10px;font-size:11px;">Guardar</button> <button class="btn danger" data-borrar-coste-ing="${c.id}" style="padding:2px 8px;font-size:10px;">✕</button></td>
+    </tr>`;
+  });
+  tbody.innerHTML = filasPend.concat(filasGuard).join('') || '<tr><td colspan="7" class="hint">Sin ingredientes todavía — sube una receta y aparecerán aquí.</td></tr>';
+
+  const resumenEl = document.getElementById('ingredientesCostesResumen');
+  if(resumenEl){
+    resumenEl.innerHTML = pendientes.length
+      ? `<span style="color:var(--negative);">${pendientes.length} ingrediente(s) de las recetas todavía sin coste</span> · ${guardadas.length} con coste`
+      : (guardadas.length ? `<span style="color:var(--positive);">Todos los ingredientes de las recetas tienen coste.</span> (${guardadas.length} en la lista)` : '');
+  }
+
+  // lee y valida los tres campos editables de una fila
+  function leerCamposFila(tr){
+    const val = campo=>tr.querySelector('[data-campo="'+campo+'"]').value;
+    const cantidad = parseFloat(String(val('cantidad')).replace(',','.'));
+    const unidad = String(val('unidad')).trim();
+    const coste = parseFloat(String(val('coste')).replace(',','.'));
+    if(isNaN(cantidad)||cantidad<=0){ toast('Cantidad de referencia no válida.', true); return null; }
+    if(!unidad){ toast('Indica la unidad.', true); return null; }
+    if(isNaN(coste)||coste<0){ toast('Introduce el coste de esa cantidad (€).', true); return null; }
+    return { cantidad, unidad, coste };
+  }
+  tbody.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('keydown', ev=>{
+      if(ev.key!=='Enter') return;
+      ev.preventDefault();
+      const tr = inp.closest('tr');
+      const btn = tr && tr.querySelector('[data-guardar-pend],[data-guardar-coste-ing]');
+      if(btn) btn.click();
+    });
+  });
+  tbody.querySelectorAll('[data-guardar-pend]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const c = STATE.ingredientesCostes.find(x=>x.id===btn.getAttribute('data-editar-coste-ing'));
-      if(!c) return;
-      const cantidad = parseFloat(prompt('Cantidad de referencia:', c.cantidadReferencia));
-      if(isNaN(cantidad)||cantidad<=0){ toast('Cantidad no válida.', true); return; }
-      const unidad = prompt('Unidad (g, kg, ml, l, unidad...):', c.unidad) || c.unidad;
-      const coste = parseFloat(prompt('Coste de esa cantidad (€):', c.costeTotal));
-      if(isNaN(coste)||coste<0){ toast('Coste no válido.', true); return; }
+      const clave = btn.getAttribute('data-guardar-pend');
+      const g = grupos.get(clave);
+      const campos = leerCamposFila(btn.closest('tr'));
+      if(!g || !campos) return;
+      btn.disabled = true;
       try{
-        await sbUpdate('ingredientes_costes', c.id, { cantidad_referencia:cantidad, unidad, coste_total:coste });
-        c.cantidadReferencia = cantidad; c.unidad = unidad; c.costeTotal = coste;
+        const saved = await sbInsert('ingredientes_costes', { ingrediente:g.nombre, cantidad_referencia:campos.cantidad, unidad:campos.unidad, coste_total:campos.coste });
+        STATE.ingredientesCostes.push({ id:saved.id, ingrediente:g.nombre, cantidadReferencia:campos.cantidad, unidad:campos.unidad, costeTotal:campos.coste });
         renderRecetario();
-      }catch(e){ toast('Error: '+e.message, true); }
+      }catch(e){ toast('Error: '+e.message, true); btn.disabled = false; }
+    });
+  });
+  tbody.querySelectorAll('[data-guardar-coste-ing]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const c = STATE.ingredientesCostes.find(x=>x.id===btn.getAttribute('data-guardar-coste-ing'));
+      const campos = leerCamposFila(btn.closest('tr'));
+      if(!c || !campos) return;
+      btn.disabled = true;
+      try{
+        await sbUpdate('ingredientes_costes', c.id, { cantidad_referencia:campos.cantidad, unidad:campos.unidad, coste_total:campos.coste });
+        c.cantidadReferencia = campos.cantidad; c.unidad = campos.unidad; c.costeTotal = campos.coste;
+        renderRecetario();
+        toast('Coste de "'+c.ingrediente+'" guardado.');
+      }catch(e){ toast('Error: '+e.message, true); btn.disabled = false; }
     });
   });
   tbody.querySelectorAll('[data-borrar-coste-ing]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.getAttribute('data-borrar-coste-ing');
-      if(!confirm('¿Borrar este coste? Las recetas que usen este ingrediente dejarán de tener su coste calculado.')) return;
+      if(!confirm('¿Borrar este coste? Si el ingrediente sigue en alguna receta, volverá a aparecer arriba como "sin coste" y esas recetas quedarán incompletas.')) return;
       try{
         await sbDelete('ingredientes_costes', id);
         STATE.ingredientesCostes = STATE.ingredientesCostes.filter(x=>x.id!==id);
@@ -7603,6 +7724,21 @@ function renderRecetarioFiltro(){
   btn.onclick = (e)=>{ e.stopPropagation(); document.querySelectorAll('.ms-panel.open').forEach(p=>{ if(p.id!=='ms-recetario-panel') p.classList.remove('open'); }); document.getElementById('ms-recetario-panel').classList.toggle('open'); };
   actualizarEtiquetaBoton();
 }
+/* última entrada de coste de producto (Costes → COGS) con el mismo nombre que la receta,
+   sin distinguir mayúsculas — para comparar con el coste calculado de la receta */
+function costeProductoVigenteDeReceta(nombre){
+  const key = (nombre||'').toLowerCase().trim();
+  const entradas = STATE.productCosts.filter(pc=>pc.productName.toLowerCase().trim()===key)
+    .sort((a,b)=>b.effectiveFrom.localeCompare(a.effectiveFrom));
+  return entradas[0] || null;
+}
+function textoCosteProductoVigente(nombre, costeReceta){
+  const pc = costeProductoVigenteDeReceta(nombre);
+  if(!pc) return 'Este producto no tiene coste en Costes → COGS todavía.';
+  const dif = costeReceta - pc.unitCost;
+  const difTxt = Math.abs(dif)<0.005 ? 'coincide con la receta' : ('receta '+(dif>0?'+':'')+dif.toFixed(2)+'€ vs. este coste');
+  return 'Coste actual en Costes: <b style="color:var(--text);">'+pc.unitCost.toFixed(3)+'€</b> (desde '+pc.effectiveFrom+', '+escapeHtml(pc.source||'')+') · '+difTxt;
+}
 function renderRecetario(){
   renderRecetarioHistorial();
   renderIngredientesCostesTabla();
@@ -7632,7 +7768,11 @@ function renderRecetario(){
           <button class="btn danger" data-borrar-receta="${r.id}" style="padding:3px 10px;font-size:11px;">✕ Borrar receta</button>
         </div>
       </div>
-      <p class="hint" style="margin-bottom:10px;">Coste de la receta: <b style="color:var(--text);">${eur(Math.round(costeTotal*100))}</b>${completo?'':' <span style="color:var(--negative);">(incompleto — falta el coste de algún ingrediente, marcado abajo)</span>'}</p>
+      <p class="hint" style="margin-bottom:6px;">Coste de la receta: <b style="color:var(--text);">${eur(Math.round(costeTotal*100))}</b>${completo?'':' <span style="color:var(--negative);">(incompleto — falta el coste de algún ingrediente, marcado abajo)</span>'}</p>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn secondary" data-usar-coste-receta="${r.id}" ${completo&&ingredientes.length>0?'':'disabled title="Completa el coste de todos los ingredientes primero"'} style="padding:4px 12px;font-size:12px;">Usar como coste del producto</button>
+        <span class="hint">${textoCosteProductoVigente(r.nombre, costeTotal)}</span>
+      </div>
       <table><thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Unidad</th><th>Coste</th><th></th></tr></thead>
       <tbody>${ingredientes.map(ing=>`
         <tr><td>${ing.ingrediente}</td><td class="num">${ing.cantidad}</td><td>${ing.unidad}</td>
@@ -7643,6 +7783,31 @@ function renderRecetario(){
     </div>`;
   }).join('');
 
+  cont.querySelectorAll('[data-usar-coste-receta]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const receta = STATE.recetas.find(x=>x.id===btn.getAttribute('data-usar-coste-receta'));
+      if(!receta) return;
+      const { costeTotal, completo } = calcularCosteReceta(receta.id);
+      if(!completo){ toast('La receta está incompleta: falta el coste de algún ingrediente.', true); return; }
+      // si ya hay un producto con este nombre en Costes (aunque cambien mayúsculas) se reutiliza su
+      // nombre exacto, para no duplicarlo; si no, se usa el nombre de la receta
+      const existente = costeProductoVigenteDeReceta(receta.nombre);
+      const productName = existente ? existente.productName : receta.nombre.trim();
+      const coste = Math.round(costeTotal*1000)/1000;
+      const fecha = prompt('Guardar "'+productName+'" con coste '+coste.toFixed(3)+'€.\n\n(El nombre debe coincidir con el "Artículo" de Square.)\n\nVigente desde (AAAA-MM-DD):', fechaLocalISO(new Date()));
+      if(!fecha) return;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())){ toast('Fecha no válida (usa AAAA-MM-DD).', true); return; }
+      const effectiveFrom = fecha.trim();
+      try{
+        const saved = await sbUpsert('product_costs', { product_name:productName, unit_cost:coste, effective_from:effectiveFrom, source:'receta' }, 'product_name,effective_from');
+        const mapped = { id:saved.id, productName:saved.product_name, unitCost:parseFloat(saved.unit_cost), effectiveFrom:saved.effective_from, source:saved.source };
+        const idx = STATE.productCosts.findIndex(x=>x.productName===productName && x.effectiveFrom===effectiveFrom);
+        if(idx>=0) STATE.productCosts[idx]=mapped; else STATE.productCosts.push(mapped);
+        toast('Coste de "'+productName+'" guardado: '+coste.toFixed(3)+'€ desde '+effectiveFrom+'.');
+        renderRecetario(); renderCostes(); renderPnl();
+      }catch(e){ toast('Error: '+e.message, true); }
+    });
+  });
   cont.querySelectorAll('[data-anadir-ingrediente]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const recetaId = btn.getAttribute('data-anadir-ingrediente');
@@ -11737,6 +11902,66 @@ function poblarSelectEmpleados(selectId){
   const actual = sel.value;
   sel.innerHTML = STATE.employees.map(e=>`<option value="${e.nombre}">${e.nombre}</option>`).join('') || '<option value="">(sin empleados)</option>';
   if(actual) sel.value = actual;
+  if(selectId==='vacEmpleado') renderVacEmpleadosLista();
+}
+/* lista de empleados de la hoja, con ✕ para eliminar: une los de la lista general
+   (tabla empleados) y los que solo aparecen en registros de vacaciones/horas extras */
+function renderVacEmpleadosLista(){
+  const cont = document.getElementById('vacEmpLista');
+  if(!cont) return;
+  const nombres = new Map(); // clave minúsculas -> nombre mostrado
+  STATE.employees.forEach(e=>{ const k=(e.nombre||'').trim().toLowerCase(); if(k) nombres.set(k, e.nombre); });
+  STATE.vacaciones.forEach(v=>{ const k=(v.empleado||'').trim().toLowerCase(); if(k && !nombres.has(k)) nombres.set(k, v.empleado); });
+  STATE.horasExtras.forEach(h=>{ const k=(h.empleado||'').trim().toLowerCase(); if(k && !nombres.has(k)) nombres.set(k, h.empleado); });
+  const lista = [...nombres.values()].sort((a,b)=>a.localeCompare(b,'es'));
+  cont.innerHTML = lista.map(n=>`<span class="pill noident" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;">${escapeHtml(n)} <button class="btn danger" data-vac-del-emp="${escapeHtml(n)}" title="Eliminar a ${escapeHtml(n)}" style="padding:0 6px;font-size:11px;line-height:18px;">✕</button></span>`).join('') || '<span class="hint">Sin empleados todavía.</span>';
+  cont.querySelectorAll('[data-vac-del-emp]').forEach(btn=>{
+    btn.addEventListener('click', ()=>eliminarEmpleadoVacaciones(btn.getAttribute('data-vac-del-emp')));
+  });
+}
+/* borra una fila y comprueba que de verdad se haya borrado (si los permisos de la base de
+   datos lo bloquean, Supabase responde "ok" pero sin borrar nada) */
+async function sbDeleteVerificado(table, id){
+  const res = await fetchWithRetry(sbUrl()+'/rest/v1/'+table+'?id=eq.'+id, { method:'DELETE', headers: sbHeaders({ 'Prefer':'return=representation' }) });
+  if(!res.ok) throw new Error('No se pudo borrar en "'+table+'" ('+res.status+').');
+  const filas = await res.json().catch(()=>null);
+  if(Array.isArray(filas) && filas.length===0) throw new Error('La base de datos no ha borrado el registro de "'+table+'" — probablemente falten permisos de borrado.');
+}
+async function eliminarEmpleadoVacaciones(nombre){
+  const k = nombre.trim().toLowerCase();
+  const mismo = x=>(x||'').trim().toLowerCase()===k;
+  const filasEmp = STATE.employees.filter(e=>mismo(e.nombre));
+  const regVac = STATE.vacaciones.filter(v=>mismo(v.empleado));
+  const regHx = STATE.horasExtras.filter(h=>mismo(h.empleado));
+  const horasPendientes = regHx.filter(h=>!h.pagada).reduce((s,h)=>s+h.horas,0);
+  let msg = '¿Eliminar a '+nombre+'?';
+  if(filasEmp.length) msg += '\n\nSe quita de la lista de empleados (también desaparece del desplegable de la app de mermas).';
+  if(regVac.length || regHx.length) msg += '\n\nTiene '+regVac.length+' registro(s) de vacaciones y '+regHx.length+' de horas extras'+(horasPendientes>0?' — ⚠ con '+horasPendientes+' h SIN PAGAR':'')+'.';
+  if(!confirm(msg)) return;
+  let borrarRegistros = false;
+  if(regVac.length || regHx.length){
+    borrarRegistros = confirm('¿Borrar también sus registros de vacaciones y horas extras?\n\nAceptar = se borran para siempre (no se puede deshacer).\nCancelar = se conservan en los históricos y siguen saliendo en las tablas de saldo.');
+  }
+  try{
+    for(const e of filasEmp){ await sbDeleteVerificado('empleados', e.id); }
+    STATE.employees = STATE.employees.filter(e=>!mismo(e.nombre));
+    if(borrarRegistros){
+      for(const v of regVac){ await sbDeleteVerificado('vacaciones', v.id); }
+      for(const h of regHx){ await sbDeleteVerificado('horas_extras', h.id); }
+      STATE.vacaciones = STATE.vacaciones.filter(v=>!mismo(v.empleado));
+      STATE.horasExtras = STATE.horasExtras.filter(h=>!mismo(h.empleado));
+    }
+    poblarSelectEmpleados('vacEmpleado');
+    poblarSelectEmpleados('hxEmpleado');
+    renderEmpleados();
+    renderVacaciones();
+    renderHorasExtras();
+    toast(nombre+' eliminado'+(borrarRegistros?' junto con sus registros':'')+'.');
+  }catch(err){
+    // lo que ya se hubiera borrado antes del fallo no se puede recuperar: se recarga la hoja para reflejar el estado real
+    toast('Error: '+err.message, true);
+    loadAndRenderVacaciones();
+  }
 }
 async function loadAndRenderVacaciones(){
   poblarSelectEmpleados('vacEmpleado');
@@ -11810,7 +12035,7 @@ function renderVacaciones(){
   tbodySaldo.innerHTML = nombres.map(n=>{
     const s = calcularSaldoVacaciones(n);
     const botonRapido = `<button class="btn secondary" data-ajuste-rapido="${n.replace(/"/g,'&quot;')}" style="padding:3px 10px;font-size:11px;">+ / − días</button>`;
-    if(!s) return `<tr><td>${n}</td><td colspan="5" class="hint">Sin valor de referencia todavía — añade uno para calcular el saldo.</td></tr><td>${botonRapido}</td></tr>`;
+    if(!s) return `<tr><td>${n}</td><td colspan="5" class="hint">Sin valor de referencia todavía — añade uno para calcular el saldo.</td><td>${botonRapido}</td></tr>`;
     return `<tr><td>${n}</td><td>${s.refFecha}: ${s.refDias} días</td><td class="num">${s.meses}</td><td class="num">${s.acumulado}${s.ajustes?' '+(s.ajustes>0?'+':'')+s.ajustes+' aj.':''}</td><td class="num">${s.usadas}</td><td class="num" style="color:${s.saldo>=0?'var(--positive)':'var(--negative)'}"><b>${s.saldo}</b></td><td>${botonRapido}</td></tr>`;
   }).join('') || '<tr><td colspan="7" class="hint">Sin registros todavía.</td></tr>';
   tbodySaldo.querySelectorAll('[data-ajuste-rapido]').forEach(btn=>{
