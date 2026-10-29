@@ -229,7 +229,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.332</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.334</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -12514,6 +12514,8 @@ function renderFacturasHistorico(){
    CAJA — Análisis de caja del mes (migrado desde la app de React,
    integrado de forma nativa. Etapa 1: subida, categorización, movimientos.)
    ========================================================= */
+/* máximo de balances mensuales que Caja conserva (si se superara, se descartan los más antiguos) */
+const CAJA_MAX_BALANCES = 100;
 const CAJA_BANK_HEADER_ROW = 16;
 const CAJA_COL_AMOUNT   = 'IMPORTE';
 const CAJA_COL_DATE     = 'F. VALOR';
@@ -12570,6 +12572,7 @@ STATE.caja = {
   sortMovimientos: '',
   savedPersonalProvs: [],
   savedGroups: [],
+  saldoBase: null, // { fecha:'AAAA-MM-DD', valor:número } — saldo real de la cuenta en una fecha, punto de partida del saldo mensual
   storageLoaded: false,
   pending: {},
   balanceMonth: '',
@@ -12825,6 +12828,7 @@ async function cajaLoadStorage(){
     const a = await cajaGet('months'); if(a) STATE.caja.savedMonths = a;
     const b = await cajaGet('cats'); if(b) STATE.caja.savedCats = b;
     const g = await cajaGet('groups'); if(g) STATE.caja.savedGroups = g;
+    const sb = await cajaGet('saldoBase'); if(sb && sb.fecha && typeof sb.valor==='number') STATE.caja.saldoBase = sb;
     STATE.caja.savedMonths.forEach(aplicarSimplificacionSocios);
     // reconciliar: cualquier categoría que ya exista de verdad en los movimientos
     // guardados (por ejemplo, guardada hace tiempo o por otra vía) se añade a la lista
@@ -13374,7 +13378,7 @@ async function cajaSaveMonth(){
     updated = [...updated.filter(x=>x.month!==mesSuelto), entryFusionado];
   });
 
-  updated = updated.sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
+  updated = updated.sort((a,b)=>a.month.localeCompare(b.month)).slice(-CAJA_MAX_BALANCES);
   await cajaSet('months', updated);
   c.savedMonths = updated;
   c.data = { ...c.data, saved:true, savedMonth:monthPrincipal };
@@ -13976,7 +13980,7 @@ async function cajaCorregirReparto(month){
     updated = [...updated.filter(x=>x.month!==mesSuelto), construirEntry(fusionados, mesSuelto, existente)];
   });
 
-  updated = updated.sort((a,b)=>a.month.localeCompare(b.month)).slice(-12);
+  updated = updated.sort((a,b)=>a.month.localeCompare(b.month)).slice(-CAJA_MAX_BALANCES);
   await cajaSet('months', updated);
   c.savedMonths = updated;
   toast('Corregido — '+totalMovidos+' movimiento(s) trasladado(s) a su mes correspondiente.');
@@ -15003,6 +15007,138 @@ function attachCajaFiltroPeriodoHandlers(el, onChange){
   const gfTo = document.getElementById('cajaGrafTo'); if(gfTo) gfTo.addEventListener('change', e=>{ STATE.caja.grafTo=e.target.value; onChange(); });
 }
 
+/* =========================================================
+   SALDO DE LA CUENTA A FINAL DE MES (Caja → Tendencias)
+   Parte de un saldo real que introduce el usuario (fecha + importe) y suma/resta los
+   movimientos BANCARIOS de cada balance guardado. No cuentan los movimientos manuales
+   (propinas en efectivo, ajustes...) ni los repartos sintéticos de socios, porque no pasan
+   por la cuenta. Se usan los importes reales del banco, sin ajustes de propinas.
+   ========================================================= */
+function cajaUltimoDiaDelMes(mes){ // 'AAAA-MM' -> 'AAAA-MM-DD'
+  const [y,m] = mes.split('-').map(Number);
+  return fechaLocalISO(new Date(y, m, 0));
+}
+function cajaMesesEntre(desde, hasta){ // lista de 'AAAA-MM' de desde a hasta, ambos incluidos
+  const res = [];
+  let [y,m] = desde.split('-').map(Number);
+  const [yh,mh] = hasta.split('-').map(Number);
+  while(y<yh || (y===yh && m<=mh)){
+    res.push(y+'-'+String(m).padStart(2,'0'));
+    m++; if(m>12){ m=1; y++; }
+  }
+  return res;
+}
+/* devuelve null si no hay saldo base; si lo hay, una fila por balance guardado:
+   { month, title, flujo, saldo (null si no se puede calcular), faltan:[meses], datosHasta } */
+function cajaSaldoMensual(base, savedMonths){
+  if(!base || !base.fecha || typeof base.valor!=='number' || isNaN(base.valor)) return null;
+  const F = base.fecha, mF = F.slice(0,7), V = base.valor;
+  const finDeMesF = (F === cajaUltimoDiaDelMes(mF));
+  const principioDeMesF = F.endsWith('-01');
+  const porMes = new Map(savedMonths.map(e=>[e.month, e]));
+  // movimientos bancarios de todos los balances: { mes, fecha ('' si no hay), amount }
+  const movs = [];
+  savedMonths.forEach(e=>{
+    const lista = (e.movementsOriginal || e.movements || []).filter(m=>!m.isManual && !m.isRecategorizacionSocio);
+    lista.forEach(m=>movs.push({ mes:e.month, fecha:m.fechaDia||'', amount:Number(m.amount)||0 }));
+  });
+  // ¿ocurre el movimiento después de la fecha base? (sin fecha exacta: se decide por mes)
+  const despuesDeBase = m => m.fecha ? m.fecha > F : m.mes > mF;
+  return [...savedMonths].sort((a,b)=>a.month.localeCompare(b.month)).map(e=>{
+    const M = e.month;
+    const flujoMes = movs.filter(m=>m.mes===M).reduce((s,m)=>s+m.amount,0);
+    const fechas = movs.filter(m=>m.mes===M && m.fecha).map(m=>m.fecha).sort();
+    const datosHasta = fechas.length ? fechas[fechas.length-1] : '';
+    let saldo, faltan = [];
+    if(M >= mF){
+      const suma = movs.filter(m=>m.mes>=mF && m.mes<=M && despuesDeBase(m)).reduce((s,m)=>s+m.amount,0);
+      cajaMesesEntre(mF, M).forEach(x=>{ if(x===mF && finDeMesF) return; if(!porMes.has(x)) faltan.push(x); });
+      saldo = V + suma;
+    } else {
+      const suma = movs.filter(m=>m.mes>M && m.mes<=mF && !despuesDeBase(m)).reduce((s,m)=>s+m.amount,0);
+      cajaMesesEntre(M, mF).forEach(x=>{ if(x===M) return; if(x===mF && principioDeMesF) return; if(!porMes.has(x)) faltan.push(x); });
+      saldo = V - suma;
+    }
+    return { month:M, title:e.title||M, flujo:flujoMes, saldo: faltan.length ? null : saldo, faltan, datosHasta };
+  });
+}
+function renderCajaSaldoCard(mesesVisibles){
+  const cont = document.getElementById('cajaSaldoCard');
+  if(!cont) return;
+  const c = STATE.caja;
+  const base = c.saldoBase;
+  const todas = cajaSaldoMensual(base, c.savedMonths);
+  const visibles = todas ? todas.filter(r=>mesesVisibles.has(r.month)) : [];
+  const inp = 'background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;';
+  const fmtFecha = f => f ? f.split('-').reverse().join('/') : '';
+  cont.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <p class="hint" style="text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Saldo de la cuenta a final de mes</p>
+      <p class="hint" style="margin-bottom:10px;">Indica cuánto dinero había <b>realmente en la cuenta</b> en una fecha (míralo en el banco; lo ideal es un fin de mes). A partir de ahí, la app suma y resta los movimientos del extracto de cada balance guardado hasta el último día de cada mes. Los movimientos manuales (propinas en efectivo, ajustes) no cuentan, porque no pasan por la cuenta.</p>
+      <div class="subfilter" style="margin-bottom:12px;">
+        <span class="hint">Saldo base:</span>
+        <input type="date" id="cajaSaldoBaseFecha" value="${base?base.fecha:''}" style="${inp}">
+        <input type="number" step="0.01" id="cajaSaldoBaseValor" placeholder="Saldo en €" value="${base?base.valor:''}" style="${inp}width:130px;">
+        <button class="btn secondary" id="cajaSaldoBaseGuardar" style="padding:5px 12px;font-size:12px;">Guardar</button>
+        ${base?'<button class="btn danger" id="cajaSaldoBaseBorrar" style="padding:5px 12px;font-size:12px;">Quitar</button>':''}
+      </div>
+      ${!base ? '<p class="hint">Introduce la fecha y el saldo para ver la evolución.</p>' : `
+      <div id="cajaSaldoStats" style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;"></div>
+      <div class="chart-wrap" style="height:220px;"><canvas id="cajaSaldoChart"></canvas></div>
+      <div style="max-height:300px;overflow:auto;margin-top:14px;">
+        <table><thead><tr><th>Mes</th><th>Flujo del mes (banco)</th><th>Saldo a fin de mes</th><th>Datos hasta</th></tr></thead><tbody>
+        ${visibles.map(r=>`<tr><td>${r.title}</td>
+          <td class="num" style="color:${r.flujo>=0?'var(--positive)':'var(--negative)'};">${r.flujo>=0?'+':''}${cajaFmt(r.flujo)}</td>
+          <td class="num">${r.saldo===null ? '<span class="hint" style="color:var(--negative);">sin calcular — falta el balance de '+r.faltan.map(x=>x).join(', ')+'</span>' : '<b>'+cajaFmt(r.saldo)+'</b>'}</td>
+          <td class="hint">${r.datosHasta?fmtFecha(r.datosHasta):'—'}</td></tr>`).join('') || '<tr><td colspan="4" class="hint">Sin meses en el periodo elegido.</td></tr>'}
+        </tbody></table>
+      </div>
+      <p class="hint" style="margin-top:8px;">Si un mes no tiene su balance guardado en Caja, los saldos de los meses siguientes no se pueden calcular (se marcan arriba). Si el último mes se subió a medias, "Datos hasta" muestra el último día con movimientos.</p>`}
+    </div>`;
+
+  document.getElementById('cajaSaldoBaseGuardar').addEventListener('click', async ()=>{
+    const fecha = document.getElementById('cajaSaldoBaseFecha').value;
+    const valor = parseFloat(String(document.getElementById('cajaSaldoBaseValor').value).replace(',','.'));
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || isNaN(valor)){ toast('Rellena la fecha y el saldo.', true); return; }
+    const ok = await cajaSet('saldoBase', { fecha, valor });
+    if(!ok){ toast('No se pudo guardar el saldo base.', true); return; }
+    c.saldoBase = { fecha, valor };
+    toast('Saldo base guardado.');
+    renderCajaTabContent();
+  });
+  const borrar = document.getElementById('cajaSaldoBaseBorrar');
+  if(borrar) borrar.addEventListener('click', async ()=>{
+    if(!confirm('¿Quitar el saldo base? Dejará de calcularse el saldo mensual.')) return;
+    const ok = await cajaSet('saldoBase', null);
+    if(!ok){ toast('No se pudo quitar.', true); return; }
+    c.saldoBase = null;
+    renderCajaTabContent();
+  });
+
+  destroyChart('cajaSaldo');
+  if(!base) return;
+  const conSaldo = visibles.filter(r=>r.saldo!==null);
+  const ultimo = conSaldo[conSaldo.length-1];
+  const anterior = conSaldo[conSaldo.length-2];
+  const valores = conSaldo.map(r=>r.saldo);
+  const stats = [
+    ['Último', ultimo ? cajaFmt(ultimo.saldo) : '—'],
+    ['Variación vs. mes anterior', (ultimo && anterior) ? ((ultimo.saldo-anterior.saldo>=0?'+':'')+cajaFmt(ultimo.saldo-anterior.saldo)) : '—'],
+    ['Máx', valores.length ? cajaFmt(Math.max(...valores)) : '—'],
+    ['Mín', valores.length ? cajaFmt(Math.min(...valores)) : '—'],
+  ];
+  document.getElementById('cajaSaldoStats').innerHTML = stats.map(([l,v])=>`<div><span class="hint">${l}: </span><span style="color:var(--copper);font-family:monospace;font-weight:700;font-size:13px;">${v}</span></div>`).join('');
+  const c2 = chartColors();
+  STATE.charts['cajaSaldo'] = safeNewChart('cajaSaldoChart', {
+    type:'line',
+    data:{ labels: visibles.map(r=>r.title), datasets:[{ label:'Saldo a fin de mes', data: visibles.map(r=>r.saldo), borderColor:'#C17F3C', backgroundColor:'#C17F3C', tension:.3, spanGaps:false }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>cajaFmt(ctx.parsed.y)}}}, scales:{
+      x:{ ticks:{color:c2.muted}, grid:{display:false} },
+      y:{ ticks:{color:c2.muted, callback: v => v+'€'}, grid:{color:c2.grid} }
+    } }
+  });
+}
+
 function renderCajaTendenciasTab(el){
   const c = STATE.caja;
   if(!c.storageLoaded){ el.innerHTML = '<p class="hint" style="text-align:center;padding:60px;">Cargando...</p>'; return; }
@@ -15066,6 +15202,7 @@ function renderCajaTendenciasTab(el){
       </div>
       ${cajaFiltroPeriodoHtml(c.grafPeriod, c.grafFrom, c.grafTo, c.savedMonths)}
     </div>
+    <div id="cajaSaldoCard"></div>
     <div style="display:flex;flex-direction:column;gap:16px;" id="cajaTendenciasCharts"></div>
   `;
 
@@ -15099,6 +15236,7 @@ function renderCajaTendenciasTab(el){
   el.querySelectorAll('[data-tend-view]').forEach(btn=>btn.addEventListener('click', ()=>{ c.tendView = btn.getAttribute('data-tend-view'); renderCajaTabContent(); }));
   attachCajaFiltroPeriodoHandlers(el, renderCajaTabContent);
 
+  renderCajaSaldoCard(new Set(tendPeriod.map(m=>m.month)));
   const chartsContainer = document.getElementById('cajaTendenciasCharts');
   chartsContainer.innerHTML = series.map((s,i)=>`
     <div class="card">
