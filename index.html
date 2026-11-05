@@ -282,7 +282,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.337</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.338</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -1415,9 +1415,12 @@ Bowl de acai,Acai,150,g</pre>
             <div class="filter-group"><label>Ver stock en esta fecha</label><input type="date" id="stockExistenteFecha"></div>
             <button class="clear-btn" id="stockExistenteRefreshBtn">Actualizar</button>
           </div>
+          <p class="hint" id="stockExistenteResumen" style="margin-top:8px;"></p>
+          <p class="hint">El último inventario sale de la app de empleados (pestaña Inventarios): para cada ingrediente se toma la última cantidad apuntada hasta la fecha elegida.</p>
+          <datalist id="stockProductosList"></datalist>
         </div>
         <div class="card" style="padding:0;overflow:auto;max-height:600px;">
-          <table id="tablaStockExistente"><thead><tr><th>Ingrediente</th><th id="stockExistenteColInv">Último inventario</th><th>Consumo teórico</th><th>Stock existente</th><th>Unidad</th></tr></thead><tbody></tbody></table>
+          <table id="tablaStockExistente"><thead><tr><th>Ingrediente</th><th>Producto del inventario</th><th id="stockExistenteColInv">Último inventario</th><th>Consumo teórico</th><th>Stock existente</th><th>Unidad</th></tr></thead><tbody></tbody></table>
         </div>
 
         <div class="section-title">Plantillas de inventario</div>
@@ -3333,7 +3336,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.tab==='resumenejecutivo') renderResumenEjecutivo();
     if(item.dataset.tab==='recetario') renderRecetario();
     if(item.dataset.tab==='rotacion'){
-      renderStockExistente();
+      renderStockExistente(true);
     }
     if(item.dataset.tab==='vacaciones'){
       if(STATE.vacaciones.length===0 && STATE.horasExtras.length===0) loadAndRenderVacaciones();
@@ -8496,20 +8499,88 @@ document.getElementById('recetarioAddRecetaBtn').addEventListener('click', async
 });
 
 /* =========================================================
-   STOCK EXISTENTE — a partir del último inventario contado (app de empleados o aquí
-   mismo) y el consumo teórico (según ventas reales) desde esa fecha hasta la elegida.
+   STOCK EXISTENTE — a partir del último inventario contado en la app de empleados
+   (tablas equipo_*, las mismas de la pestaña Inventarios) y el consumo teórico (según
+   ventas reales) desde esa fecha hasta la elegida.
    Cocina: consumo teórico vía recetas del Recetario, sobre ventas de la categoría
    "Brunch". Bebidas: consumo teórico directo (cada unidad vendida = una consumida),
    sobre ventas de la categoría "Beans" — mismo ingrediente = mismo nombre de producto.
+   Cada ingrediente se empareja con un producto de los inventarios por nombre (sin
+   tildes, mayúsculas ni paréntesis como "(UND)"); si no coincide, se puede vincular a
+   mano en la columna "Producto del inventario" (se guarda en caja_storage).
    ========================================================= */
+function eqStockNorm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/\([^)]*\)/g,' ')
+    .replace(/\bx\s?(paq|und|caja|kg|u)\b/g,' ')
+    .replace(/\b(und|unidad|unidades|kg|paq)\b/g,' ')
+    .replace(/\b(de|del|la|el|los|las)\b/g,' ')
+    .replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
+}
+/* lo apuntado en el inventario es texto libre ("12", "1 1/2", "+10", "6u", "10+12"...): se saca
+   el número para poder restar el consumo; si no hay número ("Caja", "Pedir") devuelve null */
+function eqStockNumero(txt){
+  let s = String(txt==null?'':txt).trim().toLowerCase().replace(/,/g,'.');
+  if(!s) return null;
+  if(/^\d+(\.\d+)?(\s*\+\s*\d+(\.\d+)?)+$/.test(s)) return s.split('+').reduce((a,x)=>a+parseFloat(x),0);
+  s = s.replace(/^\+\s*/,'').replace(/\s*\+$/,'');
+  let m = s.match(/^(\d+)\s+(\d+)\/(\d+)/) || s.match(/^(\d+)\.(\d+)\/(\d+)/);
+  if(m) return parseInt(m[1],10) + parseInt(m[2],10)/parseInt(m[3],10);
+  m = s.match(/^(\d+)\/(\d+)/);
+  if(m) return parseInt(m[1],10)/parseInt(m[2],10);
+  m = s.match(/^-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+async function eqStockCargar(){
+  const [invs, prods, cants] = await Promise.all([
+    eqInvReqTodo(EQINV_T.inv, 'select=id,nombre&order=nombre.asc'),
+    eqInvReqTodo(EQINV_T.prod, 'select=id,inventario_id,nombre,unidad,grupo&order=inventario_id.asc,orden.asc'),
+    eqInvReqTodo(EQINV_T.cant, 'select=producto_id,fecha,cantidad&cantidad=not.is.null&order=producto_id.asc,fecha.desc')
+  ]);
+  const invNombre = new Map(invs.map(i=>[i.id,i.nombre]));
+  const productosPorId = new Map(), porNombre = new Map(), cant = new Map();
+  prods.forEach(p=>{
+    const prod = { id:p.id, nombre:p.nombre, unidad:p.unidad||'', grupo:p.grupo||'', inventario:invNombre.get(p.inventario_id)||'' };
+    prod.etiqueta = [prod.nombre, prod.inventario, prod.grupo].filter(Boolean).join(' · ');
+    productosPorId.set(p.id, prod);
+    const k = eqStockNorm(p.nombre); prod.norm = k;
+    if(k){ if(!porNombre.has(k)) porNombre.set(k, []); porNombre.get(k).push(p.id); }
+  });
+  cants.forEach(c=>{ if(!cant.has(c.producto_id)) cant.set(c.producto_id, []); cant.get(c.producto_id).push({ fecha:c.fecha, texto:String(c.cantidad) }); });
+  cant.forEach(serie=>serie.sort((a,b)=>b.fecha.localeCompare(a.fecha)));
+  STATE.eqStock = { productosPorId, porNombre, cant, productos:[...productosPorId.values()].sort((a,b)=>a.etiqueta.localeCompare(b.etiqueta,'es')) };
+  const v = await cajaGet('stockVinculosInventario');
+  STATE.stockVinculos = (v && typeof v==='object') ? v : {};
+}
+/* producto(s) del inventario que corresponden a un ingrediente: el vinculado a mano o, si no, el de nombre igual */
+function eqStockProductosDe(ingrediente){
+  const E = STATE.eqStock; if(!E) return { ids:[], auto:true };
+  const vinc = (STATE.stockVinculos||{})[ingrediente];
+  if(vinc) return { ids: E.productosPorId.has(vinc) ? [vinc] : [], auto:false };
+  const k = eqStockNorm(ingrediente);
+  let ids = E.porNombre.get(k) || [];
+  if(!ids.length && k.length>=4){
+    // coincidencia por palabras completas, solo si no hay duda (un único nombre posible)
+    const nombresPosibles = [];
+    E.porNombre.forEach((v,pn)=>{ if((' '+pn+' ').includes(' '+k+' ') || (' '+k+' ').includes(' '+pn+' ')) nombresPosibles.push(pn); });
+    if(nombresPosibles.length===1) ids = E.porNombre.get(nombresPosibles[0]);
+  }
+  return { ids, auto:true };
+}
 function ultimoInventarioIngrediente(ingrediente, tipo, fechaLimite){
-  const candidatos = STATE.inventarioItems
-    .filter(it=>it.ingrediente===ingrediente && (it.tipo||'cocina')===tipo)
-    .map(it=>{ const inv = STATE.inventarios.find(i=>i.id===it.inventarioId); return inv ? {...it, fecha:inv.fecha} : null; })
-    .filter(Boolean)
-    .filter(it=>it.fecha<=fechaLimite)
-    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  return candidatos[0] || null;
+  const E = STATE.eqStock; if(!E) return null;
+  const { ids } = eqStockProductosDe(ingrediente);
+  let mejor = null;
+  ids.forEach(id=>{
+    for(const e of (E.cant.get(id)||[])){
+      if(e.fecha>fechaLimite) continue;
+      const n = eqStockNumero(e.texto);
+      if(n===null) continue;
+      if(!mejor || e.fecha>mejor.fecha) mejor = { fecha:e.fecha, texto:e.texto, cantidad:n, producto:E.productosPorId.get(id) };
+      break;
+    }
+  });
+  return mejor;
 }
 function consumoTeoricoCocina(ingrediente, desdeExclusivo, hastaInclusivo){
   const lineas = getAllSalesLinesRaw().filter(l=>l.fecha>desdeExclusivo && l.fecha<=hastaInclusivo && (l.categoria||'').toLowerCase()==='brunch');
@@ -8529,48 +8600,86 @@ function consumoTeoricoBebidas(ingrediente, desdeExclusivo, hastaInclusivo){
     .filter(l=>l.fecha>desdeExclusivo && l.fecha<=hastaInclusivo && l.articulo===ingrediente && (l.categoria||'').toLowerCase()==='beans')
     .reduce((s,l)=>s+l.cant, 0);
 }
-function renderStockExistente(){
+async function renderStockExistente(forzarCarga){
   const fechaInput = document.getElementById('stockExistenteFecha');
   if(!fechaInput.value) fechaInput.value = fechaLocalISO(new Date());
   const fechaFiltro = fechaInput.value;
   const colInv = document.getElementById('stockExistenteColInv');
   if(colInv) colInv.textContent = 'Último inventario (hasta '+fechaFiltro+')';
   const tbody = document.querySelector('#tablaStockExistente tbody');
+  const resumen = document.getElementById('stockExistenteResumen');
   if(!tbody) return;
+  if(forzarCarga===true || !STATE.eqStock){
+    tbody.innerHTML = '<tr><td colspan="6" class="hint" style="text-align:center;padding:30px;">Cargando los inventarios de la app de empleados...</td></tr>';
+    try{ await eqStockCargar(); }
+    catch(e){
+      STATE.eqStock = null;
+      tbody.innerHTML = '<tr><td colspan="6" class="hint warn" style="text-align:center;padding:30px;">No se pudieron cargar los inventarios de la app de empleados: '+escapeHtml(e.message)+'</td></tr>';
+      if(resumen) resumen.textContent = '';
+      return;
+    }
+  }
+  const dl = document.getElementById('stockProductosList');
+  if(dl) dl.innerHTML = STATE.eqStock.productos.map(p=>'<option value="'+escapeHtml(p.etiqueta)+'">').join('');
 
   const listaCocina = STATE.stockIngredientesLista.filter(x=>x.tipo==='cocina');
   const listaBebidas = STATE.stockIngredientesLista.filter(x=>x.tipo==='bebidas');
 
   const filas = [];
-  listaCocina.forEach(item=>{
-    const ult = ultimoInventarioIngrediente(item.ingrediente, 'cocina', fechaFiltro);
-    const consumo = ult ? consumoTeoricoCocina(item.ingrediente, ult.fecha, fechaFiltro) : null;
+  const anadir = (item, tipo, consumoFn)=>{
+    const ult = ultimoInventarioIngrediente(item.ingrediente, tipo, fechaFiltro);
+    const consumo = ult ? consumoFn(item.ingrediente, ult.fecha, fechaFiltro) : null;
     const stockExistente = (ult && consumo!==null) ? ult.cantidad - consumo : null;
-    filas.push({ ingrediente:item.ingrediente, tipo:'cocina', listaId:item.id, ultimo:ult, consumo, stockExistente, unidad:item.unidad||'' });
-  });
-  listaBebidas.forEach(item=>{
-    const ult = ultimoInventarioIngrediente(item.ingrediente, 'bebidas', fechaFiltro);
-    const consumo = ult ? consumoTeoricoBebidas(item.ingrediente, ult.fecha, fechaFiltro) : null;
-    const stockExistente = (ult && consumo!==null) ? ult.cantidad - consumo : null;
-    filas.push({ ingrediente:item.ingrediente, tipo:'bebidas', listaId:item.id, ultimo:ult, consumo, stockExistente, unidad:item.unidad||'' });
-  });
+    const dePr = eqStockProductosDe(item.ingrediente);
+    filas.push({ ingrediente:item.ingrediente, tipo, listaId:item.id, ultimo:ult, consumo, stockExistente, unidad:item.unidad||'', vinculado:!dePr.auto, hayCoincidencia:dePr.ids.length>0 });
+  };
+  listaCocina.forEach(item=>anadir(item, 'cocina', consumoTeoricoCocina));
+  listaBebidas.forEach(item=>anadir(item, 'bebidas', consumoTeoricoBebidas));
   filas.sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
 
+  if(resumen){
+    const con = filas.filter(f=>f.ultimo).length;
+    resumen.textContent = filas.length
+      ? (con+' de '+filas.length+' ingredientes tienen inventario en la app de empleados ('+STATE.eqStock.productos.length+' productos en total). Los que no, no coinciden por nombre: vincúlalos a mano en la columna "Producto del inventario".')
+      : '';
+  }
   if(filas.length===0){
-    tbody.innerHTML = '<tr><td colspan="5" class="hint" style="text-align:center;padding:30px;">Sin ingredientes en la lista todavía — sube una en "Plantillas de inventario", más abajo.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="hint" style="text-align:center;padding:30px;">Sin ingredientes en la lista todavía — sube una en "Plantillas de inventario", más abajo.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = filas.map(f=>{
+  tbody.innerHTML = filas.map((f,i)=>{
+    const u = f.ultimo;
+    const pistaAuto = f.hayCoincidencia ? '' : 'sin coincidencia — elige uno';
+    const valorVinculo = f.vinculado && STATE.eqStock.productosPorId.get(STATE.stockVinculos[f.ingrediente]) ? STATE.eqStock.productosPorId.get(STATE.stockVinculos[f.ingrediente]).etiqueta : '';
+    const placeholder = f.vinculado ? '' : (u ? ('auto: '+u.producto.nombre) : (f.hayCoincidencia ? 'auto (sin cantidades)' : pistaAuto));
     return `<tr>
       <td>${escapeHtml(f.ingrediente)} <span class="pill ${f.tipo==='cocina'?'noident':'nuevo'}" style="font-size:9px;">${f.tipo==='cocina'?'Cocina':'Bebidas'}</span></td>
-      <td class="num">${f.ultimo ? (f.ultimo.cantidad+' <span class="hint">('+f.ultimo.fecha+')</span>') : '<span class="hint">Sin inventario</span>'}</td>
+      <td><input type="text" list="stockProductosList" data-stock-vinculo="${i}" value="${escapeHtml(valorVinculo)}" placeholder="${escapeHtml(placeholder)}" style="width:230px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;"></td>
+      <td class="num">${u ? (escapeHtml(u.texto)+' <span class="hint">'+escapeHtml((u.producto.unidad?u.producto.unidad+' · ':'')+u.fecha+' · '+u.producto.inventario)+'</span>') : '<span class="hint">Sin inventario</span>'}</td>
       <td class="num">${f.consumo!==null ? (+f.consumo.toFixed(2)) : '<span class="hint">—</span>'}</td>
       <td class="num" style="font-weight:700;color:${f.stockExistente!==null?(f.stockExistente<0?'var(--negative)':'var(--positive)'):'var(--text-muted)'};">${f.stockExistente!==null ? (+f.stockExistente.toFixed(2)) : '<span class="hint">—</span>'}</td>
       <td><input type="text" data-stock-unidad="${f.listaId}" value="${escapeHtml(f.unidad)}" placeholder="unidad" style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;"></td>
     </tr>`;
   }).join('');
 
+  tbody.querySelectorAll('[data-stock-vinculo]').forEach(inp=>{
+    inp.addEventListener('change', async ()=>{
+      const f = filas[+inp.getAttribute('data-stock-vinculo')];
+      const texto = inp.value.trim();
+      const nuevo = Object.assign({}, STATE.stockVinculos);
+      if(!texto){ delete nuevo[f.ingrediente]; }
+      else {
+        const prod = STATE.eqStock.productos.find(p=>p.etiqueta===texto);
+        if(!prod){ toast('Elige un producto de la lista desplegable.', true); renderStockExistente(); return; }
+        nuevo[f.ingrediente] = prod.id;
+      }
+      const ok = await cajaSet('stockVinculosInventario', nuevo);
+      if(!ok){ toast('No se pudo guardar el vínculo.', true); return; }
+      STATE.stockVinculos = nuevo;
+      renderStockExistente();
+    });
+  });
   tbody.querySelectorAll('[data-stock-unidad]').forEach(inp=>{
     inp.addEventListener('change', async ()=>{
       const id = inp.getAttribute('data-stock-unidad');
@@ -8584,7 +8693,7 @@ function renderStockExistente(){
     });
   });
 }
-document.getElementById('stockExistenteRefreshBtn').addEventListener('click', renderStockExistente);
+document.getElementById('stockExistenteRefreshBtn').addEventListener('click', ()=>renderStockExistente(true));
 
 /* --- Plantillas de inventario: listas de ingredientes subidas por Excel — la usan tanto
    este panel como la app de empleados, para saber qué ingredientes se pueden contar. --- */
