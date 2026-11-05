@@ -157,6 +157,59 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
 .subfilter select{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;}
 #ventasGranularidad,#ticketsGranularidad{background:var(--bg);border:1px solid var(--line);color:var(--copper);border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:600;text-transform:none;letter-spacing:0;}
 .hidden{display:none !important;}
+.eqi-acceso{display:flex;gap:6px;align-items:stretch;margin-bottom:8px;}
+.eqi-acceso .btn{text-align:left;padding:14px 16px;}
+.eqi-acceso-x{background:transparent;border:1px solid var(--line);color:var(--text-muted);border-radius:12px;width:44px;cursor:pointer;font-size:14px;}
+.eqi-scroll{overflow:auto;-webkit-overflow-scrolling:touch;margin:0 -6px;padding-bottom:6px;max-height:72vh;}
+.eqi-table{border-collapse:separate;border-spacing:0;font-size:14px;min-width:100%;}
+.eqi-table th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:600;padding:6px 6px;text-align:center;white-space:nowrap;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2;}
+.eqi-table thead tr:nth-child(2) th{top:38px;}
+.eqi-table thead tr:first-child th{height:38px;box-sizing:border-box;}
+.eqi-table th.eqi-sub{font-size:10px;padding:3px 4px;}
+.eqi-table th.eqi-sub-ped{color:var(--copper);}
+.eqi-table td{padding:5px 4px;border-bottom:1px solid var(--line);background:var(--surface);}
+.eqi-table .eqi-nombre{position:sticky;left:0;z-index:2;width:128px;min-width:128px;max-width:128px;text-align:left;box-shadow:1px 0 0 var(--line);}
+.eqi-table th.eqi-nombre{z-index:4;}
+.eqi-table th{padding:6px 4px;}
+.eqi-fecha{min-width:70px;}
+.eqi-fecha-btn{background:transparent;border:none;color:var(--text);font-weight:700;font-size:12px;cursor:pointer;text-decoration:underline dotted;padding:2px 2px;font-family:'Inter',sans-serif;}
+.eqi-grupo-row td{background:var(--bg);padding:0;border-bottom:1px solid var(--line);}
+.eqi-grupo{display:inline-block;position:sticky;left:0;padding:9px 12px;font-family:'Fraunces',serif;font-weight:700;font-size:13px;letter-spacing:.4px;color:var(--copper);}
+.eqi-nombre-in{display:flex;gap:2px;align-items:center;}
+.eqi-nombre-txt{flex:1;font-size:12.5px;line-height:1.25;word-break:break-word;cursor:pointer;padding:4px 2px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+.eqi-table input{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 8px;font-size:14px;font-family:'Inter',sans-serif;}
+.eqi-table input.eqi-cant{width:66px;text-align:right;padding:9px 6px;}
+.eqi-table input.eqi-ped{border-style:dashed;}
+.eqi-table input.eqi-unidad{width:74px;padding:9px 5px;font-size:13.5px;}
+.eqi-table input::-webkit-calendar-picker-indicator{display:none !important;}
+.eqi-table input.eqi-ideal{width:54px;padding:9px 5px;text-align:right;font-size:14px;}
+.eqi-table input.eqi-prov{width:70px;padding:9px 5px;font-size:14px;}
+.eqi-table input.eqi-ok{border-color:var(--positive);}
+.eqi-table input.eqi-error{border-color:var(--negative);}
+.eqi-check{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400;}
+.eqi-check input{width:auto;}
+#eqInvBuscar{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:12px;font-size:16px;font-family:'Inter',sans-serif;}
+.eqi-x{background:transparent;border:none;color:var(--negative);cursor:pointer;font-size:12px;padding:4px 3px;line-height:1;}
+
+/* ===== INVENTARIOS (mismo módulo que la app de empleados) ===== */
+#tab-inventarios{max-width:1100px;}
+#tab-inventarios .card{margin-bottom:14px;}
+#tab-inventarios label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px;}
+#tab-inventarios .field{margin-bottom:10px;}
+#tab-inventarios select,#tab-inventarios input[type=text],#tab-inventarios input[type=search],#tab-inventarios input[type=date]{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;}
+#tab-inventarios .btn.small{padding:8px 14px;font-size:12px;white-space:nowrap;}
+#tab-inventarios .back-link{display:inline-flex;gap:6px;color:var(--copper);font-size:13px;font-weight:600;margin-bottom:12px;cursor:pointer;background:none;border:none;padding:0;}
+#tab-inventarios .eqi-acceso .btn{flex:1;text-align:left;padding:12px 16px;}
+@media (min-width:900px){
+  #tab-inventarios .eqi-table .eqi-nombre{width:230px;min-width:230px;max-width:230px;}
+  #tab-inventarios .eqi-nombre-txt{font-size:13px;}
+  #tab-inventarios .eqi-table input.eqi-cant{width:78px;}
+  #tab-inventarios .eqi-table input.eqi-unidad{width:96px;}
+  #tab-inventarios .eqi-table input.eqi-ideal{width:70px;}
+  #tab-inventarios .eqi-table input.eqi-prov{width:100px;}
+  #tab-inventarios .eqi-table input{font-size:14px;}
+  #tab-inventarios .eqi-scroll{margin:0;}
+}
 </style>
 </head>
 <body>
@@ -229,7 +282,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.336</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.337</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -244,6 +297,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="nav-item" data-tab="simulacion"><span class="dot"></span>Simulación Rentabilidad</div>
     <div class="nav-item" data-tab="simop"><span class="dot"></span>Simulación Operacional</div>
     <div class="nav-item" data-tab="recetario"><span class="dot"></span>Recetario</div>
+    <div class="nav-item" data-tab="inventarios"><span class="dot"></span>Inventarios</div>
     <div class="nav-item" data-tab="rotacion"><span class="dot"></span>Rotación de Stock</div>
     <div class="nav-item" data-tab="performance"><span class="dot"></span>Performance del equipo</div>
     <div class="nav-item" data-tab="rentabilidad"><span class="dot"></span>Rentabilidad por franja</div>
@@ -1288,6 +1342,72 @@ Bowl de acai,Acai,150,g</pre>
       </div>
 
       <!-- ROTACIÓN DE STOCK -->
+      <!-- INVENTARIOS -->
+      <!-- INVENTARIOS: tablas de producto × fecha -->
+        <div class="tabpanel" id="tab-inventarios">
+          <div id="eqInvListaView">
+            <p class="hint hidden" id="eqInvAviso" style="color:var(--negative);margin-bottom:12px;"></p>
+            <div class="card">
+              <label>Accesos directos</label>
+              <div id="eqInvAccesos" style="margin-bottom:12px;"><span class="hint">Cargando...</span></div>
+              <div class="field" style="margin-bottom:10px;"><select id="eqInvAccesoSelect"></select></div>
+              <button class="btn secondary" id="eqInvAccesoAnadirBtn">+ Añadir acceso directo</button>
+            </div>
+            <div class="card">
+              <label>Elegir inventario</label>
+              <div class="field"><select id="eqInvSelect"></select></div>
+              <button class="btn" id="eqInvAbrirBtn">Abrir inventario</button>
+            </div>
+            <div class="card">
+              <label>Crear un inventario nuevo</label>
+              <div class="field"><input type="text" id="eqInvNuevoNombre" placeholder="ej. Almacén, Cámara, Barra..."></div>
+              <button class="btn secondary" id="eqInvCrearBtn">Crear inventario</button>
+            </div>
+          </div>
+      
+          <div id="eqInvDetalleView" class="hidden">
+            <button class="back-link" id="backFromInventarioDetalleBtn">← Inventarios</button>
+            <div class="card">
+              <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:700;margin-bottom:10px;" id="eqInvTitulo"></div>
+              <div class="field" style="margin-bottom:10px;"><input type="search" id="eqInvBuscar" placeholder="Buscar producto..." autocomplete="off"></div>
+              <div class="eqi-scroll" id="eqInvTablaWrap"><span class="hint">Cargando...</span></div>
+              <div id="eqInvPie" style="margin-top:10px;"></div>
+              <label class="eqi-check"><input type="checkbox" id="eqInvConPedido"> Mostrar la columna «Pedido» en cada fecha</label>
+            </div>
+            <div class="card">
+              <label>Añadir una fecha (columna nueva)</label>
+              <div style="display:flex;gap:10px;">
+                <input type="date" id="eqInvFechaNueva" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:14px;font-size:16px;font-family:'Inter',sans-serif;">
+                <button class="btn secondary small" id="eqInvFechaAnadirBtn" style="white-space:nowrap;">+ Fecha</button>
+              </div>
+              <p class="hint" style="margin-top:8px;">Se propone la semana siguiente a la última fecha. Cámbiala si hace falta.</p>
+            </div>
+            <div class="card" id="eqInvFechaEditCard">
+              <label>Cambiar la fecha de una columna</label>
+              <div style="display:flex;gap:10px;margin-bottom:10px;">
+                <select id="eqInvFechaEditSel" style="flex:1;"></select>
+                <input type="date" id="eqInvFechaEditNueva" style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:14px;font-size:16px;font-family:'Inter',sans-serif;">
+              </div>
+              <button class="btn secondary small" id="eqInvFechaEditBtn">Cambiar fecha</button>
+              <p class="hint" style="margin-top:8px;">Mueve la columna entera (stock y pedido) a la fecha nueva. También puedes tocar la fecha en la cabecera de la tabla.</p>
+            </div>
+            <div class="card">
+              <label>Añadir un producto a este inventario</label>
+              <div class="field"><input type="text" id="eqInvProdNombre" placeholder="Nombre del producto"></div>
+              <div class="field"><input type="text" id="eqInvProdUnidad" list="eqInvUnidadesList" placeholder="Unidad estándar (kg, l, unidad...)"></div>
+              <div class="field"><input type="text" id="eqInvProdIdeal" placeholder="Stock ideal (opcional)"></div>
+              <div class="field"><input type="text" id="eqInvProdGrupo" list="eqInvGruposList" placeholder="Grupo / sección (opcional, ej. LECHES)"></div>
+              <div class="field"><input type="text" id="eqInvProdProv" placeholder="Proveedor (opcional)"></div>
+              <button class="btn" id="eqInvProdAnadirBtn">Añadir producto</button>
+            </div>
+            <div style="display:flex;gap:10px;">
+              <button class="btn secondary small" id="eqInvRenombrarBtn" style="flex:1;">✏️ Renombrar inventario</button>
+              <button class="btn secondary small" id="eqInvEliminarBtn" style="flex:1;color:var(--negative);">🗑 Eliminar inventario</button>
+            </div>
+          </div>
+          <datalist id="eqInvUnidadesList"></datalist>
+          <datalist id="eqInvGruposList"></datalist>
+
       <div class="tabpanel" id="tab-rotacion">
         <div class="section-title">Stock existente</div>
         <div class="card" style="margin-bottom:14px;">
@@ -2671,6 +2791,488 @@ document.getElementById('ventasChartTypeSelect').addEventListener('change', (e)=
 document.getElementById('ticketsChartTypeSelect').addEventListener('change', (e)=>onChartTypeChange(e.target.value));
 
 /* =========================================================
+   INVENTARIOS — tablas de producto × fecha (stock + pedido/producción)
+   Tablas de Supabase (ver inventarios_v2.sql): equipo_inventarios, equipo_inventario_productos,
+   equipo_inventario_fechas, equipo_inventario_cantidades.
+   Los accesos directos se guardan en este navegador (localStorage). Mismo módulo que la app de empleados.
+   ========================================================= */
+const EQINV_T = {
+  inv:'equipo_inventarios', prod:'equipo_inventario_productos',
+  fechas:'equipo_inventario_fechas', cant:'equipo_inventario_cantidades'
+};
+const EQINV_UNIDADES_COMUNES = ['kg','g','l','ml','unidad','caja','bandeja','paquete','botella','bolsa','lata','saco'];
+const EQINV_FECHAS_INICIALES = (window.innerWidth>=900 ? 14 : 8);    // fechas que se ven al abrir (las más recientes)
+const EQINV_FECHAS_PASO = 10;        // cuántas más se añaden con "Ver fechas anteriores"
+const EQINV_MAX_TEXTO = 40;
+const EQINV = {
+  lista: null,           // [{id,nombre,con_pedido}] de todos los inventarios (null = no cargada / error)
+  error: null,
+  actual: null,          // {id,nombre,con_pedido} del inventario abierto
+  productos: [],         // [{id,nombre,unidad,orden,grupo,ideal,proveedor}]
+  fechas: [],            // ['AAAA-MM-DD'] de más reciente a más antigua
+  cantidades: new Map(), // 'productoId|fecha' -> {s:'stock', p:'pedido'}
+  visibles: EQINV_FECHAS_INICIALES,
+  filtro: ''
+};
+
+/* petición a Supabase con errores claros; si se pide "verificar", una escritura que no
+   devuelve filas se considera fallida (permisos de la tabla en Supabase) */
+async function eqInvReq(tabla, query, opciones){
+  const o = opciones || {};
+  const prefer = [o.prefer, o.conCount ? 'count=exact' : ''].filter(Boolean).join(',');
+  const res = await fetch(sbUrl()+'/rest/v1/'+tabla+(query?('?'+query):''), {
+    method: o.method || 'GET',
+    headers: sbHeaders(Object.assign({}, o.body!==undefined ? {'Content-Type':'application/json'} : {}, prefer ? {'Prefer':prefer} : {})),
+    body: o.body!==undefined ? JSON.stringify(o.body) : undefined
+  });
+  if(!res.ok){
+    const cuerpo = await res.text().catch(()=>'');
+    if(res.status===404 || /PGRST205|relation .* does not exist|schema cache/i.test(cuerpo)) throw new Error('faltan las tablas de inventarios en Supabase (hay que ejecutar inventarios.sql y inventarios_v2.sql)');
+    if(/42703|column .* does not exist|Could not find the .* column/i.test(cuerpo)) throw new Error('falta actualizar las tablas en Supabase (hay que ejecutar inventarios_v2.sql)');
+    if(res.status===409 || /23505|duplicate key/i.test(cuerpo)) throw new Error('ese nombre ya existe');
+    throw new Error('código '+res.status);
+  }
+  const txt = await res.text();
+  const filas = txt ? JSON.parse(txt) : [];
+  if(o.conCount){
+    const m = /\/(\d+)\s*$/.exec(res.headers.get('content-range')||'');
+    filas.total = m ? Number(m[1]) : null;
+  }
+  if(o.verificar && Array.isArray(filas) && filas.length===0) throw new Error('no se guardó (revisa los permisos de las tablas en Supabase)');
+  return filas;
+}
+/* lee todas las filas aunque Supabase limite cada respuesta a 1000 */
+async function eqInvReqTodo(tabla, query){
+  const P = 1000;
+  const primera = await eqInvReq(tabla, query+'&limit='+P+'&offset=0', { conCount:true });
+  let todas = primera.slice();
+  if(primera.length<P) return todas;
+  if(primera.total && primera.total>P){
+    const pedidos = [];
+    for(let off=P; off<primera.total; off+=P) pedidos.push(eqInvReq(tabla, query+'&limit='+P+'&offset='+off));
+    (await Promise.all(pedidos)).forEach(pg=>{ todas = todas.concat(pg); });
+    return todas;
+  }
+  for(let off=P;; off+=P){
+    const pg = await eqInvReq(tabla, query+'&limit='+P+'&offset='+off);
+    todas = todas.concat(pg);
+    if(pg.length<P) return todas;
+  }
+}
+function eqInvLimpiar(s){ return String(s||'').replace(/\s+/g,' ').trim(); }
+function eqInvClave(s){ return eqInvLimpiar(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function eqInvFechaCorta(f){ const [y,m,d] = f.split('-'); return d+'/'+m+'/'+y.slice(2); }
+
+/* ---------- lista de inventarios y accesos directos ---------- */
+async function eqInvCargarLista(){
+  try{
+    EQINV.lista = (await eqInvReq(EQINV_T.inv, 'select=id,nombre,con_pedido&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre, con_pedido:r.con_pedido!==false }));
+    EQINV.lista.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    EQINV.error = null;
+  }catch(e){ EQINV.lista = null; EQINV.error = e.message; }
+}
+function eqInvAccesosIds(){
+  try{ const v = JSON.parse(localStorage.getItem('eqinv_accesos')); return Array.isArray(v) ? v : []; }catch(e){ return []; }
+}
+function eqInvGuardarAccesos(ids){ try{ localStorage.setItem('eqinv_accesos', JSON.stringify(ids)); }catch(e){} }
+function eqInvRenderLista(){
+  const aviso = document.getElementById('eqInvAviso');
+  const accesosEl = document.getElementById('eqInvAccesos');
+  const selAbrir = document.getElementById('eqInvSelect');
+  const selAcceso = document.getElementById('eqInvAccesoSelect');
+  if(!EQINV.lista){
+    aviso.textContent = 'No se pudieron cargar los inventarios: '+(EQINV.error||'error desconocido');
+    aviso.classList.remove('hidden');
+    accesosEl.innerHTML = ''; selAbrir.innerHTML = '<option value="">— no disponible —</option>'; selAcceso.innerHTML = '<option value="">— no disponible —</option>';
+    return;
+  }
+  aviso.classList.add('hidden');
+  const ids = eqInvAccesosIds().filter(id=>EQINV.lista.some(i=>i.id===id));
+  accesosEl.innerHTML = ids.length
+    ? ids.map(id=>{ const inv = EQINV.lista.find(i=>i.id===id); return `<div class="eqi-acceso"><button class="btn secondary" data-eqi-abrir="${escapeHtml(id)}">📦 ${escapeHtml(inv.nombre)}</button><button class="eqi-acceso-x" data-eqi-quitar-acceso="${escapeHtml(id)}" title="Quitar acceso directo">✕</button></div>`; }).join('')
+    : '<span class="hint">Todavía no hay accesos directos.</span>';
+  const opcionesTodos = EQINV.lista.map(i=>`<option value="${escapeHtml(i.id)}">${escapeHtml(i.nombre)}</option>`).join('');
+  const previoAbrir = selAbrir.value;
+  selAbrir.innerHTML = '<option value="">'+(EQINV.lista.length?'— elige un inventario —':'— aún no hay inventarios —')+'</option>' + opcionesTodos;
+  if(EQINV.lista.some(i=>i.id===previoAbrir)) selAbrir.value = previoAbrir;
+  const sinAcceso = EQINV.lista.filter(i=>!ids.includes(i.id));
+  selAcceso.innerHTML = '<option value="">'+(sinAcceso.length?'— elige un inventario —':'— todos tienen acceso directo —')+'</option>' + sinAcceso.map(i=>`<option value="${escapeHtml(i.id)}">${escapeHtml(i.nombre)}</option>`).join('');
+}
+async function eqInvInit(){
+  eqInvMostrarVista('lista');
+  await eqInvCargarLista();
+  eqInvRenderLista();
+}
+function eqInvMostrarVista(nombre){
+  document.getElementById('eqInvListaView').classList.toggle('hidden', nombre!=='lista');
+  document.getElementById('eqInvDetalleView').classList.toggle('hidden', nombre!=='detalle');
+}
+document.getElementById('eqInvAccesos').addEventListener('click', (e)=>{
+  const abrir = e.target.closest('[data-eqi-abrir]');
+  if(abrir){ eqInvAbrir(abrir.getAttribute('data-eqi-abrir')); return; }
+  const quitar = e.target.closest('[data-eqi-quitar-acceso]');
+  if(quitar){
+    const id = quitar.getAttribute('data-eqi-quitar-acceso');
+    eqInvGuardarAccesos(eqInvAccesosIds().filter(x=>x!==id));
+    eqInvRenderLista();
+  }
+});
+document.getElementById('eqInvAccesoAnadirBtn').addEventListener('click', ()=>{
+  const id = document.getElementById('eqInvAccesoSelect').value;
+  if(!id){ toast('Elige primero un inventario.'); return; }
+  const ids = eqInvAccesosIds();
+  if(!ids.includes(id)) ids.push(id);
+  eqInvGuardarAccesos(ids);
+  eqInvRenderLista();
+  toast('Acceso directo añadido.');
+});
+document.getElementById('eqInvAbrirBtn').addEventListener('click', ()=>{
+  const id = document.getElementById('eqInvSelect').value;
+  if(!id){ toast('Elige primero un inventario.'); return; }
+  eqInvAbrir(id);
+});
+document.getElementById('eqInvCrearBtn').addEventListener('click', async ()=>{
+  const input = document.getElementById('eqInvNuevoNombre');
+  const nombre = eqInvLimpiar(input.value);
+  if(!nombre){ toast('Escribe el nombre del inventario.'); return; }
+  if(!EQINV.lista){ toast('La lista no está disponible: '+(EQINV.error||'')); return; }
+  if(EQINV.lista.some(i=>eqInvClave(i.nombre)===eqInvClave(nombre))){ toast('Ya existe un inventario con ese nombre.'); return; }
+  try{
+    const [fila] = await eqInvReq(EQINV_T.inv, '', { method:'POST', body:{ nombre }, prefer:'return=representation', verificar:true });
+    EQINV.lista.push({ id:fila.id, nombre:fila.nombre, con_pedido:fila.con_pedido!==false });
+    EQINV.lista.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    input.value = '';
+    eqInvRenderLista();
+    toast('Inventario creado.');
+    eqInvAbrir(fila.id);
+  }catch(e){ toast('No se pudo crear: '+e.message); }
+});
+document.getElementById('eqInvNuevoNombre').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('eqInvCrearBtn').click(); } });
+
+/* ---------- inventario abierto ---------- */
+async function eqInvAbrir(id){
+  const inv = EQINV.lista && EQINV.lista.find(i=>i.id===id);
+  if(!inv) return;
+  EQINV.actual = inv;
+  EQINV.visibles = EQINV_FECHAS_INICIALES;
+  EQINV.filtro = '';
+  document.getElementById('eqInvBuscar').value = '';
+  document.getElementById('eqInvConPedido').checked = inv.con_pedido;
+  eqInvMostrarVista('detalle');
+  document.getElementById('eqInvTitulo').textContent = inv.nombre;
+  document.getElementById('eqInvTablaWrap').innerHTML = '<span class="hint">Cargando...</span>';
+  try{
+    const idq = 'inventario_id=eq.'+encodeURIComponent(id);
+    const [productos, fechas, cantidades] = await Promise.all([
+      eqInvReqTodo(EQINV_T.prod, 'select=id,nombre,unidad,orden,grupo,ideal,proveedor&'+idq+'&order=orden.asc,nombre.asc'),
+      eqInvReqTodo(EQINV_T.fechas, 'select=fecha&'+idq+'&order=fecha.desc'),
+      eqInvReqTodo(EQINV_T.cant, 'select=producto_id,fecha,cantidad,pedido&'+idq+'&order=producto_id.asc,fecha.asc')
+    ]);
+    EQINV.productos = productos.map(r=>({ id:r.id, nombre:r.nombre, unidad:r.unidad||'', orden:Number(r.orden)||0, grupo:r.grupo||'', ideal:r.ideal||'', proveedor:r.proveedor||'' }));
+    EQINV.fechas = fechas.map(r=>r.fecha);
+    EQINV.cantidades = new Map(cantidades.map(r=>[r.producto_id+'|'+r.fecha, { s:r.cantidad==null?'':String(r.cantidad), p:r.pedido==null?'':String(r.pedido) }]));
+    // una fecha con cantidades pero sin registro de columna también se muestra
+    cantidades.forEach(r=>{ if(!EQINV.fechas.includes(r.fecha)) EQINV.fechas.push(r.fecha); });
+    EQINV.fechas.sort().reverse();
+    eqInvRenderTabla();
+    eqInvRellenarListasAuxiliares();
+    // fecha propuesta para la próxima columna: una semana después de la última (o hoy)
+    const input = document.getElementById('eqInvFechaNueva');
+    if(EQINV.fechas.length){ const d = new Date(EQINV.fechas[0]+'T00:00:00'); d.setDate(d.getDate()+7); input.value = fechaLocalISO(d); }
+    else input.value = fechaLocalISO(new Date());
+  }catch(e){
+    document.getElementById('eqInvTablaWrap').innerHTML = '<span class="hint" style="color:var(--negative);">No se pudo cargar: '+escapeHtml(e.message)+'</span>';
+  }
+}
+function eqInvGruposExistentes(){
+  const vistos = [];
+  EQINV.productos.forEach(p=>{ if(p.grupo && !vistos.includes(p.grupo)) vistos.push(p.grupo); });
+  return vistos;
+}
+function eqInvRellenarListasAuxiliares(){
+  document.getElementById('eqInvGruposList').innerHTML = eqInvGruposExistentes().map(g=>'<option value="'+escapeHtml(g)+'">').join('');
+  const sel = document.getElementById('eqInvFechaEditSel');
+  const previo = sel.value;
+  sel.innerHTML = EQINV.fechas.length ? EQINV.fechas.map(f=>'<option value="'+f+'">'+eqInvFechaCorta(f)+'</option>').join('') : '<option value="">— no hay fechas —</option>';
+  if(EQINV.fechas.includes(previo)) sel.value = previo;
+}
+function eqInvCelda(prod, fecha){ return EQINV.cantidades.get(prod+'|'+fecha) || { s:'', p:'' }; }
+/* una fecha muestra la columna de pedido si el inventario la usa o si esa fecha ya tiene algún pedido apuntado */
+function eqInvFechaConPedido(f){
+  if(EQINV.actual && EQINV.actual.con_pedido) return true;
+  return EQINV.productos.some(p=>{ const c = EQINV.cantidades.get(p.id+'|'+f); return c && c.p!==''; });
+}
+function eqInvRenderTabla(){
+  const wrap = document.getElementById('eqInvTablaWrap');
+  const sinProductos = EQINV.productos.length===0;
+  const sinFechas = EQINV.fechas.length===0;
+  if(sinProductos && sinFechas){
+    wrap.innerHTML = '<span class="hint">Este inventario está vacío. Añade productos abajo y una fecha para empezar a apuntar cantidades.</span>';
+    return;
+  }
+  const fechasVis = EQINV.fechas.slice(0, EQINV.visibles);
+  const ocultas = EQINV.fechas.length - fechasVis.length;
+  const hayProv = EQINV.productos.some(p=>p.proveedor);
+  const conPed = {}; fechasVis.forEach(f=>{ conPed[f] = eqInvFechaConPedido(f); });
+  const nColsFijas = 3 + (hayProv?1:0);
+  const nCols = nColsFijas + fechasVis.reduce((n,f)=>n+(conPed[f]?2:1),0);
+  const cab1 = fechasVis.map(f=>`<th class="eqi-fecha" colspan="${conPed[f]?2:1}"><button class="eqi-fecha-btn" data-eqi-editar-fecha="${f}" title="Cambiar esta fecha">${eqInvFechaCorta(f)}</button><button class="eqi-x" data-eqi-borrar-fecha="${f}" title="Borrar esta fecha">✕</button></th>`).join('');
+  const cab2 = fechasVis.map(f=>conPed[f] ? '<th class="eqi-sub">Stock</th><th class="eqi-sub eqi-sub-ped">Pedido</th>' : '<th class="eqi-sub">Stock</th>').join('');
+  const filtro = eqInvClave(EQINV.filtro);
+  const hayGrupos = EQINV.productos.some(p=>p.grupo);
+  let filas = '', grupoPrevio = null, hayFilas = false;
+  EQINV.productos.forEach(p=>{
+    if(filtro && eqInvClave(p.nombre).indexOf(filtro)<0) return;
+    hayFilas = true;
+    const g = p.grupo || (hayGrupos ? 'Otros' : '');
+    if(g!==grupoPrevio){
+      grupoPrevio = g;
+      if(g) filas += `<tr class="eqi-grupo-row"><td colspan="${nCols}"><span class="eqi-grupo">${escapeHtml(g)}</span></td></tr>`;
+    }
+    const celdas = fechasVis.map(f=>{
+      const c = eqInvCelda(p.id, f);
+      let h = `<td><input type="text" autocomplete="off" maxlength="${EQINV_MAX_TEXTO}" class="eqi-cant" data-prod="${p.id}" data-fecha="${f}" data-campo="s" value="${escapeHtml(c.s)}"></td>`;
+      if(conPed[f]) h += `<td><input type="text" autocomplete="off" maxlength="${EQINV_MAX_TEXTO}" class="eqi-cant eqi-ped" data-prod="${p.id}" data-fecha="${f}" data-campo="p" value="${escapeHtml(c.p)}"></td>`;
+      return h;
+    }).join('');
+    filas += `<tr data-fila-prod="${p.id}">
+      <td class="eqi-nombre"><div class="eqi-nombre-in"><span class="eqi-nombre-txt" data-eqi-renombrar-prod="${p.id}" title="Toca para cambiar el nombre">${escapeHtml(p.nombre)}</span><button class="eqi-x" data-eqi-borrar-prod="${p.id}" title="Quitar producto">✕</button></div></td>
+      <td><input type="text" class="eqi-unidad" list="eqInvUnidadesList" data-eqi-unidad="${p.id}" value="${escapeHtml(p.unidad)}" placeholder="—"></td>
+      <td><input type="text" class="eqi-ideal" data-eqi-ideal="${p.id}" value="${escapeHtml(p.ideal)}" placeholder="—"></td>
+      ${hayProv?`<td><input type="text" class="eqi-prov" data-eqi-prov="${p.id}" value="${escapeHtml(p.proveedor)}" placeholder="—"></td>`:''}
+      ${celdas}</tr>`;
+  });
+  if(!hayFilas) filas = `<tr><td colspan="${nCols}" style="padding:14px;color:var(--text-muted);">Ningún producto coincide con la búsqueda.</td></tr>`;
+  wrap.innerHTML = `<table class="eqi-table"><thead>
+      <tr><th class="eqi-nombre" rowspan="2">Producto</th><th rowspan="2">Unidad</th><th rowspan="2">Ideal</th>${hayProv?'<th rowspan="2">Prov.</th>':''}${cab1}</tr>
+      <tr>${cab2}</tr></thead><tbody>${filas}</tbody></table>`;
+  const pie = document.getElementById('eqInvPie');
+  let htmlPie = '';
+  if(ocultas>0) htmlPie += `<button class="btn secondary small" id="eqInvMasFechasBtn">← Ver fechas anteriores (${ocultas} más)</button> <button class="btn secondary small" id="eqInvTodasFechasBtn">Ver todas</button>`;
+  if(EQINV.fechas.length>1) htmlPie += '<p class="hint" style="margin-top:8px;">↔ Desliza la tabla hacia los lados. La fecha más reciente va primero. Toca una fecha para cambiarla.</p>';
+  if(sinFechas) htmlPie += '<p class="hint" style="margin-top:8px;">Añade una fecha para poder apuntar cantidades.</p>';
+  if(sinProductos) htmlPie += '<p class="hint" style="margin-top:8px;">Añade productos abajo.</p>';
+  pie.innerHTML = htmlPie;
+}
+document.getElementById('eqInvPie').addEventListener('click', (e)=>{
+  if(e.target.closest('#eqInvMasFechasBtn')){ EQINV.visibles += EQINV_FECHAS_PASO; eqInvRenderTabla(); }
+  else if(e.target.closest('#eqInvTodasFechasBtn')){ EQINV.visibles = EQINV.fechas.length; eqInvRenderTabla(); }
+});
+let eqInvBuscarTimer = null;
+document.getElementById('eqInvBuscar').addEventListener('input', (e)=>{
+  clearTimeout(eqInvBuscarTimer);
+  eqInvBuscarTimer = setTimeout(()=>{ EQINV.filtro = e.target.value; eqInvRenderTabla(); }, 150);
+});
+document.getElementById('eqInvConPedido').addEventListener('change', async (e)=>{
+  const marca = e.target.checked;
+  try{
+    await eqInvReq(EQINV_T.inv, 'id=eq.'+encodeURIComponent(EQINV.actual.id), { method:'PATCH', body:{ con_pedido:marca }, prefer:'return=representation', verificar:true });
+    EQINV.actual.con_pedido = marca;
+    const en = EQINV.lista.find(i=>i.id===EQINV.actual.id); if(en) en.con_pedido = marca;
+    eqInvRenderTabla();
+  }catch(err){ e.target.checked = !marca; toast('No se guardó: '+err.message); }
+});
+
+const eqInvWrap = document.getElementById('eqInvTablaWrap');
+async function eqInvPatchProducto(p, campoBD, valor, input, etiqueta){
+  try{
+    await eqInvReq(EQINV_T.prod, 'id=eq.'+encodeURIComponent(p.id), { method:'PATCH', body:{ [campoBD]:valor }, prefer:'return=representation', verificar:true });
+    return true;
+  }catch(err){ toast('No se guardó '+etiqueta+': '+err.message); return false; }
+}
+/* guardar al terminar de editar una celda */
+eqInvWrap.addEventListener('change', async (e)=>{
+  const t = e.target;
+  if(t.classList.contains('eqi-cant')){
+    const prodId = t.getAttribute('data-prod'), fecha = t.getAttribute('data-fecha'), campo = t.getAttribute('data-campo');
+    const clave = prodId+'|'+fecha;
+    const previa = eqInvCelda(prodId, fecha);
+    const nuevo = eqInvLimpiar(t.value);
+    if(nuevo.length>EQINV_MAX_TEXTO){ t.value = previa[campo]; toast('Máximo '+EQINV_MAX_TEXTO+' caracteres.'); return; }
+    const despues = { s:previa.s, p:previa.p }; despues[campo] = nuevo;
+    try{
+      if(despues.s==='' && despues.p===''){
+        await eqInvReq(EQINV_T.cant, 'producto_id=eq.'+encodeURIComponent(prodId)+'&fecha=eq.'+fecha, { method:'DELETE', prefer:'return=representation' });
+        EQINV.cantidades.delete(clave);
+      } else {
+        await eqInvReq(EQINV_T.cant, 'on_conflict=producto_id,fecha', { method:'POST',
+          body:{ inventario_id:EQINV.actual.id, producto_id:prodId, fecha, cantidad:despues.s===''?null:despues.s, pedido:despues.p===''?null:despues.p, updated_at:new Date().toISOString() },
+          prefer:'return=representation,resolution=merge-duplicates', verificar:true });
+        EQINV.cantidades.set(clave, despues);
+      }
+      t.value = nuevo;
+      t.classList.remove('eqi-error'); t.classList.add('eqi-ok'); setTimeout(()=>t.classList.remove('eqi-ok'), 700);
+    }catch(err){
+      t.value = previa[campo];
+      t.classList.add('eqi-error');
+      toast('No se guardó: '+err.message);
+    }
+  } else if(t.hasAttribute('data-eqi-unidad')){
+    const p = EQINV.productos.find(x=>x.id===t.getAttribute('data-eqi-unidad'));
+    if(!p) return;
+    const nueva = eqInvLimpiar(t.value);
+    if(await eqInvPatchProducto(p, 'unidad', nueva, t, 'la unidad')){ p.unidad = nueva; t.value = nueva; } else t.value = p.unidad;
+  } else if(t.hasAttribute('data-eqi-ideal')){
+    const p = EQINV.productos.find(x=>x.id===t.getAttribute('data-eqi-ideal'));
+    if(!p) return;
+    const nueva = eqInvLimpiar(t.value);
+    if(await eqInvPatchProducto(p, 'ideal', nueva, t, 'el stock ideal')){ p.ideal = nueva; t.value = nueva; } else t.value = p.ideal;
+  } else if(t.hasAttribute('data-eqi-prov')){
+    const p = EQINV.productos.find(x=>x.id===t.getAttribute('data-eqi-prov'));
+    if(!p) return;
+    const nueva = eqInvLimpiar(t.value);
+    if(await eqInvPatchProducto(p, 'proveedor', nueva, t, 'el proveedor')){ p.proveedor = nueva; t.value = nueva; } else t.value = p.proveedor;
+  }
+});
+/* Enter en una cantidad: baja a la misma fecha y columna del producto siguiente */
+eqInvWrap.addEventListener('keydown', (e)=>{
+  if(e.key!=='Enter' || !e.target.classList.contains('eqi-cant')) return;
+  e.preventDefault();
+  const f = e.target.getAttribute('data-fecha'), c = e.target.getAttribute('data-campo');
+  const mismos = [...eqInvWrap.querySelectorAll('.eqi-cant')].filter(x=>x.getAttribute('data-fecha')===f && x.getAttribute('data-campo')===c);
+  const i = mismos.indexOf(e.target);
+  e.target.blur();
+  if(mismos[i+1]) mismos[i+1].focus();
+});
+eqInvWrap.addEventListener('click', async (e)=>{
+  const rn = e.target.closest('[data-eqi-renombrar-prod]');
+  if(rn){
+    const p = EQINV.productos.find(x=>x.id===rn.getAttribute('data-eqi-renombrar-prod'));
+    if(!p) return;
+    const nuevo = eqInvLimpiar(prompt('Nombre del producto:', p.nombre) || '');
+    if(!nuevo || nuevo===p.nombre) return;
+    if(EQINV.productos.some(x=>x.id!==p.id && x.grupo===p.grupo && eqInvClave(x.nombre)===eqInvClave(nuevo))){ toast('Ya hay otro producto con ese nombre en este grupo.'); return; }
+    if(await eqInvPatchProducto(p, 'nombre', nuevo, null, 'el nombre')){ p.nombre = nuevo; rn.textContent = nuevo; }
+    return;
+  }
+  const ef = e.target.closest('[data-eqi-editar-fecha]');
+  if(ef){
+    const fecha = ef.getAttribute('data-eqi-editar-fecha');
+    document.getElementById('eqInvFechaEditSel').value = fecha;
+    document.getElementById('eqInvFechaEditNueva').value = fecha;
+    const card = document.getElementById('eqInvFechaEditCard');
+    card.scrollIntoView({ behavior:'smooth', block:'center' });
+    toast('Elige la fecha nueva abajo y pulsa "Cambiar fecha".');
+    return;
+  }
+  const bf = e.target.closest('[data-eqi-borrar-fecha]');
+  if(bf){
+    const fecha = bf.getAttribute('data-eqi-borrar-fecha');
+    const hay = EQINV.productos.filter(p=>EQINV.cantidades.has(p.id+'|'+fecha)).length;
+    if(!confirm('¿Borrar la columna del '+eqInvFechaCorta(fecha)+(hay?' y sus '+hay+' cantidad(es)':'')+'? No se puede deshacer.')) return;
+    try{
+      const idq = 'inventario_id=eq.'+encodeURIComponent(EQINV.actual.id)+'&fecha=eq.'+fecha;
+      await eqInvReq(EQINV_T.cant, idq, { method:'DELETE', prefer:'return=representation' });
+      await eqInvReq(EQINV_T.fechas, idq, { method:'DELETE', prefer:'return=representation' });
+      EQINV.fechas = EQINV.fechas.filter(f=>f!==fecha);
+      EQINV.productos.forEach(p=>EQINV.cantidades.delete(p.id+'|'+fecha));
+      eqInvRenderTabla(); eqInvRellenarListasAuxiliares();
+    }catch(err){ toast('No se pudo borrar: '+err.message); }
+    return;
+  }
+  const bp = e.target.closest('[data-eqi-borrar-prod]');
+  if(bp){
+    const p = EQINV.productos.find(x=>x.id===bp.getAttribute('data-eqi-borrar-prod'));
+    if(!p) return;
+    if(!confirm('¿Quitar "'+p.nombre+'" de este inventario, con todas sus cantidades? No se puede deshacer.')) return;
+    try{
+      await eqInvReq(EQINV_T.prod, 'id=eq.'+encodeURIComponent(p.id), { method:'DELETE', prefer:'return=representation', verificar:true });
+      EQINV.productos = EQINV.productos.filter(x=>x.id!==p.id);
+      EQINV.fechas.forEach(f=>EQINV.cantidades.delete(p.id+'|'+f));
+      eqInvRenderTabla(); eqInvRellenarListasAuxiliares();
+    }catch(err){ toast('No se pudo quitar: '+err.message); }
+  }
+});
+document.getElementById('eqInvFechaAnadirBtn').addEventListener('click', async ()=>{
+  const fecha = document.getElementById('eqInvFechaNueva').value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)){ toast('Elige una fecha.'); return; }
+  if(EQINV.fechas.includes(fecha)){ toast('Esa fecha ya está en la tabla.'); return; }
+  try{
+    await eqInvReq(EQINV_T.fechas, '', { method:'POST', body:{ inventario_id:EQINV.actual.id, fecha }, prefer:'return=representation', verificar:true });
+    EQINV.fechas.push(fecha); EQINV.fechas.sort().reverse();
+    eqInvRenderTabla(); eqInvRellenarListasAuxiliares();
+    const d = new Date(fecha+'T00:00:00'); d.setDate(d.getDate()+7);
+    document.getElementById('eqInvFechaNueva').value = fechaLocalISO(d);
+  }catch(err){ toast('No se pudo añadir la fecha: '+err.message); }
+});
+/* cambiar la fecha de una columna ya existente (mueve también sus cantidades) */
+document.getElementById('eqInvFechaEditBtn').addEventListener('click', async ()=>{
+  const vieja = document.getElementById('eqInvFechaEditSel').value;
+  const nueva = document.getElementById('eqInvFechaEditNueva').value;
+  if(!vieja){ toast('No hay fechas que cambiar.'); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(nueva)){ toast('Elige la fecha nueva.'); return; }
+  if(nueva===vieja){ toast('Es la misma fecha.'); return; }
+  if(EQINV.fechas.includes(nueva)){ toast('Ya existe una columna con la fecha '+eqInvFechaCorta(nueva)+'.'); return; }
+  const idq = 'inventario_id=eq.'+encodeURIComponent(EQINV.actual.id)+'&fecha=eq.';
+  let fechaCambiada = false;
+  try{
+    await eqInvReq(EQINV_T.fechas, idq+vieja, { method:'PATCH', body:{ fecha:nueva }, prefer:'return=representation', verificar:true });
+    fechaCambiada = true;
+    await eqInvReq(EQINV_T.cant, idq+vieja, { method:'PATCH', body:{ fecha:nueva }, prefer:'return=representation' });
+    EQINV.productos.forEach(p=>{
+      const c = EQINV.cantidades.get(p.id+'|'+vieja);
+      if(c){ EQINV.cantidades.delete(p.id+'|'+vieja); EQINV.cantidades.set(p.id+'|'+nueva, c); }
+    });
+    EQINV.fechas = EQINV.fechas.map(f=>f===vieja?nueva:f).sort().reverse();
+    eqInvRenderTabla(); eqInvRellenarListasAuxiliares();
+    document.getElementById('eqInvFechaEditSel').value = nueva;
+    toast('Fecha cambiada.');
+  }catch(err){
+    if(fechaCambiada){ try{ await eqInvReq(EQINV_T.fechas, idq+nueva, { method:'PATCH', body:{ fecha:vieja }, prefer:'return=representation' }); }catch(e2){} }
+    toast('No se pudo cambiar la fecha: '+err.message);
+  }
+});
+document.getElementById('eqInvProdAnadirBtn').addEventListener('click', async ()=>{
+  const nombre = eqInvLimpiar(document.getElementById('eqInvProdNombre').value);
+  const unidad = eqInvLimpiar(document.getElementById('eqInvProdUnidad').value);
+  const ideal = eqInvLimpiar(document.getElementById('eqInvProdIdeal').value);
+  const grupo = eqInvLimpiar(document.getElementById('eqInvProdGrupo').value);
+  const proveedor = eqInvLimpiar(document.getElementById('eqInvProdProv').value);
+  if(!nombre){ toast('Escribe el nombre del producto.'); return; }
+  if(EQINV.productos.some(p=>p.grupo===grupo && eqInvClave(p.nombre)===eqInvClave(nombre))){ toast('Ese producto ya está en este inventario'+(grupo?' (grupo '+grupo+')':'')+'.'); return; }
+  try{
+    // si el grupo ya existe, el producto va al final de ese grupo; si no, al final de la tabla
+    const delGrupo = grupo ? EQINV.productos.filter(p=>p.grupo===grupo) : [];
+    const orden = delGrupo.length
+      ? Math.round((Math.max(...delGrupo.map(p=>p.orden))+0.001)*1000)/1000
+      : EQINV.productos.reduce((m,p)=>Math.max(m,p.orden),0)+1;
+    const [fila] = await eqInvReq(EQINV_T.prod, '', { method:'POST', body:{ inventario_id:EQINV.actual.id, nombre, unidad, ideal, grupo, proveedor, orden }, prefer:'return=representation', verificar:true });
+    EQINV.productos.push({ id:fila.id, nombre:fila.nombre, unidad:fila.unidad||'', orden:Number(fila.orden)||orden, grupo:fila.grupo||'', ideal:fila.ideal||'', proveedor:fila.proveedor||'' });
+    EQINV.productos.sort((a,b)=>a.orden-b.orden || a.nombre.localeCompare(b.nombre,'es'));
+    ['eqInvProdNombre','eqInvProdUnidad','eqInvProdIdeal','eqInvProdProv'].forEach(id=>{ document.getElementById(id).value = ''; });
+    eqInvRenderTabla(); eqInvRellenarListasAuxiliares();
+    toast('Producto añadido.');
+    document.getElementById('eqInvProdNombre').focus();
+  }catch(err){ toast('No se pudo añadir: '+err.message); }
+});
+document.getElementById('eqInvProdNombre').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('eqInvProdAnadirBtn').click(); } });
+document.getElementById('eqInvRenombrarBtn').addEventListener('click', async ()=>{
+  const nuevo = eqInvLimpiar(prompt('Nuevo nombre del inventario:', EQINV.actual.nombre) || '');
+  if(!nuevo || nuevo===EQINV.actual.nombre) return;
+  if(EQINV.lista.some(i=>i.id!==EQINV.actual.id && eqInvClave(i.nombre)===eqInvClave(nuevo))){ toast('Ya existe un inventario con ese nombre.'); return; }
+  try{
+    await eqInvReq(EQINV_T.inv, 'id=eq.'+encodeURIComponent(EQINV.actual.id), { method:'PATCH', body:{ nombre:nuevo }, prefer:'return=representation', verificar:true });
+    EQINV.actual.nombre = nuevo;
+    const en = EQINV.lista.find(i=>i.id===EQINV.actual.id); if(en) en.nombre = nuevo;
+    document.getElementById('eqInvTitulo').textContent = nuevo;
+  }catch(err){ toast('No se pudo renombrar: '+err.message); }
+});
+document.getElementById('eqInvEliminarBtn').addEventListener('click', async ()=>{
+  if(!confirm('¿Eliminar el inventario "'+EQINV.actual.nombre+'" con todos sus productos y cantidades? No se puede deshacer.')) return;
+  try{
+    await eqInvReq(EQINV_T.inv, 'id=eq.'+encodeURIComponent(EQINV.actual.id), { method:'DELETE', prefer:'return=representation', verificar:true });
+    EQINV.lista = EQINV.lista.filter(i=>i.id!==EQINV.actual.id);
+    eqInvGuardarAccesos(eqInvAccesosIds().filter(x=>x!==EQINV.actual.id));
+    EQINV.actual = null;
+    eqInvRenderLista(); eqInvMostrarVista('lista');
+    toast('Inventario eliminado.');
+  }catch(err){ toast('No se pudo eliminar: '+err.message); }
+});
+document.getElementById('backFromInventarioDetalleBtn').addEventListener('click', ()=>{ EQINV.actual = null; eqInvRenderLista(); eqInvMostrarVista('lista'); });
+
+document.getElementById('eqInvUnidadesList').innerHTML = EQINV_UNIDADES_COMUNES.map(u=>'<option value="'+u+'">').join('');
+
+/* =========================================================
    RENDER: TABS
    ========================================================= */
 document.querySelectorAll('.nav-item').forEach(item=>{
@@ -2679,7 +3281,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     item.classList.add('active');
     document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
     document.getElementById('tab-'+item.dataset.tab).classList.add('active');
-    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación Rentabilidad','Ingresos, costes y beneficio resultante, a modo de escenario'], simop:['Simulación Operacional','Bebidas y tickets simulados por barista y hora, con una plantilla de prueba'], recetario:['Recetario','Recetas de brunch con sus ingredientes y cantidades'], rotacion:['Rotación de Stock','Consumo teórico de ingredientes según las ventas reales'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
+    const titles = { ventas:['Ventas','Evolución de ventas por periodo, franja horaria y día de la semana'], tickets:['Tickets','Número de tickets y ticket medio'], productos:['Productos & categorías','Ranking de artículos y ventas por categoría'], clientes:['Clientes','Nuevo, repetido y con tarjeta de fidelidad'], pnl:['PNL','Cuenta de resultados: ingresos y costes por periodo'], costes:['Costes','COGS (coste de producto) y otros costes recurrentes'], caja:['Análisis de Caja','Gestión de movimientos bancarios y balances mensuales'], mermas:['Mermas','Registro de mermas de los empleados'], produccion:['Producción','Lo pedido vs lo completado, semana a semana y producto a producto'], ajustedemanda:['Ajuste de demanda','% manual de más o menos consumo esperado, por franja y tipo de día'], simulacion:['Simulación Rentabilidad','Ingresos, costes y beneficio resultante, a modo de escenario'], simop:['Simulación Operacional','Bebidas y tickets simulados por barista y hora, con una plantilla de prueba'], recetario:['Recetario','Recetas de brunch con sus ingredientes y cantidades'], inventarios:['Inventarios','Stock y pedidos por producto y fecha (los mismos de la app de empleados)'], rotacion:['Rotación de Stock','Consumo teórico de ingredientes según las ventas reales'], performance:['Performance del equipo','Fidelidad nueva y tickets con algo más que bebida'], rentabilidad:['Rentabilidad por franja','Ventas − COGS − coste laboral, por franja horaria'], rendimiento:['Rendimiento operacional','Bebidas y tickets por barista y por hora'], resumenejecutivo:['Resumen Ejecutivo','Tendencias mensuales para compartir con inversores'], vacaciones:['Vacaciones y horas extras','Histórico por empleado'], facturas:['Facturas','Crea, guarda y exporta facturas en PDF'], historico:['Subir datos','Importa tus exports semanales de Square'], config:['Configuración','Conexión con el almacenamiento compartido'] };
     const tituloActual = titles[item.dataset.tab] || [item.dataset.tab, ''];
     document.getElementById('pageTitle').textContent = tituloActual[0];
     document.getElementById('pageSub').textContent = tituloActual[1];
@@ -2727,6 +3329,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       actualizarSimopPlantillaSemanaLabel();
       renderHistorialPlantillasSimop();
     }
+    if(item.dataset.tab==='inventarios') eqInvInit();
     if(item.dataset.tab==='resumenejecutivo') renderResumenEjecutivo();
     if(item.dataset.tab==='recetario') renderRecetario();
     if(item.dataset.tab==='rotacion'){
