@@ -282,7 +282,7 @@ td.num{font-family:'IBM Plex Mono',monospace;text-align:right;}
     <div class="brand">
       <h1 style="font-size:16px;">The Miners Plaza de España</h1>
       <small>Reporting · Plaza de España</small>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.339</div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">v2026-07-25.340</div>
     </div>
     <div class="nav-item active" data-tab="ventas"><span class="dot"></span>Ventas</div>
     <div class="nav-item" data-tab="tickets"><span class="dot"></span>Tickets</div>
@@ -2023,6 +2023,17 @@ async function ensurePeriodLoaded(period){
   LS.set(cacheKey, data);
 }
 
+async function cargarEmpleados(){
+  try{
+    STATE.employees = (await sbList('empleados', 'select=*&order=nombre.asc')).map(r=>({ id:r.id, nombre:r.nombre, activo:r.activo }));
+    return true;
+  }catch(e){
+    console.error('Error cargando empleados', e);
+    toast('No se pudo cargar la lista de empleados: '+e.message, true);
+    return false;
+  }
+}
+
 async function loadAllData(){
   const ok = await ensureIndexLoaded();
   if(!ok){ renderAll(); return; }
@@ -2050,6 +2061,13 @@ async function loadAllData(){
     STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), tipo:r.tipo||'pagada' }));
   }catch(e){
     console.error('Error cargando datos de PNL/COGS', e);
+    toast('No se pudieron cargar todos los datos ('+e.message+'). Revisa la conexión y recarga.', true);
+  }
+  // la lista de empleados y las propinas se cargan aparte: si falla otra tabla antes, no se quedan vacías
+  if(!STATE.employees.length) await cargarEmpleados();
+  if(!STATE.propinas.length){
+    try{ STATE.propinas = (await sbList('propinas', 'select=*&order=fecha.desc')).map(r=>({ id:r.id, fecha:r.fecha, importe:parseFloat(r.importe), tipo:r.tipo||'pagada' })); }
+    catch(e){ console.error('Error cargando propinas', e); }
   }
   renderPeriodsList();
   populateFilterOptions();
@@ -3340,7 +3358,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
       renderStockExistente(true);
     }
     if(item.dataset.tab==='vacaciones'){
-      if(STATE.vacaciones.length===0 && STATE.horasExtras.length===0) loadAndRenderVacaciones();
+      if((STATE.vacaciones.length===0 && STATE.horasExtras.length===0) || STATE.employees.length===0) loadAndRenderVacaciones();
       else { poblarSelectEmpleados('vacEmpleado'); poblarSelectEmpleados('hxEmpleado'); renderVacaciones(); renderHorasExtras(); }
     }
     if(item.dataset.tab==='clientes') renderClientesTendencia();
@@ -12613,7 +12631,10 @@ function poblarSelectEmpleados(selectId){
   const sel = document.getElementById(selectId);
   if(!sel) return;
   const actual = sel.value;
-  sel.innerHTML = STATE.employees.map(e=>`<option value="${e.nombre}">${e.nombre}</option>`).join('') || '<option value="">(sin empleados)</option>';
+  const nombres = STATE.employees.map(e=>e.nombre);
+  const vistos = new Set(nombres.map(n=>(n||'').trim().toLowerCase()));
+  [].concat(STATE.vacaciones||[], STATE.horasExtras||[]).forEach(r=>{ const k=(r.empleado||'').trim().toLowerCase(); if(k && !vistos.has(k)){ vistos.add(k); nombres.push(r.empleado); } });
+  sel.innerHTML = nombres.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') || '<option value="">(sin empleados)</option>';
   if(actual) sel.value = actual;
   if(selectId==='vacEmpleado') renderVacEmpleadosLista();
 }
@@ -12677,6 +12698,7 @@ async function eliminarEmpleadoVacaciones(nombre){
   }
 }
 async function loadAndRenderVacaciones(){
+  if(!STATE.employees.length) await cargarEmpleados();
   poblarSelectEmpleados('vacEmpleado');
   poblarSelectEmpleados('hxEmpleado');
   try{
@@ -12687,6 +12709,8 @@ async function loadAndRenderVacaciones(){
     const rowsH = await sbList('horas_extras', 'select=*&order=fecha.desc');
     STATE.horasExtras = rowsH.map(r=>({ id:r.id, empleado:r.empleado, fecha:r.fecha, horas:parseFloat(r.horas), nota:r.nota, pagada:!!r.pagada }));
   }catch(e){ toast('No se pudo cargar horas extras: '+e.message, true); STATE.horasExtras=[]; }
+  poblarSelectEmpleados('vacEmpleado');
+  poblarSelectEmpleados('hxEmpleado');
   renderVacaciones();
   renderHorasExtras();
 }
